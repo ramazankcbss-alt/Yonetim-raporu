@@ -102,7 +102,9 @@ void main() {
     expect(paylas, findsOneWidget);
     await t.drag(liste, const Offset(0, 3000));
     await t.pumpAndSettle();
-    await t.tap(find.text('Haftalık').last);
+    await t.tap(find.descendant(
+        of: find.byKey(const Key('rapor-liste')),
+        matching: find.text('Haftalık')));
     await t.pumpAndSettle();
     await t.scrollUntilVisible(paylas, 300, scrollable: liste);
     expect(paylas, findsOneWidget);
