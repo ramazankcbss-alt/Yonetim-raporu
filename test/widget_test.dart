@@ -92,12 +92,10 @@ void main() {
     // Rapor
     await t.tap(find.text('Rapor'));
     await t.pumpAndSettle();
-    // Rapor ekranının dikey listesi ("Raporun içeriği" panelini içeren).
     final liste = find
-        .ancestor(
-            of: find.text('Raporun içeriği'),
-            matching: find.byWidgetPredicate((w) =>
-                w is Scrollable && w.axisDirection == AxisDirection.down))
+        .descendant(
+            of: find.byKey(const Key('rapor-liste')),
+            matching: find.byType(Scrollable))
         .first;
     final paylas = find.text('Paylaş (e-posta, WhatsApp…)');
     await t.scrollUntilVisible(paylas, 300, scrollable: liste);
