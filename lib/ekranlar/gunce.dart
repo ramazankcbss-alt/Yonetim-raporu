@@ -25,7 +25,9 @@ class _GunceEkranState extends State<GunceEkran> {
     _f = VeriDeposu.ben.ozelGetir();
   }
 
-  void _yenile() => setState(() => _f = VeriDeposu.ben.ozelGetir());
+  void _yenile() => setState(() {
+        _f = VeriDeposu.ben.ozelGetir();
+      });
 
   Future<void> _yaz() async {
     final sonuc = await formGoster(

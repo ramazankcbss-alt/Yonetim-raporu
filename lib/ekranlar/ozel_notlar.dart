@@ -24,7 +24,9 @@ class _OzelNotlarEkranState extends State<OzelNotlarEkran> {
     _f = VeriDeposu.ben.ozelGetir();
   }
 
-  void _yenile() => setState(() => _f = VeriDeposu.ben.ozelGetir());
+  void _yenile() => setState(() {
+        _f = VeriDeposu.ben.ozelGetir();
+      });
 
   @override
   Widget build(BuildContext context) {
