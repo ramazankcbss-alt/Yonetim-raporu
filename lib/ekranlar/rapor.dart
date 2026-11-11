@@ -44,6 +44,7 @@ class _RaporEkranState extends State<RaporEkran> {
     final hazir = _haftalik ? hafta != null : gun != null;
 
     return ListView(
+      key: const Key('rapor-liste'),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         SegmentedButton<bool>(
