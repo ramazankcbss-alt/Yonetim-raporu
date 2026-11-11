@@ -32,6 +32,18 @@ DateTime? tarihOku(Object? v) {
   return DateTime(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
 }
 
+/// "2026-11-05" ya da "05.11.2026" → tarih. Kontrol Paneli tarihleri metin
+/// olarak gelebildiği için işlerde bu esnek okuyucu kullanılır.
+DateTime? tarihEsnek(Object? v) {
+  final iso = tarihOku(v);
+  if (iso != null) return iso;
+  if (v == null) return null;
+  final m = RegExp(r'^(\d{1,2})\.(\d{1,2})\.(\d{4})')
+      .firstMatch(v.toString().trim());
+  if (m == null) return null;
+  return DateTime(int.parse(m[3]!), int.parse(m[2]!), int.parse(m[1]!));
+}
+
 DateTime gunu(DateTime d) => DateTime(d.year, d.month, d.day);
 
 bool ayniGun(DateTime a, DateTime b) =>
@@ -246,6 +258,56 @@ class BesiSatir {
   }
 }
 
+/// Kontrol Paneli'ndeki tek bir iş / takip kalemi.
+/// Sütunlar: No, Konu, Çiftlik/Birim, Kaynak, Açılış, Durum,
+/// Son değişiklik, Son durum, Sorumlu.
+class Is {
+  const Is({
+    required this.no,
+    required this.konu,
+    this.ciftlik = '',
+    this.kaynak = '',
+    this.acilis,
+    this.durum = '',
+    this.sonDegisiklik,
+    this.sonDurum = '',
+    this.sorumlu = '',
+  });
+
+  final int no;
+  final String konu, ciftlik, kaynak, durum, sonDurum, sorumlu;
+  final DateTime? acilis, sonDegisiklik;
+
+  bool get bekliyor => durum == 'Bekliyor';
+  bool get devam => durum == 'Devam ediyor';
+  bool get tamam => durum == 'Tamamlandı';
+
+  /// Bekleyen ve açılışından bu yana 14 günü geçmiş iş.
+  bool gecikmis(DateTime bugun) =>
+      bekliyor &&
+      acilis != null &&
+      gunu(bugun).difference(gunu(acilis!)).inDays > 14;
+
+  static Is? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 2) return null;
+    final no = sayiOku(r[0]);
+    final konu = _metin(r[1]);
+    if (no == null || konu.isEmpty) return null;
+    return Is(
+      no: no.round(),
+      konu: konu,
+      ciftlik: r.length > 2 ? _metin(r[2]) : '',
+      kaynak: r.length > 3 ? _metin(r[3]) : '',
+      acilis: r.length > 4 ? tarihEsnek(r[4]) : null,
+      durum: r.length > 5 ? _metin(r[5]) : '',
+      sonDegisiklik: r.length > 6 ? tarihEsnek(r[6]) : null,
+      sonDurum: r.length > 7 ? _metin(r[7]) : '',
+      sorumlu: r.length > 8 ? _metin(r[8]) : '',
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tüm veri
 // ---------------------------------------------------------------------------
@@ -258,6 +320,7 @@ class RaporVerisi {
     this.ekim = const [],
     this.hasat = const [],
     this.besi = const [],
+    this.isler = const [],
     this.olusturma,
   })  : ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -275,6 +338,7 @@ class RaporVerisi {
   final List<EkimSatir> ekim;
   final List<HasatSatir> hasat;
   final List<BesiSatir> besi;
+  final List<Is> isler;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -287,6 +351,7 @@ class RaporVerisi {
       ekim: oku('ekim', EkimSatir.oku),
       hasat: oku('hasat', HasatSatir.oku),
       besi: oku('besi', BesiSatir.oku),
+      isler: oku('isler', Is.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }
