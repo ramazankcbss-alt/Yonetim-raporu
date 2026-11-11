@@ -35,6 +35,17 @@ var SAYFALAR = {
   isler: 'Kontrol Paneli'
 };
 
+// Özel bölümler ("Özel Notlar – Sadece Ramazan Kocabaş" dosyası). Bu dosya
+// paylaşılmadığı için yalnızca sahibi (siz) okuyup yazabilir; Apps Script
+// sizin adınıza çalıştığından erişebilir.
+var OZEL_DOSYA_ID = '1-XtWC5sj1RydL01_Exf3Dh8EQDkBqPj3wl1NM9HzX6o';
+var OZEL_SAYFALAR = {
+  ozelNotlar: { ad: 'Notlar', sutun: 5 },
+  danismanlik: { ad: 'Danışmanlık', sutun: 6 },
+  toplanti: { ad: 'Toplantı Notları', sutun: 7 },
+  gunluk: { ad: 'Günlük', sutun: 4 }
+};
+
 /** Uygulamanın çağırdığı adres. */
 function doGet(e) {
   var p = (e && e.parameter) || {};
@@ -46,6 +57,7 @@ function doGet(e) {
     return json_({ ok: false, hata: 'Anahtar hatalı. Bağlantı linkini kurulum e-postasından yeniden kopyalayın.' });
   }
   try {
+    if (p.bolum === 'ozel') return json_(ozelTopla_());
     var gun = Math.max(7, Math.min(1500, parseInt(p.gun, 10) || 400));
     return json_(veriTopla_(gun));
   } catch (err) {
@@ -129,6 +141,72 @@ function islerOku_(tz) {
         return v;
       });
     });
+}
+
+/** Özel dosyadaki bölümleri okur (Danışmanlık, Toplantı, Özel Notlar, Günlük). */
+function ozelTopla_() {
+  var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  function oku(ad, sutun) {
+    var sh = ss.getSheetByName(ad);
+    if (!sh) return [];
+    var son = sh.getLastRow();
+    if (son < 2) return [];
+    return sh.getRange(2, 1, son - 1, sutun).getValues()
+      .filter(function (r) {
+        return String(r[0]).trim() !== '' || String(r[1]).trim() !== '';
+      })
+      .map(function (r) {
+        return r.map(function (v) {
+          if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+          if (v === null || v === undefined) return '';
+          return v;
+        });
+      });
+  }
+  return {
+    ok: true,
+    ozelNotlar: oku(OZEL_SAYFALAR.ozelNotlar.ad, OZEL_SAYFALAR.ozelNotlar.sutun),
+    danismanlik: oku(OZEL_SAYFALAR.danismanlik.ad, OZEL_SAYFALAR.danismanlik.sutun),
+    toplanti: oku(OZEL_SAYFALAR.toplanti.ad, OZEL_SAYFALAR.toplanti.sutun),
+    gunluk: oku(OZEL_SAYFALAR.gunluk.ad, OZEL_SAYFALAR.gunluk.sutun)
+  };
+}
+
+/** Uygulamadan gelen yeni kayıtları (danışma, toplantı, günlük) ekler. */
+function doPost(e) {
+  var p = (e && e.parameter) || {};
+  var anahtar = PropertiesService.getScriptProperties().getProperty('ANAHTAR');
+  if (!anahtar || p.anahtar !== anahtar) {
+    return json_({ ok: false, hata: 'Anahtar hatalı.' });
+  }
+  try {
+    var govde = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
+    var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+    var bugun = Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy');
+    function ekle(ad, satir) {
+      var sh = ss.getSheetByName(ad);
+      if (!sh) throw new Error(ad + ' sayfası bulunamadı.');
+      sh.appendRow(satir);
+    }
+    if (govde.tur === 'danismanlik') {
+      ekle(OZEL_SAYFALAR.danismanlik.ad,
+        [bugun, govde.konu || '', govde.soru || '', 'Yeni', '', '']);
+    } else if (govde.tur === 'toplanti') {
+      ekle(OZEL_SAYFALAR.toplanti.ad,
+        [bugun, govde.yer || '', govde.katilimcilar || '', govde.konular || '',
+          govde.notlar || '', '', '']);
+    } else if (govde.tur === 'gunluk') {
+      ekle(OZEL_SAYFALAR.gunluk.ad,
+        [bugun, govde.baslik || '', govde.icerik || '', '']);
+    } else {
+      return json_({ ok: false, hata: 'Bilinmeyen kayıt türü.' });
+    }
+    return json_({ ok: true });
+  } catch (err) {
+    return json_({ ok: false, hata: 'Kaydedilemedi: ' + err });
+  }
 }
 
 function json_(o) {
