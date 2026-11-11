@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../veri/model.dart';
+import '../veri/ozel.dart';
 
 /// Rapor PDF'inde görünen bilgiler (Ayarlar ekranından).
 class RaporAyari {
@@ -71,6 +72,10 @@ class VeriDeposu extends ChangeNotifier {
   /// Testlerde ağ yerine kullanılır.
   @visibleForTesting
   Future<String> Function(Uri adres)? sahteIstek;
+
+  /// Testlerde POST yerine kullanılır.
+  @visibleForTesting
+  Future<String> Function(Uri adres, String govde)? sahteGonder;
 
   Future<void> baslat() async {
     final p = await SharedPreferences.getInstance();
@@ -196,6 +201,70 @@ class VeriDeposu extends ChangeNotifier {
       throw VeriHatasi(
           'Bağlantıya izin verilmedi. Apps Script dağıtımında "Erişimi olanlar: Herkes" seçili olmalı.');
     }
+    if (r.statusCode != 200) {
+      throw VeriHatasi('Sunucu hatası (${r.statusCode}). Biraz sonra tekrar deneyin.');
+    }
+    return utf8.decode(r.bodyBytes);
+  }
+
+  // --- Özel bölümler (Danışmanlık, Toplantı, Özel Notlar, Günlük) ---
+  // Diske yazılmaz; her açılışta çekilir.
+
+  Future<OzelVeri> ozelGetir() async {
+    final l = link;
+    if (l == null) throw VeriHatasi('Bağlantı linki yok.');
+    final u = Uri.parse(l);
+    final adres = u.replace(queryParameters: {
+      ...u.queryParameters,
+      'bolum': 'ozel',
+    });
+    final ham =
+        (sahteIstek != null ? await sahteIstek!(adres) : await _istek(adres))
+            .trimLeft();
+    if (ham.startsWith('<')) {
+      throw VeriHatasi(
+          'Bağlantı Google girişi istiyor. Apps Script dağıtımı "Herkes" olmalı.');
+    }
+    final Object? j;
+    try {
+      j = jsonDecode(ham);
+    } catch (_) {
+      throw VeriHatasi('Bağlantıdan anlaşılmayan bir cevap geldi.');
+    }
+    if (j is! Map<String, dynamic> || j['ok'] != true) {
+      final h = j is Map ? j['hata'] : null;
+      throw VeriHatasi((h ?? 'Özel veri alınamadı.').toString());
+    }
+    return OzelVeri.json(j);
+  }
+
+  Future<void> ozelGonder(String tur, Map<String, String> alan) async {
+    final l = link;
+    if (l == null) throw VeriHatasi('Bağlantı linki yok.');
+    final govde = jsonEncode({'tur': tur, ...alan});
+    final u = Uri.parse(l);
+    final ham = (sahteGonder != null
+            ? await sahteGonder!(u, govde)
+            : await _gonder(u, govde))
+        .trimLeft();
+    final Object? j;
+    try {
+      j = jsonDecode(ham);
+    } catch (_) {
+      throw VeriHatasi('Kayıt sırasında anlaşılmayan bir cevap geldi.');
+    }
+    if (j is! Map<String, dynamic> || j['ok'] != true) {
+      final h = j is Map ? j['hata'] : null;
+      throw VeriHatasi((h ?? 'Kaydedilemedi.').toString());
+    }
+  }
+
+  static Future<String> _gonder(Uri adres, String govde) async {
+    final r = await http
+        .post(adres,
+            body: govde,
+            headers: {'Content-Type': 'text/plain;charset=utf-8'})
+        .timeout(const Duration(seconds: 45));
     if (r.statusCode != 200) {
       throw VeriHatasi('Sunucu hatası (${r.statusCode}). Biraz sonra tekrar deneyin.');
     }

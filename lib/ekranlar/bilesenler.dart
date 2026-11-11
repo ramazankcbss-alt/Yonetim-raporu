@@ -444,3 +444,28 @@ class BilgiKutusu extends StatelessWidget {
         ),
       );
 }
+
+/// Veri alınamadığında gösterilen hata gövdesi (tekrar dene butonlu).
+class HataGovde extends StatelessWidget {
+  const HataGovde({super.key, required this.mesaj, required this.yenile});
+
+  final String mesaj;
+  final VoidCallback yenile;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(24),
+        children: [
+          const SizedBox(height: 32),
+          const Icon(Icons.cloud_off_outlined, size: 48, color: Renk.soluk),
+          const SizedBox(height: 12),
+          Text(mesaj,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14.5, color: Renk.yazi)),
+          const SizedBox(height: 16),
+          Center(
+              child: Buton(
+                  yazi: 'Tekrar dene', ikon: Icons.refresh, onTap: yenile)),
+        ],
+      );
+}

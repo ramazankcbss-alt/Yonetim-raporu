@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../tema.dart';
 import '../veri/model.dart';
+import 'danismanlik.dart';
+import 'gunce.dart';
 import 'isler.dart';
+import 'kilit.dart';
+import 'ozel_notlar.dart';
+import 'toplanti.dart';
 
 /// Asistan sekmesi: sekreterlik, danışmanlık, toplantı notları, özel notlar
 /// ve günlük bölümlerine açılan hub. Hazır olmayan bölümler "Yakında".
@@ -32,33 +37,39 @@ class AsistanEkran extends StatelessWidget {
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => IslerEkran(veri: veri))),
         ),
-        const _Bolum(
+        _Bolum(
           ikon: Icons.forum_outlined,
           baslik: 'Danışmanlık',
           aciklama: 'Bir konuyu sor, görüş ve yol önerisi al',
           renk: Renk.mavi,
-          yakinda: true,
+          ac: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const DanismanlikEkran())),
         ),
-        const _Bolum(
+        _Bolum(
           ikon: Icons.groups_outlined,
           baslik: 'Toplantı Notları',
           aciklama: 'Toplantıları kaydet; zamanla birleştirip analiz et',
           renk: Renk.yesil,
-          yakinda: true,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ToplantiEkran())),
         ),
-        const _Bolum(
+        _Bolum(
           ikon: Icons.lock_outline,
           baslik: 'Özel Notlar',
           aciklama: 'Olumsuzluk, uyuşmazlık ve öneriler — yalnızca sana özel',
           renk: Renk.turuncu,
-          yakinda: true,
+          ac: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const KilitKapisi(
+                  baslik: 'Özel Notlar', child: OzelNotlarEkran()))),
         ),
-        const _Bolum(
+        _Bolum(
           ikon: Icons.menu_book_outlined,
           baslik: 'Günlük',
           aciklama: 'Aklından geçenler; kimseyle paylaşılmaz',
           renk: Renk.amber,
-          yakinda: true,
+          ac: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) =>
+                  const KilitKapisi(baslik: 'Günlük', child: GunceEkran()))),
         ),
       ],
     );
