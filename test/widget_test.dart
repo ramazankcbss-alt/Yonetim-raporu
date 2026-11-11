@@ -92,9 +92,17 @@ void main() {
     // Rapor
     await t.tap(find.text('Rapor'));
     await t.pumpAndSettle();
-    expect(find.text('Paylaş (e-posta, WhatsApp…)'), findsOneWidget);
+    final paylas = find.text('Paylaş (e-posta, WhatsApp…)');
+    await t.scrollUntilVisible(paylas, 300,
+        scrollable: find.byType(Scrollable).last);
+    expect(paylas, findsOneWidget);
+    await t.drag(find.byType(ListView).last, const Offset(0, 3000));
+    await t.pumpAndSettle();
     await t.tap(find.text('Haftalık').last);
     await t.pumpAndSettle();
+    await t.scrollUntilVisible(paylas, 300,
+        scrollable: find.byType(Scrollable).last);
+    expect(paylas, findsOneWidget);
   });
 
   test('PDF raporları oluşur', () async {

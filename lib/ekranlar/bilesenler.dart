@@ -189,7 +189,7 @@ class SutGrafigi extends StatelessWidget {
     return Column(
       children: [
         SizedBox(
-          height: yukseklik + 44,
+          height: yukseklik + 64,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -200,18 +200,30 @@ class SutGrafigi extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Text(sayi(g.sut),
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: Renk.yazi)),
+                        // Sütunlar, etiketlerden kalan yüksekliğe göre
+                        // ölçeklenir; yazı büyük olsa da taşma olmaz.
+                        Expanded(
+                          child: LayoutBuilder(builder: (context, k) {
+                            final h = math.max(0.0, k.maxHeight - 22);
+                            return Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(sayi(g.sut),
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Renk.yazi)),
+                                ),
+                                const SizedBox(height: 4),
+                                _cubuk(g.erentepe.sut, enCok, h, erentepeRenk,
+                                    ust: true),
+                                _cubuk(g.fethiye.sut, enCok, h, fethiyeRenk),
+                              ],
+                            );
+                          }),
                         ),
-                        const SizedBox(height: 4),
-                        _cubuk(g.erentepe.sut, enCok, yukseklik, erentepeRenk,
-                            ust: true),
-                        _cubuk(g.fethiye.sut, enCok, yukseklik, fethiyeRenk),
                         const SizedBox(height: 6),
                         Text(gunKisa(g.tarih),
                             style: const TextStyle(
