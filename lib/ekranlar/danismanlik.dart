@@ -24,7 +24,9 @@ class _DanismanlikEkranState extends State<DanismanlikEkran> {
     _f = VeriDeposu.ben.ozelGetir();
   }
 
-  void _yenile() => setState(() => _f = VeriDeposu.ben.ozelGetir());
+  void _yenile() => setState(() {
+        _f = VeriDeposu.ben.ozelGetir();
+      });
 
   Future<void> _soruSor() async {
     final sonuc = await formGoster(

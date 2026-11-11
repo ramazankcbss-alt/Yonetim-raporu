@@ -24,7 +24,9 @@ class _ToplantiEkranState extends State<ToplantiEkran> {
     _f = VeriDeposu.ben.ozelGetir();
   }
 
-  void _yenile() => setState(() => _f = VeriDeposu.ben.ozelGetir());
+  void _yenile() => setState(() {
+        _f = VeriDeposu.ben.ozelGetir();
+      });
 
   Future<void> _ekle() async {
     final sonuc = await formGoster(
