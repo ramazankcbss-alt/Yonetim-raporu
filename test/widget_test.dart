@@ -92,16 +92,21 @@ void main() {
     // Rapor
     await t.tap(find.text('Rapor'));
     await t.pumpAndSettle();
+    // Rapor ekranının dikey listesi ("Raporun içeriği" panelini içeren).
+    final liste = find
+        .ancestor(
+            of: find.text('Raporun içeriği'),
+            matching: find.byWidgetPredicate((w) =>
+                w is Scrollable && w.axisDirection == AxisDirection.down))
+        .first;
     final paylas = find.text('Paylaş (e-posta, WhatsApp…)');
-    await t.scrollUntilVisible(paylas, 300,
-        scrollable: find.byType(Scrollable).last);
+    await t.scrollUntilVisible(paylas, 300, scrollable: liste);
     expect(paylas, findsOneWidget);
-    await t.drag(find.byType(ListView).last, const Offset(0, 3000));
+    await t.drag(liste, const Offset(0, 3000));
     await t.pumpAndSettle();
     await t.tap(find.text('Haftalık').last);
     await t.pumpAndSettle();
-    await t.scrollUntilVisible(paylas, 300,
-        scrollable: find.byType(Scrollable).last);
+    await t.scrollUntilVisible(paylas, 300, scrollable: liste);
     expect(paylas, findsOneWidget);
   });
 
