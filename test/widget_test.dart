@@ -118,8 +118,6 @@ void main() {
     expect(find.text('Sekreterlik — İşler'), findsOneWidget);
     expect(find.textContaining('Vetkim ödemesi'), findsOneWidget);
     expect(find.text('Bekleyen işler (1)'), findsOneWidget);
-    await t.pageBack();
-    await t.pumpAndSettle();
   });
 
   test('PDF raporları oluşur', () async {
