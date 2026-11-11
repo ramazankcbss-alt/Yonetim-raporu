@@ -4,6 +4,7 @@ import '../bicim.dart';
 import '../servis/guncelleme.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
+import 'asistan.dart';
 import 'ayarlar.dart';
 import 'bilesenler.dart';
 import 'gunluk.dart';
@@ -41,7 +42,13 @@ class _AnaEkranState extends State<AnaEkran> {
   int _sekme = 0;
   final d = VeriDeposu.ben;
 
-  static const _basliklar = ['Günlük Pano', 'Haftalık Pano', 'Tarım', 'Rapor Gönder'];
+  static const _basliklar = [
+    'Günlük Pano',
+    'Haftalık Pano',
+    'Tarım',
+    'Rapor Gönder',
+    'Asistan',
+  ];
 
   @override
   void initState() {
@@ -72,6 +79,7 @@ class _AnaEkranState extends State<AnaEkran> {
             HaftalikEkran(veri: veri),
             TarimEkran(veri: veri),
             RaporEkran(veri: veri),
+            AsistanEkran(veri: veri),
           ];
           govde = Column(
             children: [
@@ -154,6 +162,10 @@ class _AnaEkranState extends State<AnaEkran> {
                   icon: Icon(Icons.picture_as_pdf_outlined),
                   selectedIcon: Icon(Icons.picture_as_pdf),
                   label: 'Rapor'),
+              NavigationDestination(
+                  icon: Icon(Icons.support_agent_outlined),
+                  selectedIcon: Icon(Icons.support_agent),
+                  label: 'Asistan'),
             ],
           ),
         );

@@ -9,6 +9,21 @@ final Map<String, dynamic> ornekJson = {
   'ok': true,
   'surum': 1,
   'olusturma': '2026-11-06T15:40:00',
+  // No, Konu, Çiftlik, Kaynak, Açılış, Durum, Son değişiklik, Son durum, Sorumlu
+  'isler': [
+    [
+      '1', 'Vetkim ödemesi', 'Çiftlikler', 'Chat – Ödeme', '2026-09-28',
+      'Bekliyor', '2026-11-02', 'Firma sürekli arıyor', 'Özge Demirel'
+    ],
+    [
+      '2', 'Sağım sistemi bakımı', 'Şekersüt', 'Gmail', '2026-11-09',
+      'Devam ediyor', '2026-11-10', 'Teklif alındı, karar bekliyor', 'Bakım'
+    ],
+    [
+      '3', 'Yağmurluk alımı', 'Çiftlikler', 'Chat – Satınalma', '2026-10-27',
+      'Tamamlandı', '2026-11-04', 'İhsan Kocak\'tan alındı', 'Murat Bala'
+    ],
+  ],
   'hayvanOzet': [
     ..._gun('2026-11-02', [
       ['Fethiye Şube', 41, 2, 981, 419, 10471, 0, 3, 1, 1],

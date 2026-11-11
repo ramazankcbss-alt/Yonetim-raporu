@@ -31,7 +31,8 @@ var SAYFALAR = {
   tarim: 'Tarım_Veri',
   ekim: 'Ekim_Alanları',
   hasat: 'Hasat_Verim',
-  besi: 'Besi_Plan'
+  besi: 'Besi_Plan',
+  isler: 'Kontrol Paneli'
 };
 
 /** Uygulamanın çağırdığı adres. */
@@ -101,8 +102,33 @@ function veriTopla_(gun) {
     // Ürün, Çiftlik, Alan (da), Toplam (kg), Verim (kg/da), Kayıt Tarihi
     hasat: dolu(satirlar(SAYFALAR.hasat, 6)),
     // İşletme, Yerli Dana, Kesimi Planlanan Erkek Dana, Kesimi Planlanan İnek
-    besi: dolu(satirlar(SAYFALAR.besi, 4))
+    besi: dolu(satirlar(SAYFALAR.besi, 4)),
+    // No, Konu, Çiftlik/Birim, Kaynak, Açılış, Durum, Son değişiklik,
+    // Son durum, Sorumlu (Kontrol Paneli sayfası, 8. satırdan itibaren)
+    isler: islerOku_(tz)
   };
+}
+
+/** Kontrol Paneli'ndeki işleri okur (başlık 7. satırda, veri 8'den başlar). */
+function islerOku_(tz) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SAYFALAR.isler);
+  if (!sh) return [];
+  var son = sh.getLastRow();
+  if (son < 8) return [];
+  var rows = sh.getRange(8, 1, son - 7, 9).getValues();
+  return rows
+    .filter(function (r) {
+      var no = String(r[0]).trim();
+      return no !== '' && !isNaN(parseFloat(no)) && String(r[1]).trim() !== '';
+    })
+    .map(function (r) {
+      return r.map(function (v) {
+        if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+        if (v === null || v === undefined) return '';
+        return v;
+      });
+    });
 }
 
 function json_(o) {
