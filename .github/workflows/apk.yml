@@ -14,6 +14,8 @@ permissions:
 env:
   # İmza anahtarının şifresi: Settings → Secrets and variables → Actions
   YONETIM_KEYSTORE_PASSWORD: ${{ secrets.YONETIM_KEYSTORE_PASSWORD }}
+  # İmza anahtarının kendisi (base64). Tanımlıysa depodaki dosyanın yerine kullanılır.
+  YONETIM_KEYSTORE_B64: ${{ secrets.YONETIM_KEYSTORE_B64 }}
 
 jobs:
   build:
@@ -46,6 +48,18 @@ jobs:
 
       - name: Android proje dosyalarını oluştur
         run: flutter create --platforms=android --org com.panagro --project-name yonetim_raporu .
+
+      - name: İmza anahtarını hazırla
+        run: |
+          if [ -n "$YONETIM_KEYSTORE_B64" ]; then
+            echo "$YONETIM_KEYSTORE_B64" | base64 -d > ci/yonetim-raporu.p12
+            echo "İmza anahtarı gizli ayardan alındı."
+          elif [ -f ci/yonetim-raporu.p12 ]; then
+            echo "İmza anahtarı depodaki dosyadan alındı."
+          else
+            echo "::error::İmza anahtarı yok. GitHub → Settings → Secrets and variables → Actions bölümüne YONETIM_KEYSTORE_B64 ekleyin."
+            exit 1
+          fi
 
       - name: Android ayarları (uygulama adı, izinler, imza anahtarı)
         run: |
