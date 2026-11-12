@@ -21,7 +21,8 @@ Widget _uygulama(Widget ev) => MaterialApp(
     );
 
 void _telefon(WidgetTester t) {
-  t.view.physicalSize = const Size(1080, 2340);
+  // Uzun pencere: ListView tembel yüklemesin, tüm kartlar kurulsun.
+  t.view.physicalSize = const Size(1080, 5400);
   t.view.devicePixelRatio = 3;
   addTearDown(t.view.reset);
 }
