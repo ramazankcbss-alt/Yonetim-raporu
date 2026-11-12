@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../bicim.dart';
+import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
@@ -22,6 +23,22 @@ class IsAkisiEkran extends StatefulWidget {
 }
 
 class _IsAkisiEkranState extends State<IsAkisiEkran> {
+  void _veriDegisti() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    VeriDeposu.ben.addListener(_veriDegisti);
+  }
+
+  @override
+  void dispose() {
+    VeriDeposu.ben.removeListener(_veriDegisti);
+    super.dispose();
+  }
+
   // Bölümler görünüm sırası: önce hat, sonra hat dışı.
   static const _sira = [
     'Sipariş',
@@ -44,7 +61,7 @@ class _IsAkisiEkranState extends State<IsAkisiEkran> {
   @override
   Widget build(BuildContext context) {
     final bugun = DateTime.now();
-    final akis = widget.veri.akis;
+    final akis = (VeriDeposu.ben.veri ?? widget.veri).akis;
 
     int sonGun(AkisKaydi a) =>
         a.sonGuncelleme?.millisecondsSinceEpoch ??
@@ -76,7 +93,10 @@ class _IsAkisiEkranState extends State<IsAkisiEkran> {
         : _sira.where((b) => (gruplar[b] ?? const []).isNotEmpty).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('İş Akışı')),
+      appBar: AppBar(
+        title: const Text('İş Akışı'),
+        actions: const [TabloGuncelleButonu()],
+      ),
       body: akis.isEmpty
           ? const BosDurum(
               ikon: Icons.account_tree_outlined,
