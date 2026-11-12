@@ -28,14 +28,15 @@ class _IslerEkranState extends State<IslerEkran> {
     final bugun = DateTime.now();
     final isler = widget.veri.isler;
 
-    int acilis(Is a) => a.acilis?.millisecondsSinceEpoch ?? 0;
+    // En yeni hareket (son değişiklik, yoksa açılış) en üstte: azalan sıra.
+    int sonHareket(Is a) =>
+        (a.sonDegisiklik ?? a.acilis ?? DateTime(2000)).millisecondsSinceEpoch;
     final bekleyen = isler.where((i) => i.bekliyor).toList()
-      ..sort((a, b) => acilis(a).compareTo(acilis(b)));
+      ..sort((a, b) => sonHareket(b).compareTo(sonHareket(a)));
     final devam = isler.where((i) => i.devam).toList()
-      ..sort((a, b) => acilis(a).compareTo(acilis(b)));
+      ..sort((a, b) => sonHareket(b).compareTo(sonHareket(a)));
     final tamam = isler.where((i) => i.tamam).toList()
-      ..sort((a, b) => (b.sonDegisiklik ?? DateTime(2000))
-          .compareTo(a.sonDegisiklik ?? DateTime(2000)));
+      ..sort((a, b) => sonHareket(b).compareTo(sonHareket(a)));
     final geciken = bekleyen.where((i) => i.gecikmis(bugun)).length;
 
     final goster = _filtre == null;

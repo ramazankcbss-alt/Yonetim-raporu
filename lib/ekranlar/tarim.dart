@@ -25,15 +25,18 @@ class _TarimEkranState extends State<TarimEkran> {
     final v = widget.veri;
     final (plan, ekilen) = ekimToplami(v.ekim);
     final sonTarih = v.tarim.isEmpty ? null : v.tarim.last.tarih;
-    final akis = sonTarih == null
-        ? const <TarimKaydi>[]
-        : v
-            .tarimDonem(sonTarih.subtract(const Duration(days: 30)), sonTarih)
-            .where((t) => t.hayvancilik == _hayvancilik)
-            .where((t) => _ciftlik == null || t.ciftlik == _ciftlik)
-            .toList()
-            .reversed
-            .toList();
+    final List<TarimKaydi> akis;
+    if (sonTarih == null) {
+      akis = const <TarimKaydi>[];
+    } else {
+      // En yeni faaliyet en üstte.
+      akis = v
+          .tarimDonem(sonTarih.subtract(const Duration(days: 30)), sonTarih)
+          .where((t) => t.hayvancilik == _hayvancilik)
+          .where((t) => _ciftlik == null || t.ciftlik == _ciftlik)
+          .toList()
+        ..sort((a, b) => b.tarih.compareTo(a.tarih));
+    }
     // Çiftlik çipleri yalnızca seçili türde kaydı olan çiftlikleri göstersin.
     final turCiftlikleri = {
       for (final t in v.tarim)
