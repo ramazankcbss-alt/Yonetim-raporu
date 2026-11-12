@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../bicim.dart';
+import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
@@ -18,6 +19,22 @@ class IslerEkran extends StatefulWidget {
 }
 
 class _IslerEkranState extends State<IslerEkran> {
+  void _veriDegisti() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    VeriDeposu.ben.addListener(_veriDegisti);
+  }
+
+  @override
+  void dispose() {
+    VeriDeposu.ben.removeListener(_veriDegisti);
+    super.dispose();
+  }
+
   String? _filtre; // null: tümü; 'Bekliyor' / 'Devam ediyor' / 'Tamamlandı'
 
   void _degistir(String durum) =>
@@ -26,7 +43,7 @@ class _IslerEkranState extends State<IslerEkran> {
   @override
   Widget build(BuildContext context) {
     final bugun = DateTime.now();
-    final isler = widget.veri.isler;
+    final isler = (VeriDeposu.ben.veri ?? widget.veri).isler;
 
     // En yeni hareket (son değişiklik, yoksa açılış) en üstte: azalan sıra.
     int sonHareket(Is a) =>
@@ -42,7 +59,10 @@ class _IslerEkranState extends State<IslerEkran> {
     final goster = _filtre == null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sekreterlik — İşler')),
+      appBar: AppBar(
+        title: const Text('Sekreterlik — İşler'),
+        actions: const [TabloGuncelleButonu()],
+      ),
       body: isler.isEmpty
           ? const BosDurum(
               ikon: Icons.inbox_outlined, yazi: 'Takip edilen iş yok.')

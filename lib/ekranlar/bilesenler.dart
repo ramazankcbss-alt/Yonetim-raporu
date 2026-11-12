@@ -516,3 +516,43 @@ class EsitleButonu extends StatelessWidget {
     );
   }
 }
+
+
+/// Sekreterlik ve İş Akışı ekranlarındaki "Güncelle" düğmesi: tablodaki en
+/// son hali anında çeker. Otomatik görevlerin zamanlamasına dokunmaz.
+class TabloGuncelleButonu extends StatelessWidget {
+  const TabloGuncelleButonu({super.key});
+
+  Future<void> _guncelle(BuildContext context) async {
+    final d = VeriDeposu.ben;
+    await d.yenile();
+    if (!context.mounted) return;
+    bildir(
+        context,
+        d.hata ??
+            'Güncellendi: tablodaki en son hali alındı'
+                '${d.veri?.olusturma == null ? '' : ' (${zamanBicim(d.veri!.olusturma!)})'}.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = VeriDeposu.ben;
+    return ListenableBuilder(
+      listenable: d,
+      builder: (context, _) => d.yukleniyor
+          ? const Padding(
+              padding: EdgeInsets.all(14),
+              child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.4, color: Colors.white)),
+            )
+          : IconButton(
+              tooltip: 'Güncelle / Eşitle',
+              icon: const Icon(Icons.sync),
+              onPressed: () => _guncelle(context),
+            ),
+    );
+  }
+}
