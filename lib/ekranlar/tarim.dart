@@ -44,6 +44,14 @@ class _TarimEkranState extends State<TarimEkran> {
       ...turCiftlikleri.where((c) => !ciftlikSirasi.contains(c)),
     ];
 
+    // Hayvancılık için son haftanın hayvan verileri.
+    final haftalar = v.haftalar;
+    final sonHafta = haftalar.isEmpty ? null : haftalar.first;
+    final hg = sonHafta == null ? null : haftalikGostergeler(v, sonHafta);
+    final hayvanOzeti = sonHafta == null
+        ? null
+        : canliHayvanOzeti(v, sonHafta, sonHafta.add(const Duration(days: 6)));
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
@@ -93,6 +101,75 @@ class _TarimEkranState extends State<TarimEkran> {
                   ),
           ),
         ] else ...[
+          if (hg != null) ...[
+            if (sonHafta != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10, left: 2),
+                child: Text('Son hafta: ${haftaEtiketi(sonHafta)}',
+                    style:
+                        const TextStyle(fontSize: 12.5, color: Renk.soluk)),
+              ),
+            GostergeIzgarasi(kartlar: [
+              GostergeKarti(
+                baslik: 'Toplam Hayvan',
+                deger: sayi(hg.toplamHayvan),
+                ikon: Icons.pets,
+              ),
+              GostergeKarti(
+                baslik: 'Sağılan Hayvan',
+                deger: sayi(hg.sagilan),
+                ikon: Icons.water_drop_outlined,
+                renk: Renk.mavi,
+              ),
+              GostergeKarti(
+                baslik: 'Haftalık Süt',
+                deger: kg(hg.sut),
+                ikon: Icons.local_drink_outlined,
+                renk: Renk.mavi,
+                alt: hg.ortVerim == null
+                    ? null
+                    : 'Ort. ${sayi(hg.ortVerim, ondalik: 1)} kg/baş/gün',
+              ),
+              GostergeKarti(
+                baslik: 'Doğan Buzağı',
+                deger: sayi(hg.dogan),
+                ikon: Icons.cruelty_free_outlined,
+                renk: Renk.yesil,
+                alt: hg.olenBuzagi == null
+                    ? null
+                    : 'Ölen buzağı: ${sayi(hg.olenBuzagi)}',
+              ),
+              GostergeKarti(
+                baslik: 'Kesilen Dana',
+                deger: sayi(hg.kesilenDana),
+                ikon: Icons.content_cut,
+                renk: Renk.turuncu,
+                alt: hg.eskKesilen == null
+                    ? null
+                    : 'ESK-Taşağıl: ${sayi(hg.eskKesilen)}',
+              ),
+              GostergeKarti(
+                baslik: 'İnek/Düve Kesim-Satış',
+                deger: sayi(hg.kesimSatis),
+                ikon: Icons.sell_outlined,
+                renk: Renk.turuncu,
+              ),
+            ]),
+            const SizedBox(height: 12),
+          ],
+          Panel(
+            baslik: 'İşletme Bazlı Canlı Hayvan',
+            child: (hayvanOzeti == null || hayvanOzeti.ozetGunu == null)
+                ? const BosDurum(
+                    ikon: Icons.table_chart_outlined,
+                    yazi: 'İşletme özeti verisi yok.')
+                : VeriTablosu(
+                    basliklar: isletmeBasliklari,
+                    satirlar: isletmeSatirlari(hayvanOzeti),
+                    vurguluSonSatir: true,
+                    ilkSutunGenislik: 190,
+                  ),
+          ),
           Panel(
             baslik: 'Besi Planı ve Kesim',
             child: v.besi.isEmpty
@@ -105,9 +182,6 @@ class _TarimEkranState extends State<TarimEkran> {
                     ilkSutunGenislik: 110,
                   ),
           ),
-          const BilgiKutusu(
-              yazi:
-                  'Günlük süt, sağılan ve hayvan sayıları için Günlük ve Haftalık sekmelerine bakın.'),
         ],
         Panel(
           baslik: _hayvancilik
