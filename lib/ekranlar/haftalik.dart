@@ -35,7 +35,8 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
     final g = haftalikGostergeler(v, hafta);
     final oz = canliHayvanOzeti(v, hafta, son);
     final gunler = v.gunlukDonem(hafta, son);
-    final tarim = v.tarimDonem(hafta, son).reversed.toList();
+    final tarim = v.tarimDonem(hafta, son).toList()
+      ..sort((a, b) => b.tarih.compareTo(a.tarih)); // en yeni üstte
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),

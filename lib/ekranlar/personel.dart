@@ -23,11 +23,17 @@ class PersonelEkran extends StatelessWidget {
       final d = k.donem.trim().isEmpty ? 'Diğer' : k.donem.trim();
       (gruplar[d] ??= []).add(k);
     }
+    // Her dönem içinde en yeni tarih en üstte.
+    for (final l in gruplar.values) {
+      l.sort((a, b) => (b.tarih ?? DateTime(2000))
+          .compareTo(a.tarih ?? DateTime(2000)));
+    }
+    // Dönemleri kronolojik: en yeni ay-yıl üstte, "Diğer" en sonda.
     final donemler = gruplar.keys.toList()
       ..sort((a, b) {
         if (a == 'Diğer') return 1;
         if (b == 'Diğer') return -1;
-        return b.compareTo(a); // en yeni dönem üstte (kaba)
+        return _donemSira(b).compareTo(_donemSira(a));
       });
 
     return Scaffold(
@@ -49,6 +55,26 @@ class PersonelEkran extends StatelessWidget {
             ),
     );
   }
+}
+
+const _aylar = [
+  'ocak', 'şubat', 'mart', 'nisan', 'mayıs', 'haziran',
+  'temmuz', 'ağustos', 'eylül', 'ekim', 'kasım', 'aralık'
+];
+
+/// "Ekim 2026" gibi bir dönemi sıralanabilir sayıya çevirir (yıl*100 + ay).
+/// Çözülemezse 0.
+int _donemSira(String donem) {
+  final s = donem.toLowerCase();
+  var ay = 0;
+  for (var i = 0; i < _aylar.length; i++) {
+    if (s.contains(_aylar[i])) {
+      ay = i + 1;
+      break;
+    }
+  }
+  final yil = int.tryParse(RegExp(r'(19|20)\d{2}').firstMatch(s)?.group(0) ?? '') ?? 0;
+  return yil * 100 + ay;
 }
 
 Color _turRenk(String t) {
