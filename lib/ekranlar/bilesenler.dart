@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../servis/veri_servisi.dart';
+
 import '../bicim.dart';
 import '../tema.dart';
 import '../veri/model.dart';
@@ -468,4 +470,49 @@ class HataGovde extends StatelessWidget {
                   yazi: 'Tekrar dene', ikon: Icons.refresh, onTap: yenile)),
         ],
       );
+}
+
+
+/// "Eşitle" düğmesi: kaynak tablolardaki (canlı hayvan, tarım) yeni günleri
+/// anında rapora çeker ve ekranı yeniler.
+class EsitleButonu extends StatelessWidget {
+  const EsitleButonu({super.key});
+
+  Future<void> _esitle(BuildContext context) async {
+    final d = VeriDeposu.ben;
+    try {
+      final mesaj = await d.esitle();
+      if (context.mounted) bildir(context, mesaj);
+    } on VeriHatasi catch (e) {
+      if (context.mounted) bildir(context, e.mesaj);
+    } catch (_) {
+      if (context.mounted) {
+        bildir(context, 'Eşitlenemedi. İnternet bağlantınızı kontrol edin.');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = VeriDeposu.ben;
+    return ListenableBuilder(
+      listenable: d,
+      builder: (context, _) => Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: OutlinedButton.icon(
+            onPressed: d.esitleniyor ? null : () => _esitle(context),
+            icon: d.esitleniyor
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.sync, size: 18),
+            label: Text(d.esitleniyor ? 'Eşitleniyor…' : 'Güncelle / Eşitle'),
+          ),
+        ),
+      ),
+    );
+  }
 }

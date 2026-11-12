@@ -52,6 +52,7 @@ class _GunlukEkranState extends State<GunlukEkran> {
           etiket: tarihUzun,
           degisti: (d) => setState(() => _gun = d),
         ),
+        const EsitleButonu(),
         if (oz.ozetGunu == null)
           const BilgiKutusu(
             uyari: true,

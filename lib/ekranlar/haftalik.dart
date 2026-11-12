@@ -47,6 +47,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
           etiket: haftaEtiketi,
           degisti: (d) => setState(() => _hafta = d),
         ),
+        const EsitleButonu(),
         Padding(
           padding: const EdgeInsets.only(bottom: 10, left: 2),
           child: Text(
