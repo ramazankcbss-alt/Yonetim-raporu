@@ -224,12 +224,16 @@ class _TurDugme extends StatelessWidget {
                 Icon(ikon,
                     size: 18, color: secili ? Renk.ana : Renk.soluk),
                 const SizedBox(width: 6),
-                Text(yazi,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight:
-                            secili ? FontWeight.w700 : FontWeight.w500,
-                        color: secili ? Renk.ana : Renk.soluk)),
+                Flexible(
+                  child: Text(yazi,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight:
+                              secili ? FontWeight.w700 : FontWeight.w500,
+                          color: secili ? Renk.ana : Renk.soluk)),
+                ),
               ],
             ),
           ),
