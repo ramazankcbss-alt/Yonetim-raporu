@@ -61,6 +61,20 @@ if "OtaUpdateFileProvider" not in m:
         </receiver>
 """
     m = m.replace("    </application>", ota + "    </application>", 1)
+# WhatsApp (https) ve e-posta bağlantılarını açabilmek için (Android 11+).
+if "<queries>" not in m:
+    sorgu = """    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+    </queries>
+"""
+    m = m.replace("</manifest>", sorgu + "</manifest>", 1)
 yaz(MANIFEST, m)
 
 xml_klasor = os.path.join(APP, "src", "main", "res", "xml")

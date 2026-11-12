@@ -468,6 +468,80 @@ class PersonelKaydi {
   }
 }
 
+/// Takip edilen çalışan ('Kişiler' sayfası).
+/// Sütunlar: Ad Soyad, Görev/Birim, Telefon, E-posta, Eşleşme anahtarları, Not.
+class Kisi {
+  const Kisi({
+    required this.ad,
+    this.birim = '',
+    this.telefon = '',
+    this.eposta = '',
+    this.anahtarlar = const [],
+    this.not = '',
+  });
+
+  final String ad, birim, telefon, eposta, not;
+
+  /// İş kayıtlarında bu kişiyi yakalayan sözcükler (küçük harf). Boşsa ad.
+  final List<String> anahtarlar;
+
+  bool get telefonVar => whatsappNumarasi != null;
+  bool get epostaVar => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(eposta);
+
+  /// WhatsApp için uluslararası numara (90…); okunamazsa null.
+  String? get whatsappNumarasi {
+    var d = telefon.replaceAll(RegExp(r'[^0-9]'), '');
+    if (d.isEmpty) return null;
+    if (d.startsWith('00')) d = d.substring(2);
+    if (d.startsWith('0')) d = '90${d.substring(1)}';
+    if (d.length == 10 && d.startsWith('5')) d = '90$d';
+    return d.length >= 11 ? d : null;
+  }
+
+  List<String> get _arananlar =>
+      anahtarlar.isEmpty ? [trKucuk(ad)] : anahtarlar;
+
+  /// Verilen metinlerden biri kişinin anahtarlarından birini içeriyor mu?
+  bool eslesir(Iterable<String> metinler) {
+    final birlesik = trKucuk(metinler.join(' | '));
+    return _arananlar.any((a) => a.isNotEmpty && birlesik.contains(a));
+  }
+
+  /// Kontrol Paneli'nde bu kişiyle ilgili işler (sorumlu, konu, son durum).
+  bool isEslesir(Is i) => eslesir([i.sorumlu, i.konu, i.sonDurum]);
+
+  /// İş Akışı'nda bu kişiyle ilgili kayıtlar.
+  bool akisEslesir(AkisKaydi k) =>
+      eslesir([k.firma, k.durum, k.sonrakiAdim, k.detay, k.baslik]);
+
+  static Kisi? oku(Object? v) {
+    final r = _liste(v);
+    if (r.isEmpty) return null;
+    final ad = _metin(r[0]);
+    if (ad.isEmpty) return null;
+    final ham = r.length > 4 ? _metin(r[4]) : '';
+    return Kisi(
+      ad: ad,
+      birim: r.length > 1 ? _metin(r[1]) : '',
+      telefon: r.length > 2 ? _metin(r[2]) : '',
+      eposta: r.length > 3 ? _metin(r[3]) : '',
+      anahtarlar: [
+        for (final p in ham.split(','))
+          if (trKucuk(p).isNotEmpty) trKucuk(p)
+      ],
+      not: r.length > 5 ? _metin(r[5]) : '',
+    );
+  }
+}
+
+/// Türkçe küçük harfe çevirir (İ→i, I→ı) ve boşlukları sadeleştirir.
+String trKucuk(String s) => s
+    .replaceAll('İ', 'i')
+    .replaceAll('I', 'ı')
+    .toLowerCase()
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
+
 // ---------------------------------------------------------------------------
 // Tüm veri
 // ---------------------------------------------------------------------------
@@ -484,6 +558,7 @@ class RaporVerisi {
     this.akis = const [],
     this.arsiv = const [],
     this.personel = const [],
+    this.kisiler = const [],
     this.olusturma,
   })  : ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -505,6 +580,7 @@ class RaporVerisi {
   final List<AkisKaydi> akis;
   final List<ArsivKaydi> arsiv;
   final List<PersonelKaydi> personel;
+  final List<Kisi> kisiler;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -521,6 +597,7 @@ class RaporVerisi {
       akis: oku('isakisi', AkisKaydi.oku),
       arsiv: oku('arsiv', ArsivKaydi.oku),
       personel: oku('personel', PersonelKaydi.oku),
+      kisiler: oku('kisiler', Kisi.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }

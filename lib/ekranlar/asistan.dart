@@ -7,6 +7,7 @@ import 'danismanlik.dart';
 import 'gunce.dart';
 import 'isakisi.dart';
 import 'isler.dart';
+import 'kisiler.dart';
 import 'personel.dart';
 import 'kilit.dart';
 import 'ozel_notlar.dart';
@@ -39,6 +40,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.ana,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => IslerEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.people_alt_outlined,
+          baslik: 'Kişiler',
+          aciklama: _kisiOzet(veri),
+          renk: Renk.yesil,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => KisilerEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.account_tree_outlined,
@@ -104,6 +113,16 @@ class AsistanEkran extends StatelessWidget {
 }
 
 const _morAsistan = Color(0xFF7C3AED);
+
+String _kisiOzet(RaporVerisi veri) {
+  if (veri.kisiler.isEmpty) return 'Çalışanların takip ettiği işler ve eksikler';
+  final bugun = DateTime.now();
+  final eksik = veri.kisiler
+      .map((k) => KisiIsleri(k, veri).eksik(bugun))
+      .fold<int>(0, (a, b) => a + b);
+  return '${veri.kisiler.length} kişi'
+      '${eksik > 0 ? ' · $eksik eksik/bekleyen iş' : ''} · mesajla hatırlat';
+}
 
 String _arsivOzet(RaporVerisi veri) {
   final n = veri.arsiv.length;

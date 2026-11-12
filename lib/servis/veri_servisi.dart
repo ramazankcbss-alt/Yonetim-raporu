@@ -239,6 +239,12 @@ class VeriDeposu extends ChangeNotifier {
   }
 
   Future<void> ozelGonder(String tur, Map<String, String> alan) async {
+    await _islem(tur, alan);
+  }
+
+  /// Apps Script'e bir işlem gönderir; cevabı (ok: true) döndürür.
+  Future<Map<String, dynamic>> _islem(
+      String tur, Map<String, String> alan) async {
     final l = link;
     if (l == null) throw VeriHatasi('Bağlantı linki yok.');
     final govde = jsonEncode({'tur': tur, ...alan});
@@ -247,24 +253,71 @@ class VeriDeposu extends ChangeNotifier {
             ? await sahteGonder!(u, govde)
             : await _gonder(u, govde))
         .trimLeft();
+    if (ham.startsWith('<')) {
+      throw VeriHatasi('Bağlantıdan anlaşılmayan bir cevap geldi. Apps Script '
+          'kodunu güncelleyip yeni sürüm olarak dağıttığınızdan emin olun.');
+    }
     final Object? j;
     try {
       j = jsonDecode(ham);
     } catch (_) {
-      throw VeriHatasi('Kayıt sırasında anlaşılmayan bir cevap geldi.');
+      throw VeriHatasi('İşlem sırasında anlaşılmayan bir cevap geldi.');
     }
     if (j is! Map<String, dynamic> || j['ok'] != true) {
       final h = j is Map ? j['hata'] : null;
-      throw VeriHatasi((h ?? 'Kaydedilemedi.').toString());
+      throw VeriHatasi((h ?? 'İşlem yapılamadı.').toString());
+    }
+    return j;
+  }
+
+  /// "Eşitle": kaynak tablolardaki yeni günleri rapora çeker, sonra veriyi
+  /// yeniler. Kullanıcıya gösterilecek özet mesajı döndürür.
+  bool esitleniyor = false;
+
+  Future<String> esitle() async {
+    if (esitleniyor) return 'Eşitleme zaten sürüyor.';
+    esitleniyor = true;
+    notifyListeners();
+    try {
+      final c = await _islem('esitle', const {});
+      final notlar = (c['notlar'] is List)
+          ? (c['notlar'] as List).map((e) => e.toString()).toList()
+          : const <String>[];
+      await yenile();
+      final mesaj = (c['mesaj'] ?? 'Eşitlendi.').toString();
+      return notlar.isEmpty ? mesaj : '$mesaj\n${notlar.join('\n')}';
+    } finally {
+      esitleniyor = false;
+      notifyListeners();
     }
   }
 
+  /// Kişiler sayfasındaki kişiye uygulamanın sahibi adına e-posta gönderir.
+  Future<void> epostaGonder(String ad, String konu, String metin) async {
+    await _islem('mesaj', {'ad': ad, 'konu': konu, 'metin': metin});
+  }
+
+  /// Kişinin telefonunu / e-postasını kaydeder ve veriyi yeniler.
+  Future<void> kisiKaydet(String ad,
+      {required String telefon, required String eposta}) async {
+    await _islem('kisi', {'ad': ad, 'telefon': telefon, 'eposta': eposta});
+    await yenile();
+  }
+
   static Future<String> _gonder(Uri adres, String govde) async {
-    final r = await http
+    var r = await http
         .post(adres,
             body: govde,
             headers: {'Content-Type': 'text/plain;charset=utf-8'})
-        .timeout(const Duration(seconds: 45));
+        .timeout(const Duration(seconds: 120));
+    // Apps Script, POST cevabını bir yönlendirme (302) ile verir; cevabı
+    // yönlendirilen adresten GET ile okuruz.
+    final yer = r.headers['location'];
+    if ((r.statusCode == 302 || r.statusCode == 303) && yer != null) {
+      r = await http
+          .get(adres.resolve(yer))
+          .timeout(const Duration(seconds: 45));
+    }
     if (r.statusCode != 200) {
       throw VeriHatasi('Sunucu hatası (${r.statusCode}). Biraz sonra tekrar deneyin.');
     }
