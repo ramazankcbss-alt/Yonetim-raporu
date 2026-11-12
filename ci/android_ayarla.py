@@ -152,5 +152,16 @@ if "yonetim-raporu.p12" not in g:
     g, n = re.subn(r"(\nandroid \{\n)", lambda x: x.group(1) + imza, g, count=1)
     if n != 1:
         sys.exit("android { bloğu bulunamadı")
+# Sürüm derlemesinde lint'i kapat: bazı eklentilerde (url_launcher) Android
+# lint, Java 17 ile çalışırken hata verip derlemeyi durduruyor.
+if "checkReleaseBuilds" not in g:
+    lint = (
+        "    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n"
+        if kotlin_dsl
+        else "    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n"
+    )
+    g, n = re.subn(r"(\nandroid \{\n)", lambda x: x.group(1) + lint, g, count=1)
+    if n != 1:
+        sys.exit("android { bloğu bulunamadı (lint)")
 yaz(p, g)
 print("Android ayarları uygulandı:", p)
