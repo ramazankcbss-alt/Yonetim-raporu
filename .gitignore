@@ -10,3 +10,6 @@ pubspec.lock
 .vscode/
 # CI'da oluşturulan Android klasörü
 android/
+
+# İmza anahtarı depoda tutulmaz (GitHub gizli ayarı: YONETIM_KEYSTORE_B64)
+ci/yonetim-raporu.p12
