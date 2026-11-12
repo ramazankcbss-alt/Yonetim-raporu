@@ -308,6 +308,67 @@ class Is {
   }
 }
 
+/// İş Akışı tablosundaki bir kalem: siparişten finansa kadar ilerleyen bir iş
+/// ya da Arıza-Bakım / İnsan Kaynakları / Diğer bölümünden bir kayıt.
+class AkisKaydi {
+  const AkisKaydi({
+    required this.no,
+    required this.baslik,
+    this.bolum = '',
+    this.durum = '',
+    this.firma = '',
+    this.tutar = '',
+    this.anahtar = '',
+    this.acilis,
+    this.sonGuncelleme,
+    this.kaynak = '',
+    this.sonrakiAdim = '',
+    this.detay = '',
+  });
+
+  final int no;
+  final String baslik, bolum, durum, firma, tutar, anahtar, kaynak;
+  final String sonrakiAdim, detay;
+  final DateTime? acilis, sonGuncelleme;
+
+  /// Satınalma hattındaki aşama sırası; hat dışı bölümler için -1.
+  static const List<String> hat = [
+    'Sipariş',
+    'Satınalma',
+    'Malzeme Tedarik',
+    'Muhasebe',
+    'Finans',
+    'Tamamlandı',
+  ];
+
+  int get asama => hat.indexOf(bolum);
+  bool get hatta => asama >= 0;
+  bool get tamam => bolum == 'Tamamlandı';
+  bool get finansta => bolum == 'Finans';
+
+  static AkisKaydi? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 2) return null;
+    final no = sayiOku(r[0]);
+    final baslik = _metin(r[1]);
+    if (no == null || baslik.isEmpty) return null;
+    return AkisKaydi(
+      no: no.round(),
+      baslik: baslik,
+      bolum: r.length > 2 ? _metin(r[2]) : '',
+      durum: r.length > 3 ? _metin(r[3]) : '',
+      firma: r.length > 4 ? _metin(r[4]) : '',
+      tutar: r.length > 5 ? _metin(r[5]) : '',
+      anahtar: r.length > 6 ? _metin(r[6]) : '',
+      acilis: r.length > 7 ? tarihEsnek(r[7]) : null,
+      sonGuncelleme: r.length > 8 ? tarihEsnek(r[8]) : null,
+      kaynak: r.length > 9 ? _metin(r[9]) : '',
+      sonrakiAdim: r.length > 10 ? _metin(r[10]) : '',
+      detay: r.length > 11 ? _metin(r[11]) : '',
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tüm veri
 // ---------------------------------------------------------------------------
@@ -321,6 +382,7 @@ class RaporVerisi {
     this.hasat = const [],
     this.besi = const [],
     this.isler = const [],
+    this.akis = const [],
     this.olusturma,
   })  : ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -339,6 +401,7 @@ class RaporVerisi {
   final List<HasatSatir> hasat;
   final List<BesiSatir> besi;
   final List<Is> isler;
+  final List<AkisKaydi> akis;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -352,6 +415,7 @@ class RaporVerisi {
       hasat: oku('hasat', HasatSatir.oku),
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
+      akis: oku('isakisi', AkisKaydi.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }

@@ -32,7 +32,8 @@ var SAYFALAR = {
   ekim: 'Ekim_Alanları',
   hasat: 'Hasat_Verim',
   besi: 'Besi_Plan',
-  isler: 'Kontrol Paneli'
+  isler: 'Kontrol Paneli',
+  isakisi: 'İş Akışı'
 };
 
 // Özel bölümler ("Özel Notlar – Sadece Ramazan Kocabaş" dosyası). Bu dosya
@@ -117,8 +118,33 @@ function veriTopla_(gun) {
     besi: dolu(satirlar(SAYFALAR.besi, 4)),
     // No, Konu, Çiftlik/Birim, Kaynak, Açılış, Durum, Son değişiklik,
     // Son durum, Sorumlu (Kontrol Paneli sayfası, 8. satırdan itibaren)
-    isler: islerOku_(tz)
+    isler: islerOku_(tz),
+    // No, Başlık, Bölüm, Durum/son gelişme, Firma, Tutar, Anahtar, Açılış,
+    // Son güncelleme, Kaynak, Sonraki adım, Detay (İş Akışı sayfası, 2'den)
+    isakisi: isAkisiOku_(tz)
   };
+}
+
+/** İş Akışı sayfasını okur (başlık 1. satırda, veri 2'den; 12 sütun). */
+function isAkisiOku_(tz) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SAYFALAR.isakisi);
+  if (!sh) return [];
+  var son = sh.getLastRow();
+  if (son < 2) return [];
+  var rows = sh.getRange(2, 1, son - 1, 12).getValues();
+  return rows
+    .filter(function (r) {
+      var no = String(r[0]).trim();
+      return no !== '' && !isNaN(parseFloat(no)) && String(r[1]).trim() !== '';
+    })
+    .map(function (r) {
+      return r.map(function (v) {
+        if (v instanceof Date) return Utilities.formatDate(v, tz, 'dd.MM.yyyy');
+        if (v === null || v === undefined) return '';
+        return v;
+      });
+    });
 }
 
 /** Kontrol Paneli'ndeki işleri okur (başlık 7. satırda, veri 8'den başlar). */
