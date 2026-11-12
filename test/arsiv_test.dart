@@ -96,6 +96,9 @@ void main() {
       await t.pumpAndSettle();
 
       expect(find.text('Personel / Puantaj'), findsOneWidget);
+      // İlk sekme personel listesi; belgeler ikinci sekmede.
+      await t.tap(find.textContaining('Puantaj / İK'));
+      await t.pumpAndSettle();
       expect(find.textContaining('kişi bazlı maaş'), findsOneWidget);
       expect(find.textContaining('Ekim 2026'), findsWidgets);
       expect(find.text('Çiftlikler Taşeron Personel Puantajı'), findsOneWidget);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../bicim.dart';
+import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
@@ -36,23 +37,44 @@ class PersonelEkran extends StatelessWidget {
         return _donemSira(b).compareTo(_donemSira(a));
       });
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Personel / Puantaj')),
-      body: kayitlar.isEmpty
-          ? const BosDurum(
-              ikon: Icons.badge_outlined,
-              yazi:
-                  'Henüz personel kaydı yok.\nPuantaj ve İK mailleri geldikçe buraya işlenir.')
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                const BilgiKutusu(
-                    yazi:
-                        'Özet/katalog görünümü — kişi bazlı maaş ve puantaj rakamları burada tutulmaz. Ayrıntı için ilgili belgeye bakın.'),
-                for (final d in donemler)
-                  _DonemGrup(donem: d, liste: gruplar[d]!),
-              ],
-            ),
+    final belgeler = kayitlar.isEmpty
+        ? const BosDurum(
+            ikon: Icons.badge_outlined,
+            yazi:
+                'Henüz personel kaydı yok.\nPuantaj ve İK mailleri geldikçe buraya işlenir.')
+        : ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              const BilgiKutusu(
+                  yazi:
+                      'Özet/katalog görünümü — kişi bazlı maaş ve puantaj rakamları burada tutulmaz. Ayrıntı için ilgili belgeye bakın.'),
+              for (final d in donemler)
+                _DonemGrup(donem: d, liste: gruplar[d]!),
+            ],
+          );
+
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Personel / Puantaj'),
+          bottom: TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
+            tabs: [
+              Tab(text: 'Personel (${veri.personelListesi.length})'),
+              Tab(text: 'Puantaj / İK (${kayitlar.length})'),
+            ],
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            PersonelListesi(veri: veri),
+            belgeler,
+          ],
+        ),
+      ),
     );
   }
 }
@@ -222,4 +244,134 @@ class _Rozet extends StatelessWidget {
             style: TextStyle(
                 fontSize: 11, fontWeight: FontWeight.w700, color: renk)),
       );
+}
+
+
+/// Tüm çiftlik personeli (ad, görev, birim); seçilenler Kişiler'e eklenir.
+class PersonelListesi extends StatefulWidget {
+  const PersonelListesi({super.key, required this.veri});
+
+  final RaporVerisi veri;
+
+  @override
+  State<PersonelListesi> createState() => _PersonelListesiState();
+}
+
+class _PersonelListesiState extends State<PersonelListesi> {
+  String _ara = '';
+  final _secili = <String>{};
+  bool _ekleniyor = false;
+
+  Future<void> _ekle(List<PersonelKisi> secilenler) async {
+    setState(() => _ekleniyor = true);
+    var n = 0;
+    try {
+      for (final p in secilenler) {
+        await VeriDeposu.ben.kisiKaydet(
+          p.ad,
+          telefon: p.telefon,
+          eposta: '',
+          birim: [p.gorev, p.birim].where((e) => e.isNotEmpty).join(' – '),
+          yenilensin: false,
+        );
+        n++;
+      }
+      await VeriDeposu.ben.yenile();
+      if (mounted) {
+        setState(_secili.clear);
+        bildir(context, "$n kişi Kişiler'e eklendi.");
+      }
+    } on VeriHatasi catch (e) {
+      if (mounted) bildir(context, '$n kişi eklendi; sonra hata: ${e.mesaj}');
+    } catch (_) {
+      if (mounted) bildir(context, '$n kişi eklendi; kalanlar eklenemedi.');
+    } finally {
+      if (mounted) setState(() => _ekleniyor = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final veri = VeriDeposu.ben.veri ?? widget.veri;
+    final mevcut = {for (final k in veri.kisiler) trKucuk(k.ad)};
+    final q = trKucuk(_ara);
+    final liste = [
+      for (final p in veri.personelListesi)
+        if (q.isEmpty || p.aranabilir.contains(q)) p
+    ];
+    final gruplar = <String, List<PersonelKisi>>{};
+    for (final p in liste) {
+      (gruplar[p.birim.isEmpty ? 'Diğer' : p.birim] ??= []).add(p);
+    }
+    final secilenler = [
+      for (final p in veri.personelListesi)
+        if (_secili.contains(p.ad)) p
+    ];
+    if (veri.personelListesi.isEmpty) {
+      return const BosDurum(
+          ikon: Icons.people_outline,
+          yazi: "Personel listesi boş. Rapor tablosundaki 'Personel_Listesi' "
+              'sayfası doldurulunca burada görünür.');
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TextField(
+            onChanged: (v) => setState(() => _ara = v),
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.search),
+              labelText: 'Ara: ad, görev ya da birim',
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+            children: [
+              for (final b in (gruplar.keys.toList()..sort())) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
+                  child: Text('$b (${gruplar[b]!.length})',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, color: Renk.ana)),
+                ),
+                for (final p in gruplar[b]!)
+                  mevcut.contains(trKucuk(p.ad))
+                      ? ListTile(
+                          dense: true,
+                          leading: const Icon(Icons.check_circle,
+                              color: Renk.yesil),
+                          title: Text(p.ad),
+                          subtitle: Text('${p.gorev} · Kişiler\'de'),
+                        )
+                      : CheckboxListTile(
+                          dense: true,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          value: _secili.contains(p.ad),
+                          onChanged: (v) => setState(() => v == true
+                              ? _secili.add(p.ad)
+                              : _secili.remove(p.ad)),
+                          title: Text(p.ad),
+                          subtitle: Text(p.gorev),
+                        ),
+              ],
+            ],
+          ),
+        ),
+        if (secilenler.isNotEmpty)
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: Buton(
+                yazi: "Seçilen ${secilenler.length} kişiyi Kişiler'e ekle",
+                ikon: Icons.person_add_alt_1,
+                mesgul: _ekleniyor,
+                onTap: () => _ekle(secilenler),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }

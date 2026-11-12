@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yonetim_raporu/veri/model.dart';
+import 'package:yonetim_raporu/veri/ozel.dart';
 
 void main() {
   test('Kisi.oku alanları ve anahtarları okur', () {
@@ -57,5 +58,25 @@ void main() {
       ],
     });
     expect(v.kisiler.single.ad, 'Zübeyde Gülmez');
+  });
+
+  test('PersonelKisi ve KisiOlayi okunur', () {
+    final v = RaporVerisi.json({
+      'personelListesi': [
+        ['Murat Bala', 'Çiftlik İşletme Operatörü', 'Şekersüt Çiftlik', '05462916491', '70089']
+      ],
+    });
+    expect(v.personelListesi.single.gorev, 'Çiftlik İşletme Operatörü');
+    final o = OzelVeri.json({
+      'kisiOlaylari': [
+        ['2026-11-12', 'Özge Demirel', 'Gecikme', 'Vetkim ödemesi', 'Cevap yok',
+          'Olumsuz', '', 'Chat', 'O-1'],
+        ['2026-11-10', 'Özge Demirel', 'Eksik bilgi', 'Soya', '', 'Olumlu',
+          '2026-11-12', 'Chat', 'O-2'],
+      ],
+    });
+    expect(o.kisiOlaylari.length, 2);
+    expect(o.kisiOlaylari.first.olumlu, isFalse);
+    expect(o.kisiOlaylari.last.olumlu, isTrue);
   });
 }

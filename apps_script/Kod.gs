@@ -37,7 +37,8 @@ var SAYFALAR = {
   arsiv: 'Arşiv',
   personel: 'Personel',
   kisiler: 'Kişiler',
-  mesajKaydi: 'Mesaj_Kaydı'
+  mesajKaydi: 'Mesaj_Kaydı',
+  personelListesi: 'Personel_Listesi'
 };
 
 // "Eşitle" düğmesinin okuduğu kaynak tablolar.
@@ -52,7 +53,10 @@ var OZEL_SAYFALAR = {
   ozelNotlar: { ad: 'Notlar', sutun: 5 },
   danismanlik: { ad: 'Danışmanlık', sutun: 6 },
   toplanti: { ad: 'Toplantı Notları', sutun: 7 },
-  gunluk: { ad: 'Günlük', sutun: 4 }
+  gunluk: { ad: 'Günlük', sutun: 4 },
+  // Kişi bazlı olaylar: Tarih, Kişi, Tür, Konu, Açıklama, Durum
+  // (Olumsuz/Olumlu), Düzeltilme tarihi, Kaynak, Kimlik
+  kisiOlaylari: { ad: 'Kişi_Olaylar', sutun: 9 }
 };
 
 /** Uygulamanın çağırdığı adres. */
@@ -135,7 +139,9 @@ function veriTopla_(gun) {
     // Dönem, Tür, Konu, Gönderen, Özet, Belge, Tarih (Personel, 2'den)
     personel: basitOku_(SAYFALAR.personel, 7, tz),
     // Ad Soyad, Görev/Birim, Telefon, E-posta, Eşleşme anahtarları, Not
-    kisiler: basitOku_(SAYFALAR.kisiler, 6, tz)
+    kisiler: basitOku_(SAYFALAR.kisiler, 6, tz),
+    // Ad Soyad, Görev, Birim, Telefon, Sicil No (tüm çiftlik personeli)
+    personelListesi: basitOku_(SAYFALAR.personelListesi, 5, tz)
   };
 }
 
@@ -230,7 +236,8 @@ function ozelTopla_() {
     ozelNotlar: oku(OZEL_SAYFALAR.ozelNotlar.ad, OZEL_SAYFALAR.ozelNotlar.sutun),
     danismanlik: oku(OZEL_SAYFALAR.danismanlik.ad, OZEL_SAYFALAR.danismanlik.sutun),
     toplanti: oku(OZEL_SAYFALAR.toplanti.ad, OZEL_SAYFALAR.toplanti.sutun),
-    gunluk: oku(OZEL_SAYFALAR.gunluk.ad, OZEL_SAYFALAR.gunluk.sutun)
+    gunluk: oku(OZEL_SAYFALAR.gunluk.ad, OZEL_SAYFALAR.gunluk.sutun),
+    kisiOlaylari: oku(OZEL_SAYFALAR.kisiOlaylari.ad, OZEL_SAYFALAR.kisiOlaylari.sutun)
   };
 }
 
@@ -246,6 +253,7 @@ function doPost(e) {
     if (govde.tur === 'esitle') return json_(esitle_());
     if (govde.tur === 'mesaj') return json_(mesajGonder_(govde));
     if (govde.tur === 'kisi') return json_(kisiGuncelle_(govde));
+    if (govde.tur === 'olay') return json_(olayDurumu_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
     var bugun = Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy');
@@ -633,13 +641,37 @@ function kisiGuncelle_(g) {
   var k = kisilerOku_();
   for (var i = 0; i < k.satirlar.length; i++) {
     if (String(k.satirlar[i][0]).trim() !== ad) continue;
-    if (g.telefon !== undefined) k.sh.getRange(i + 2, 3).setValue(String(g.telefon).trim());
+    if (g.telefon !== undefined) {
+      k.sh.getRange(i + 2, 3).setNumberFormat('@').setValue(String(g.telefon).trim());
+    }
     if (g.eposta !== undefined) k.sh.getRange(i + 2, 4).setValue(String(g.eposta).trim());
     return { ok: true };
   }
-  k.sh.appendRow([ad, String(g.birim || ''), String(g.telefon || ''),
-    String(g.eposta || ''), ad, '']);
+  var bas = k.sh.getLastRow() + 1;
+  k.sh.getRange(bas, 3).setNumberFormat('@');
+  k.sh.getRange(bas, 1, 1, 6).setValues([[ad, String(g.birim || ''),
+    String(g.telefon || ''), String(g.eposta || ''), String(g.anahtar || ad), '']]);
   return { ok: true };
+}
+
+/** Kişi olayını Olumlu (düzeltildi) / Olumsuz olarak işaretler. */
+function olayDurumu_(g) {
+  var kimlik = String(g.kimlik || '').trim();
+  var durum = g.durum === 'Olumlu' ? 'Olumlu' : 'Olumsuz';
+  if (!kimlik) return { ok: false, hata: 'Olay kimliği gerekli.' };
+  var sh = SpreadsheetApp.openById(OZEL_DOSYA_ID).getSheetByName(OZEL_SAYFALAR.kisiOlaylari.ad);
+  if (!sh) return { ok: false, hata: "'Kişi_Olaylar' sayfası bulunamadı." };
+  var son = sh.getLastRow();
+  if (son < 2) return { ok: false, hata: 'Olay bulunamadı.' };
+  var v = sh.getRange(2, 9, son - 1, 1).getValues();
+  for (var i = 0; i < v.length; i++) {
+    if (String(v[i][0]).trim() !== kimlik) continue;
+    sh.getRange(i + 2, 6).setValue(durum);
+    sh.getRange(i + 2, 7).setValue(durum === 'Olumlu'
+      ? Utilities.formatDate(new Date(), TZ_, 'dd.MM.yyyy') : '');
+    return { ok: true };
+  }
+  return { ok: false, hata: 'Olay bulunamadı.' };
 }
 
 /** Elle deneme: Apps Script editöründe çalıştırıp günlüğe bakın. */
