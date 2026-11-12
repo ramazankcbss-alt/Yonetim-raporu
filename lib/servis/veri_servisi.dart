@@ -210,6 +210,9 @@ class VeriDeposu extends ChangeNotifier {
   // --- Özel bölümler (Danışmanlık, Toplantı, Özel Notlar, Günlük) ---
   // Diske yazılmaz; her açılışta çekilir.
 
+  /// Son çekilen özel veri (yalnızca bellekte; diske yazılmaz).
+  OzelVeri? ozelBellek;
+
   Future<OzelVeri> ozelGetir() async {
     final l = link;
     if (l == null) throw VeriHatasi('Bağlantı linki yok.');
@@ -235,7 +238,9 @@ class VeriDeposu extends ChangeNotifier {
       final h = j is Map ? j['hata'] : null;
       throw VeriHatasi((h ?? 'Özel veri alınamadı.').toString());
     }
-    return OzelVeri.json(j);
+    final o = OzelVeri.json(j);
+    ozelBellek = o;
+    return o;
   }
 
   Future<void> ozelGonder(String tur, Map<String, String> alan) async {
@@ -297,11 +302,28 @@ class VeriDeposu extends ChangeNotifier {
     await _islem('mesaj', {'ad': ad, 'konu': konu, 'metin': metin});
   }
 
-  /// Kişinin telefonunu / e-postasını kaydeder ve veriyi yeniler.
+  /// Kişinin telefonunu / e-postasını kaydeder (yoksa yeni kişi ekler) ve
+  /// veriyi yeniler.
   Future<void> kisiKaydet(String ad,
-      {required String telefon, required String eposta}) async {
-    await _islem('kisi', {'ad': ad, 'telefon': telefon, 'eposta': eposta});
-    await yenile();
+      {required String telefon,
+      required String eposta,
+      String birim = '',
+      bool yenilensin = true}) async {
+    await _islem('kisi', {
+      'ad': ad,
+      'telefon': telefon,
+      'eposta': eposta,
+      'birim': birim,
+      'anahtar': ad,
+    });
+    if (yenilensin) await yenile();
+  }
+
+  /// Kişi olayını Olumlu (düzeltildi) ya da Olumsuz yapar; özel veriyi yeniler.
+  Future<void> olayDurumu(String kimlik, {required bool olumlu}) async {
+    await _islem('olay', {'kimlik': kimlik, 'durum': olumlu ? 'Olumlu' : 'Olumsuz'});
+    await ozelGetir();
+    notifyListeners();
   }
 
   static Future<String> _gonder(Uri adres, String govde) async {

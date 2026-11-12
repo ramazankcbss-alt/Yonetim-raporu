@@ -123,6 +123,46 @@ class GunceGiris {
   }
 }
 
+/// Kişi bazlı olay: Tarih, Kişi, Tür, Konu, Açıklama, Durum (Olumsuz /
+/// Olumlu), Düzeltilme tarihi, Kaynak, Kimlik. Olumsuz olay düzeltildiğinde
+/// Olumlu'ya çevrilir.
+class KisiOlayi {
+  const KisiOlayi({
+    this.tarih,
+    this.kisi = '',
+    this.tur = '',
+    this.konu = '',
+    this.aciklama = '',
+    this.durum = '',
+    this.duzeltilme,
+    this.kaynak = '',
+    this.kimlik = '',
+  });
+
+  final DateTime? tarih, duzeltilme;
+  final String kisi, tur, konu, aciklama, durum, kaynak, kimlik;
+
+  bool get olumlu => durum.trim().toLowerCase() == 'olumlu';
+
+  static KisiOlayi? oku(Object? v) {
+    final r = _l(v);
+    final kisi = _al(r, 1);
+    final konu = _al(r, 3);
+    if (kisi.isEmpty || (konu.isEmpty && _al(r, 4).isEmpty)) return null;
+    return KisiOlayi(
+      tarih: r.isNotEmpty ? tarihEsnek(r[0]) : null,
+      kisi: kisi,
+      tur: _al(r, 2),
+      konu: konu,
+      aciklama: _al(r, 4),
+      durum: _al(r, 5),
+      duzeltilme: r.length > 6 ? tarihEsnek(r[6]) : null,
+      kaynak: _al(r, 7),
+      kimlik: _al(r, 8),
+    );
+  }
+}
+
 /// ?bolum=ozel cevabının tamamı.
 class OzelVeri {
   const OzelVeri({
@@ -130,12 +170,14 @@ class OzelVeri {
     this.danismanlik = const [],
     this.toplanti = const [],
     this.gunce = const [],
+    this.kisiOlaylari = const [],
   });
 
   final List<OzelNot> ozelNotlar;
   final List<DanismanlikKaydi> danismanlik;
   final List<ToplantiNotu> toplanti;
   final List<GunceGiris> gunce;
+  final List<KisiOlayi> kisiOlaylari;
 
   factory OzelVeri.json(Map<String, dynamic> j) {
     List<T> oku<T extends Object>(String alan, T? Function(Object?) f) =>
@@ -145,6 +187,7 @@ class OzelVeri {
       danismanlik: oku('danismanlik', DanismanlikKaydi.oku),
       toplanti: oku('toplanti', ToplantiNotu.oku),
       gunce: oku('gunluk', GunceGiris.oku),
+      kisiOlaylari: oku('kisiOlaylari', KisiOlayi.oku),
     );
   }
 }

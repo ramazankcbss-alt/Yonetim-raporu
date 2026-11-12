@@ -534,6 +534,36 @@ class Kisi {
   }
 }
 
+/// Çiftlik personel listesindeki bir çalışan ('Personel_Listesi' sayfası).
+/// Sütunlar: Ad Soyad, Görev, Birim, Telefon, Sicil No.
+class PersonelKisi {
+  const PersonelKisi({
+    required this.ad,
+    this.gorev = '',
+    this.birim = '',
+    this.telefon = '',
+    this.sicil = '',
+  });
+
+  final String ad, gorev, birim, telefon, sicil;
+
+  String get aranabilir => trKucuk('$ad $gorev $birim');
+
+  static PersonelKisi? oku(Object? v) {
+    final r = _liste(v);
+    if (r.isEmpty) return null;
+    final ad = _metin(r[0]);
+    if (ad.isEmpty) return null;
+    return PersonelKisi(
+      ad: ad,
+      gorev: r.length > 1 ? _metin(r[1]) : '',
+      birim: r.length > 2 ? _metin(r[2]) : '',
+      telefon: r.length > 3 ? _metin(r[3]) : '',
+      sicil: r.length > 4 ? _metin(r[4]) : '',
+    );
+  }
+}
+
 /// Türkçe küçük harfe çevirir (İ→i, I→ı) ve boşlukları sadeleştirir.
 String trKucuk(String s) => s
     .replaceAll('İ', 'i')
@@ -559,6 +589,7 @@ class RaporVerisi {
     this.arsiv = const [],
     this.personel = const [],
     this.kisiler = const [],
+    this.personelListesi = const [],
     this.olusturma,
   })  : ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -581,6 +612,7 @@ class RaporVerisi {
   final List<ArsivKaydi> arsiv;
   final List<PersonelKaydi> personel;
   final List<Kisi> kisiler;
+  final List<PersonelKisi> personelListesi;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -598,6 +630,7 @@ class RaporVerisi {
       arsiv: oku('arsiv', ArsivKaydi.oku),
       personel: oku('personel', PersonelKaydi.oku),
       kisiler: oku('kisiler', Kisi.oku),
+      personelListesi: oku('personelListesi', PersonelKisi.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }
