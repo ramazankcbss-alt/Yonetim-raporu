@@ -18,6 +18,7 @@ class TarimEkran extends StatefulWidget {
 
 class _TarimEkranState extends State<TarimEkran> {
   String? _ciftlik; // null: tümü
+  bool _hayvancilik = false; // false: Ziraat, true: Hayvancılık
 
   @override
   Widget build(BuildContext context) {
@@ -28,67 +29,90 @@ class _TarimEkranState extends State<TarimEkran> {
         ? const <TarimKaydi>[]
         : v
             .tarimDonem(sonTarih.subtract(const Duration(days: 30)), sonTarih)
+            .where((t) => t.hayvancilik == _hayvancilik)
             .where((t) => _ciftlik == null || t.ciftlik == _ciftlik)
             .toList()
             .reversed
             .toList();
+    // Çiftlik çipleri yalnızca seçili türde kaydı olan çiftlikleri göstersin.
+    final turCiftlikleri = {
+      for (final t in v.tarim)
+        if (t.hayvancilik == _hayvancilik) t.ciftlik
+    };
     final ciftlikler = [
-      ...ciftlikSirasi.where((c) => v.tarim.any((t) => t.ciftlik == c)),
-      ...{for (final t in v.tarim) t.ciftlik}
-          .where((c) => !ciftlikSirasi.contains(c)),
+      ...ciftlikSirasi.where(turCiftlikleri.contains),
+      ...turCiftlikleri.where((c) => !ciftlikSirasi.contains(c)),
     ];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        GostergeIzgarasi(kartlar: [
-          GostergeKarti(
-            baslik: 'Planlanan Alan',
-            deger: '${sayi(plan)} da',
-            ikon: Icons.map_outlined,
-          ),
-          GostergeKarti(
-            baslik: 'Ekilen Alan',
-            deger: '${sayi(ekilen)} da',
-            ikon: Icons.grass,
-            renk: Renk.yesil,
-            alt: plan > 0 ? 'Planın %${sayi(ekilen / plan * 100)}\'i' : null,
-          ),
-        ]),
+        _TurGecis(
+          hayvancilik: _hayvancilik,
+          sec: (h) => setState(() {
+            _hayvancilik = h;
+            _ciftlik = null;
+          }),
+        ),
         const SizedBox(height: 12),
+        if (!_hayvancilik) ...[
+          GostergeIzgarasi(kartlar: [
+            GostergeKarti(
+              baslik: 'Planlanan Alan',
+              deger: '${sayi(plan)} da',
+              ikon: Icons.map_outlined,
+            ),
+            GostergeKarti(
+              baslik: 'Ekilen Alan',
+              deger: '${sayi(ekilen)} da',
+              ikon: Icons.grass,
+              renk: Renk.yesil,
+              alt: plan > 0 ? 'Planın %${sayi(ekilen / plan * 100)}\'i' : null,
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Panel(
+            baslik: 'Ekim Alanları (dekar)',
+            child: v.ekim.isEmpty
+                ? const BosDurum(
+                    ikon: Icons.grass, yazi: 'Ekim alanı verisi yok.')
+                : Column(
+                    children: [for (final e in v.ekim) _EkimSatiri(e: e)],
+                  ),
+          ),
+          Panel(
+            baslik: 'Hasat / Verim Özeti',
+            child: v.hasat.isEmpty
+                ? const BosDurum(
+                    ikon: Icons.inventory_2_outlined, yazi: 'Hasat kaydı yok.')
+                : VeriTablosu(
+                    basliklar: hasatBasliklari,
+                    satirlar: hasatSatirlari(v.hasat),
+                    metinSutunlari: const {0, 1},
+                    ilkSutunGenislik: 170,
+                  ),
+          ),
+        ] else ...[
+          Panel(
+            baslik: 'Besi Planı ve Kesim',
+            child: v.besi.isEmpty
+                ? const BosDurum(
+                    ikon: Icons.pets, yazi: 'Besi planı verisi yok.')
+                : VeriTablosu(
+                    basliklar: besiBasliklari,
+                    satirlar: besiSatirlari(v.besi),
+                    vurguluSonSatir: true,
+                    ilkSutunGenislik: 110,
+                  ),
+          ),
+          const BilgiKutusu(
+              yazi:
+                  'Günlük süt, sağılan ve hayvan sayıları için Günlük ve Haftalık sekmelerine bakın.'),
+        ],
         Panel(
-          baslik: 'Ekim Alanları (dekar)',
-          child: v.ekim.isEmpty
-              ? const BosDurum(ikon: Icons.grass, yazi: 'Ekim alanı verisi yok.')
-              : Column(
-                  children: [for (final e in v.ekim) _EkimSatiri(e: e)],
-                ),
-        ),
-        Panel(
-          baslik: 'Hasat / Verim Özeti',
-          child: v.hasat.isEmpty
-              ? const BosDurum(
-                  ikon: Icons.inventory_2_outlined, yazi: 'Hasat kaydı yok.')
-              : VeriTablosu(
-                  basliklar: hasatBasliklari,
-                  satirlar: hasatSatirlari(v.hasat),
-                  metinSutunlari: const {0, 1},
-                  ilkSutunGenislik: 170,
-                ),
-        ),
-        Panel(
-          baslik: 'Besi Planı ve Kesim',
-          child: v.besi.isEmpty
-              ? const BosDurum(ikon: Icons.pets, yazi: 'Besi planı verisi yok.')
-              : VeriTablosu(
-                  basliklar: besiBasliklari,
-                  satirlar: besiSatirlari(v.besi),
-                  vurguluSonSatir: true,
-                  ilkSutunGenislik: 110,
-                ),
-        ),
-        Panel(
-          baslik: 'Faaliyet Akışı (son 30 gün)',
+          baslik: _hayvancilik
+              ? 'Hayvancılık Faaliyetleri (son 30 gün)'
+              : 'Ziraat Faaliyetleri (son 30 gün)',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -120,6 +144,97 @@ class _TarimEkranState extends State<TarimEkran> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Ziraat / Hayvancılık ikili geçişi.
+class _TurGecis extends StatelessWidget {
+  const _TurGecis({required this.hayvancilik, required this.sec});
+
+  final bool hayvancilik;
+  final ValueChanged<bool> sec;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Renk.zemin,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Renk.cizgi),
+      ),
+      child: Row(
+        children: [
+          _TurDugme(
+              yazi: 'Ziraat',
+              ikon: Icons.agriculture_outlined,
+              secili: !hayvancilik,
+              onTap: () => sec(false)),
+          _TurDugme(
+              yazi: 'Hayvancılık',
+              ikon: Icons.pets_outlined,
+              secili: hayvancilik,
+              onTap: () => sec(true)),
+        ],
+      ),
+    );
+  }
+}
+
+class _TurDugme extends StatelessWidget {
+  const _TurDugme({
+    required this.yazi,
+    required this.ikon,
+    required this.secili,
+    required this.onTap,
+  });
+
+  final String yazi;
+  final IconData ikon;
+  final bool secili;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(9),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            decoration: BoxDecoration(
+              color: secili ? Renk.kart : Colors.transparent,
+              borderRadius: BorderRadius.circular(9),
+              boxShadow: secili
+                  ? [
+                      BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1))
+                    ]
+                  : null,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(ikon,
+                    size: 18, color: secili ? Renk.ana : Renk.soluk),
+                const SizedBox(width: 6),
+                Text(yazi,
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight:
+                            secili ? FontWeight.w700 : FontWeight.w500,
+                        color: secili ? Renk.ana : Renk.soluk)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

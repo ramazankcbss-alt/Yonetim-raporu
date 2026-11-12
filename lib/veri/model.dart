@@ -184,6 +184,30 @@ class TarimKaydi {
     if (c.isEmpty || f.isEmpty) return null;
     return TarimKaydi(tarih: t, ciftlik: c, faaliyet: f);
   }
+
+  /// Faaliyet hayvancılığa mı ait? Değilse ziraat (bitkisel) sayılır.
+  bool get hayvancilik => faaliyetHayvancilik(faaliyet);
+}
+
+/// Bir tarım faaliyetini kabaca hayvancılık/ziraat olarak ayırır. Metinde
+/// açık bir hayvancılık ipucu yoksa ziraat (bitkisel üretim) kabul edilir.
+/// ("süt" bilerek kullanılmadı: "Şekersüt" çiftlik adıyla karışmasın.)
+bool faaliyetHayvancilik(String faaliyet) {
+  final s = faaliyet
+      .toLowerCase()
+      .replaceAll('̇', '') // "İ" → "i" sonrası kalan birleşik nokta
+      .replaceAll('ı', 'i')
+      .replaceAll('ğ', 'g')
+      .replaceAll('ş', 's')
+      .replaceAll('ö', 'o')
+      .replaceAll('ü', 'u')
+      .replaceAll('ç', 'c');
+  const anahtar = [
+    'sagim', 'sagmal', 'buzag', 'inek', 'duve', 'dana', 'boga', 'besi',
+    'kesim', 'asilama', 'tohumlama', 'suni tohum', 'dogum', 'veteriner',
+    'mastitis', 'kupe', 'ahir', 'agil', 'padok', 'tirnak', 'rasyon', 'hayvan',
+  ];
+  return anahtar.any(s.contains);
 }
 
 class EkimSatir {
