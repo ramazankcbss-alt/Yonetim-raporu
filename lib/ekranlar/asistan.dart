@@ -4,6 +4,7 @@ import '../tema.dart';
 import '../veri/model.dart';
 import 'danismanlik.dart';
 import 'gunce.dart';
+import 'isakisi.dart';
 import 'isler.dart';
 import 'kilit.dart';
 import 'ozel_notlar.dart';
@@ -36,6 +37,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.ana,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => IslerEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.account_tree_outlined,
+          baslik: 'İş Akışı',
+          aciklama: _akisOzet(veri),
+          renk: _morAsistan,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => IsAkisiEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.forum_outlined,
@@ -74,6 +83,19 @@ class AsistanEkran extends StatelessWidget {
       ],
     );
   }
+}
+
+const _morAsistan = Color(0xFF7C3AED);
+
+String _akisOzet(RaporVerisi veri) {
+  final acik = veri.akis.where((k) => !k.tamam).length;
+  final finans = veri.akis.where((k) => k.finansta).length;
+  if (veri.akis.isEmpty) {
+    return 'Sipariş → satınalma → fatura → ödeme akışı';
+  }
+  return finans > 0
+      ? '$acik açık iş · $finans ödeme aşamasında'
+      : '$acik açık iş · sipariştan finansa';
 }
 
 class _Bolum extends StatelessWidget {

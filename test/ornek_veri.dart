@@ -24,6 +24,35 @@ final Map<String, dynamic> ornekJson = {
       'Tamamlandı', '2026-11-04', 'İhsan Kocak\'tan alındı', 'Murat Bala'
     ],
   ],
+  // No, Başlık, Bölüm, Durum, Firma, Tutar, Anahtar, Açılış, Son güncelleme,
+  // Kaynak, Sonraki adım, Detay
+  'isakisi': [
+    [
+      '1', 'Soya küspesi siparişi', 'Satınalma', 'SAT açıldı',
+      'Çukurova Yem', '', '2-412888', '08.11.2026', '10.11.2026',
+      'Chat – Satınalma', 'Malzeme teslim bekleniyor', ''
+    ],
+    [
+      '2', 'Vetkim ilaç ödemesi', 'Finans', 'Ödeme bekliyor',
+      'Vetkim', '48.500 TL', '', '20.10.2026', '01.11.2026',
+      'Chat – Ödeme', 'Finans ödemeyi planlasın', ''
+    ],
+    [
+      '3', 'Sağım sistemi fatura', 'Muhasebe', 'Fatura geldi',
+      'DeLaval', '', 'FT-2026-551', '25.10.2026', '11.11.2026',
+      'Gmail', 'Ödeme planına eklenecek', ''
+    ],
+    [
+      '4', 'Traktör dingil arızası', 'Arıza-Bakım', 'Serviste',
+      '42 VU 717', '', '', '05.11.2026', '09.11.2026',
+      'Chat – Satınalma', 'Parça bekleniyor', ''
+    ],
+    [
+      '5', 'Yağmurluk alımı', 'Tamamlandı', 'Ödendi',
+      'İhsan Kocak', '', '', '27.10.2026', '04.11.2026',
+      'Chat – Satınalma', '', ''
+    ],
+  ],
   'hayvanOzet': [
     ..._gun('2026-11-02', [
       ['Fethiye Şube', 41, 2, 981, 419, 10471, 0, 3, 1, 1],
