@@ -94,6 +94,30 @@ void main() {
           findsOneWidget);
     });
 
+    testWidgets('hat kutusuna dokununca liste süzülür', (t) async {
+      _telefon(t);
+      final veri = RaporVerisi.json(ornekJson);
+      await t.pumpWidget(_uygulama(IsAkisiEkran(veri: veri)));
+      await t.pumpAndSettle();
+
+      // Başlangıçta her iki kalem de görünür.
+      expect(find.text('1. Soya küspesi siparişi'), findsOneWidget);
+      expect(find.text('2. Vetkim ilaç ödemesi'), findsOneWidget);
+
+      // Satınalma hat kutusuna dokun (ilki = üstteki şerit kutusu; ekranda).
+      await t.tap(find.text('Satınalma').first);
+      await t.pumpAndSettle();
+
+      // Yalnızca Satınalma kalemi kalır.
+      expect(find.text('1. Soya küspesi siparişi'), findsOneWidget);
+      expect(find.text('2. Vetkim ilaç ödemesi'), findsNothing);
+
+      // Tümü ile geri dön.
+      await t.tap(find.text('Tümü'));
+      await t.pumpAndSettle();
+      expect(find.text('2. Vetkim ilaç ödemesi'), findsOneWidget);
+    });
+
     testWidgets('veri yoksa boş durum', (t) async {
       _telefon(t);
       await t.pumpWidget(_uygulama(IsAkisiEkran(veri: RaporVerisi.json({}))));
