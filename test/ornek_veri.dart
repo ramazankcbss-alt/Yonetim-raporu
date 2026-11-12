@@ -53,6 +53,32 @@ final Map<String, dynamic> ornekJson = {
       'Chat – Satınalma', '', ''
     ],
   ],
+  // Tarih, Kategori, Konu, Gönderen, Özet, Ekler, Periyot
+  'arsiv': [
+    [
+      '02.11.2026', 'Puantaj / İK',
+      'Çiftlikler Puantaj ve Fazla Mesailer (Ekim2026)',
+      'Osman Konuk (abholding)',
+      'Ekim ek ödemeler: Pangev/Pankent yemek-yol ücreti',
+      'ÇİFTLİKLER PUANTAJ VE MESAİLER 2026 EKİM', 'Ekim 2026'
+    ],
+    [
+      '10.11.2026', 'Sipariş / Satınalma', 'Sağımhane dezenfektan talebi',
+      'Sinem', 'Şekersüt/Fethiye şartname iletildi', '', ''
+    ],
+  ],
+  // Dönem, Tür, Konu, Gönderen, Özet, Belge, Tarih
+  'personel': [
+    [
+      'Ekim 2026', 'Puantaj', 'Çiftlikler Puantaj ve Fazla Mesailer',
+      'Osman Konuk (İK/işveren)', 'Ekim puantaj ve fazla mesailer; ek ödemeler',
+      'ÇİFTLİKLER PUANTAJ VE MESAİLER 2026 EKİM', '02.11.2026'
+    ],
+    [
+      'Ekim 2026', 'Taşeron Puantaj', 'Çiftlikler Taşeron Personel Puantajı',
+      'Osman Konuk', 'Taşeron personel puantajı', '', '02.11.2026'
+    ],
+  ],
   'hayvanOzet': [
     ..._gun('2026-11-02', [
       ['Fethiye Şube', 41, 2, 981, 419, 10471, 0, 3, 1, 1],

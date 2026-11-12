@@ -393,6 +393,81 @@ class AkisKaydi {
   }
 }
 
+/// Belge Havuzu / Arşiv kaydı: gelen bir mailin ya da belgenin kataloğu.
+class ArsivKaydi {
+  const ArsivKaydi({
+    required this.konu,
+    this.tarih,
+    this.kategori = '',
+    this.gonderen = '',
+    this.ozet = '',
+    this.ekler = '',
+    this.periyot = '',
+  });
+
+  final DateTime? tarih;
+  final String konu, kategori, gonderen, ozet, ekler, periyot;
+
+  bool get ekliMi => ekler.trim().isNotEmpty;
+  bool get aylikMi => periyot.trim().isNotEmpty;
+
+  /// Serbest metin aramasında taranan birleşik alan (küçük harf).
+  String get aranabilir =>
+      [konu, kategori, gonderen, ozet, ekler, periyot]
+          .join(' ')
+          .toLowerCase();
+
+  static ArsivKaydi? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 3) return null;
+    final konu = _metin(r[2]);
+    if (konu.isEmpty) return null;
+    return ArsivKaydi(
+      tarih: tarihEsnek(r[0]),
+      kategori: _metin(r[1]),
+      konu: konu,
+      gonderen: r.length > 3 ? _metin(r[3]) : '',
+      ozet: r.length > 4 ? _metin(r[4]) : '',
+      ekler: r.length > 5 ? _metin(r[5]) : '',
+      periyot: r.length > 6 ? _metin(r[6]) : '',
+    );
+  }
+}
+
+/// Personel / Puantaj kaydı (özet/katalog — kişi bazlı rakam tutulmaz).
+class PersonelKaydi {
+  const PersonelKaydi({
+    required this.konu,
+    this.donem = '',
+    this.tur = '',
+    this.gonderen = '',
+    this.ozet = '',
+    this.belge = '',
+    this.tarih,
+  });
+
+  final String donem, tur, konu, gonderen, ozet, belge;
+  final DateTime? tarih;
+
+  bool get belgeliMi => belge.trim().isNotEmpty;
+
+  static PersonelKaydi? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 3) return null;
+    final konu = _metin(r[2]);
+    if (konu.isEmpty) return null;
+    return PersonelKaydi(
+      donem: _metin(r[0]),
+      tur: _metin(r[1]),
+      konu: konu,
+      gonderen: r.length > 3 ? _metin(r[3]) : '',
+      ozet: r.length > 4 ? _metin(r[4]) : '',
+      belge: r.length > 5 ? _metin(r[5]) : '',
+      tarih: r.length > 6 ? tarihEsnek(r[6]) : null,
+    );
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Tüm veri
 // ---------------------------------------------------------------------------
@@ -407,6 +482,8 @@ class RaporVerisi {
     this.besi = const [],
     this.isler = const [],
     this.akis = const [],
+    this.arsiv = const [],
+    this.personel = const [],
     this.olusturma,
   })  : ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -426,6 +503,8 @@ class RaporVerisi {
   final List<BesiSatir> besi;
   final List<Is> isler;
   final List<AkisKaydi> akis;
+  final List<ArsivKaydi> arsiv;
+  final List<PersonelKaydi> personel;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -440,6 +519,8 @@ class RaporVerisi {
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
       akis: oku('isakisi', AkisKaydi.oku),
+      arsiv: oku('arsiv', ArsivKaydi.oku),
+      personel: oku('personel', PersonelKaydi.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }

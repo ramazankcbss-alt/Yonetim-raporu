@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../tema.dart';
 import '../veri/model.dart';
+import 'arsiv.dart';
 import 'danismanlik.dart';
 import 'gunce.dart';
 import 'isakisi.dart';
 import 'isler.dart';
+import 'personel.dart';
 import 'kilit.dart';
 import 'ozel_notlar.dart';
 import 'toplanti.dart';
@@ -47,6 +49,22 @@ class AsistanEkran extends StatelessWidget {
               MaterialPageRoute(builder: (_) => IsAkisiEkran(veri: veri))),
         ),
         _Bolum(
+          ikon: Icons.inventory_2_outlined,
+          baslik: 'Belge Havuzu',
+          aciklama: _arsivOzet(veri),
+          renk: Renk.mavi,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ArsivEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.badge_outlined,
+          baslik: 'Personel / Puantaj',
+          aciklama: _personelOzet(veri),
+          renk: Renk.turuncu,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => PersonelEkran(veri: veri))),
+        ),
+        _Bolum(
           ikon: Icons.forum_outlined,
           baslik: 'Danışmanlık',
           aciklama: 'Bir konuyu sor, görüş ve yol önerisi al',
@@ -86,6 +104,20 @@ class AsistanEkran extends StatelessWidget {
 }
 
 const _morAsistan = Color(0xFF7C3AED);
+
+String _arsivOzet(RaporVerisi veri) {
+  final n = veri.arsiv.length;
+  return n == 0
+      ? 'Gelen mail ve belgeleri ara, bul'
+      : '$n belge · ara, bul, kategoriye göre süz';
+}
+
+String _personelOzet(RaporVerisi veri) {
+  final n = veri.personel.length;
+  return n == 0
+      ? 'Puantaj, fazla mesai, İK — özet'
+      : '$n kayıt · puantaj, mesai, İK (özet)';
+}
 
 String _akisOzet(RaporVerisi veri) {
   final acik = veri.akis.where((k) => !k.tamam).length;
