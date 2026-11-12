@@ -8,15 +8,25 @@ import 'bilesenler.dart';
 /// Sekreterlik — Kontrol Paneli'ndeki işlerin (bekleyen / devam eden /
 /// tamamlanan) salt okunur görünümü. Veri E-Tablodan gelir, uygulamada
 /// değiştirilmez; durum değişiklikleri E-Tablo ve otomatik görevlerle yürür.
-class IslerEkran extends StatelessWidget {
+class IslerEkran extends StatefulWidget {
   const IslerEkran({super.key, required this.veri});
 
   final RaporVerisi veri;
 
   @override
+  State<IslerEkran> createState() => _IslerEkranState();
+}
+
+class _IslerEkranState extends State<IslerEkran> {
+  String? _filtre; // null: tümü; 'Bekliyor' / 'Devam ediyor' / 'Tamamlandı'
+
+  void _degistir(String durum) =>
+      setState(() => _filtre = (_filtre == durum) ? null : durum);
+
+  @override
   Widget build(BuildContext context) {
     final bugun = DateTime.now();
-    final isler = veri.isler;
+    final isler = widget.veri.isler;
 
     int acilis(Is a) => a.acilis?.millisecondsSinceEpoch ?? 0;
     final bekleyen = isler.where((i) => i.bekliyor).toList()
@@ -27,6 +37,8 @@ class IslerEkran extends StatelessWidget {
       ..sort((a, b) => (b.sonDegisiklik ?? DateTime(2000))
           .compareTo(a.sonDegisiklik ?? DateTime(2000)));
     final geciken = bekleyen.where((i) => i.gecikmis(bugun)).length;
+
+    final goster = _filtre == null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Sekreterlik — İşler')),
@@ -41,31 +53,39 @@ class IslerEkran extends StatelessWidget {
                     _Sayac(
                         etiket: 'Bekliyor',
                         sayi: bekleyen.length,
-                        renk: Renk.turuncu),
+                        renk: Renk.turuncu,
+                        secili: _filtre == 'Bekliyor',
+                        onTap: () => _degistir('Bekliyor')),
                     const SizedBox(width: 10),
                     _Sayac(
                         etiket: 'Devam',
                         sayi: devam.length,
-                        renk: Renk.mavi),
+                        renk: Renk.mavi,
+                        secili: _filtre == 'Devam ediyor',
+                        onTap: () => _degistir('Devam ediyor')),
                     const SizedBox(width: 10),
                     _Sayac(
                         etiket: 'Tamam',
                         sayi: tamam.length,
-                        renk: Renk.yesil),
+                        renk: Renk.yesil,
+                        secili: _filtre == 'Tamamlandı',
+                        onTap: () => _degistir('Tamamlandı')),
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (geciken > 0)
+                if (geciken > 0 && (goster || _filtre == 'Bekliyor'))
                   BilgiKutusu(
                       uyari: true,
                       yazi:
                           '$geciken iş 14 günden uzun süredir bekliyor. Toplantıda sorumlu ve tarih atanabilir.'),
-                if (bekleyen.isNotEmpty)
+                if ((goster || _filtre == 'Bekliyor') && bekleyen.isNotEmpty)
                   _grup('Bekleyen işler', bekleyen, bugun),
-                if (devam.isNotEmpty) _grup('Devam eden işler', devam, bugun),
-                if (tamam.isNotEmpty) _grup('Tamamlanan işler', tamam, bugun),
+                if ((goster || _filtre == 'Devam ediyor') && devam.isNotEmpty)
+                  _grup('Devam eden işler', devam, bugun),
+                if ((goster || _filtre == 'Tamamlandı') && tamam.isNotEmpty)
+                  _grup('Tamamlanan işler', tamam, bugun),
                 const SizedBox(height: 8),
-                if (veri.olusturma != null)
+                if (widget.veri.olusturma != null)
                   Center(
                     child: Text('Kaynak: Kontrol Paneli · ${tarihKisa(bugun)}',
                         style:
@@ -100,31 +120,53 @@ Color _durumRenk(String d) {
 }
 
 class _Sayac extends StatelessWidget {
-  const _Sayac({required this.etiket, required this.sayi, required this.renk});
+  const _Sayac({
+    required this.etiket,
+    required this.sayi,
+    required this.renk,
+    required this.secili,
+    required this.onTap,
+  });
 
   final String etiket;
   final int sayi;
   final Color renk;
+  final bool secili;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: renk.withValues(alpha: 0.10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: renk.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          children: [
-            Text('$sayi',
-                style: TextStyle(
-                    fontSize: 24, fontWeight: FontWeight.w800, color: renk)),
-            const SizedBox(height: 2),
-            Text(etiket,
-                style: const TextStyle(fontSize: 12.5, color: Renk.yazi)),
-          ],
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: renk.withValues(alpha: secili ? 0.20 : 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: renk.withValues(alpha: secili ? 0.90 : 0.25),
+                  width: secili ? 2 : 1),
+            ),
+            child: Column(
+              children: [
+                Text('$sayi',
+                    style: TextStyle(
+                        fontSize: 24, fontWeight: FontWeight.w800, color: renk)),
+                const SizedBox(height: 2),
+                Text(etiket,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        color: Renk.yazi,
+                        fontWeight:
+                            secili ? FontWeight.w700 : FontWeight.w400)),
+              ],
+            ),
+          ),
         ),
       ),
     );
