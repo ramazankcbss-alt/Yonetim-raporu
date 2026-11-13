@@ -8,6 +8,7 @@ import 'arsiv.dart';
 import 'danismanlik.dart';
 import 'esk.dart';
 import 'gecmis.dart';
+import 'hastalik.dart';
 import 'gunce.dart';
 import 'isakisi.dart';
 import 'isler.dart';
@@ -95,6 +96,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.ana,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => GecmisEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.vaccines_outlined,
+          baslik: 'Hastalık Dağılımı',
+          aciklama: 'Aylara göre hastalıklar; çiftlik, cins ve ölüm/kalım/kuru/kesim/imha + önleme tedbirleri',
+          renk: Renk.kirmizi,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => HastalikEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.forum_outlined,

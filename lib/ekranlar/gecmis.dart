@@ -45,7 +45,7 @@ class GecmisEkran extends StatelessWidget {
                             'güncel olmalı.'),
                   )
                 : TabBarView(children: [
-                    _Gostergeler(kayitlar: v.gecmis),
+                    _Gostergeler(kayitlar: v.gecmis.where((x) => x.konu != 'Hastalık kaydı').toList()),
                     _Dersler(dersler: v.dersler),
                   ]),
           ),
