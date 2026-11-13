@@ -70,7 +70,7 @@ void main() {
     expect(find.text('Ekim 2026'), findsOneWidget);
     expect(find.text('Tahmini'), findsOneWidget);
 
-    await t.tap(find.text('Eksik belgeler'));
+    await t.tap(find.text('Eksikler'));
     await t.pumpAndSettle();
     expect(find.text('ESK sözleşmesi'), findsOneWidget);
     expect(find.text('Kimden: Ümit Buldu / Osman Konuk'), findsOneWidget);
