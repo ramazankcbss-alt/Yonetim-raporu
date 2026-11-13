@@ -129,6 +129,9 @@ class _Ozet extends StatelessWidget {
         _Grup(baslik: 'Fiyatlar', satirlar: bol('Fiyat')),
         _Grup(baslik: 'Faturalar', satirlar: bol('Fatura')),
         _Grup(baslik: 'ESK adına alımlar', satirlar: bol('Alım')),
+        _Grup(
+            baslik: 'Geçmiş yıllar (ESK öncesi Taşağıl)',
+            satirlar: bol('Geçmiş')),
       ],
     );
   }
