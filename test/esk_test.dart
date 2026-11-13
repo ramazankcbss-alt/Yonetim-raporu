@@ -33,6 +33,7 @@ final _eskJson = <String, dynamic>{
     ['Özet', '2026 Ocak–Ağustos toplam (resmi)', -7648002, ''],
     ['Fiyat', 'Bakım besleme ücreti', '50 TL/baş/gün', 'Ekim faturası'],
     ['Öneri', '1. Asgari hacim maddesi', '3.600 baş/gün', 'Al ya da öde'],
+    ['Geçmiş', 'Taşağıl doluluk 2018 → 2023', '5.899 → 0 baş', ''],
     ['Eksik', 'ESK sözleşmesi', 'Ümit Buldu / Osman Konuk', 'Süre, fiyat'],
   ],
 };
@@ -64,6 +65,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('3.546 baş / gün ortalama'), findsOneWidget);
     expect(find.textContaining('başabaşın 507 baş altında'), findsOneWidget);
+    expect(find.text('Taşağıl doluluk 2018 → 2023'), findsOneWidget);
 
     await t.tap(find.text('Aylık'));
     await t.pumpAndSettle();
