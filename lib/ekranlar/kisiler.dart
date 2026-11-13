@@ -25,11 +25,6 @@ class KisiIsleri {
           for (final o in olaylar)
             if (kisi.eslesir([o.kisi])) o
         ]..sort((a, b) => _tarihSirala(a.tarih, b.tarih)),
-        yazismalar = [
-          for (final a in veri.arsiv)
-            if (kisi.eslesir([a.kisiler, a.konu, a.gonderen, a.ozet, a.ekler]))
-              a
-        ]..sort((a, b) => _tarihSirala(a.tarih, b.tarih)),
         ik = [
           for (final p in veri.personel)
             if (kisi.eslesir([p.konu, p.ozet, p.belge])) p
@@ -39,9 +34,6 @@ class KisiIsleri {
   /// Personel/Puantaj (İK) kayıtlarında adı geçenler: savunma, tutanak,
   /// puantaj farkı, iş kazası vb.
   final List<PersonelKaydi> ik;
-
-  /// Adının geçtiği tüm yazışmalar (Belge Havuzu / Arşiv), konu ayırmadan.
-  final List<ArsivKaydi> yazismalar;
   final List<Is> isler;
   final List<AkisKaydi> akis;
   final List<KisiOlayi> olaylar;
@@ -49,8 +41,7 @@ class KisiIsleri {
   int get toplam => isler.length + akis.length;
 
   /// Hiç açık işi ve olayı yok.
-  bool get kayitsiz =>
-      toplam == 0 && olaylar.isEmpty && ik.isEmpty && yazismalar.isEmpty;
+  bool get kayitsiz => toplam == 0 && olaylar.isEmpty && ik.isEmpty;
   int get olumsuz => olaylar.where((o) => !o.olumlu).length;
   int get olumlu => olaylar.where((o) => o.olumlu).length;
 
@@ -603,31 +594,6 @@ class _KisiDetayEkranState extends State<KisiDetayEkran> {
                       ].join(' · ')),
                     ),
                   ),
-              ],
-              if (ki.yazismalar.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: Text('Adı geçen yazışmalar (${ki.yazismalar.length})',
-                      style: const TextStyle(
-                          fontSize: 15.5, fontWeight: FontWeight.w700)),
-                  children: [
-                    for (final a in ki.yazismalar.take(100))
-                      Card(
-                        child: ListTile(
-                          dense: true,
-                          title: Text(a.konu,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text([
-                            if (a.tarih != null) tarihKisa(a.tarih!),
-                            if (a.gonderen.isNotEmpty) a.gonderen,
-                            if (a.ozet.isNotEmpty) a.ozet,
-                          ].join(' · ')),
-                        ),
-                      ),
-                  ],
-                ),
               ],
               const SizedBox(height: 14),
               // --- Açık işler ---

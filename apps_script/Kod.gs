@@ -134,8 +134,8 @@ function veriTopla_(gun) {
     // No, Başlık, Bölüm, Durum/son gelişme, Firma, Tutar, Anahtar, Açılış,
     // Son güncelleme, Kaynak, Sonraki adım, Detay (İş Akışı sayfası, 2'den)
     isakisi: isAkisiOku_(tz),
-    // Tarih, Kategori, Konu, Gönderen, Özet, Ekler, Periyot, Anahtar, Geçen kişiler (Arşiv, 2'den)
-    arsiv: basitOku_(SAYFALAR.arsiv, 9, tz),
+    // Tarih, Kategori, Konu, Gönderen, Özet, Ekler, Periyot (Arşiv, 2'den)
+    arsiv: basitOku_(SAYFALAR.arsiv, 7, tz),
     // Dönem, Tür, Konu, Gönderen, Özet, Belge, Tarih (Personel, 2'den)
     personel: basitOku_(SAYFALAR.personel, 7, tz),
     // Ad Soyad, Görev/Birim, Telefon, E-posta, Eşleşme anahtarları, Not
