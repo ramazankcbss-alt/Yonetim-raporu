@@ -5,10 +5,13 @@ import '../tema.dart';
 /// Formdaki tek bir alan.
 class AlanTanim {
   const AlanTanim(this.anahtar, this.etiket,
-      {this.cokSatir = false, this.zorunlu = false});
+      {this.cokSatir = false, this.zorunlu = false, this.baslangic = ''});
 
   final String anahtar;
   final String etiket;
+
+  /// Düzenleme formlarında alanın dolu gelen değeri.
+  final String baslangic;
   final bool cokSatir;
   final bool zorunlu;
 }
@@ -55,7 +58,7 @@ class _Form extends StatefulWidget {
 
 class _FormState extends State<_Form> {
   late final Map<String, TextEditingController> _c = {
-    for (final a in widget.alanlar) a.anahtar: TextEditingController()
+    for (final a in widget.alanlar) a.anahtar: TextEditingController(text: a.baslangic)
   };
   bool _mesgul = false;
   String? _hata;

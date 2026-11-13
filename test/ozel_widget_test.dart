@@ -22,7 +22,7 @@ final Map<String, dynamic> _ozelJson = {
     ['11.11.2026', 'Uyuşmazlık', 'ESK Ekim kesim farkı', '21 baş fark', 'Gmail'],
   ],
   'danismanlik': [
-    ['11.11.2026', 'Vade kararı', 'Ne yapmalıyım?', 'Yeni', '', ''],
+    ['11.11.2026', 'Vade kararı', 'Ne yapmalıyım?', 'Yeni', '', '', 2],
   ],
   'toplanti': [
     ['11.11.2026', 'Koordinasyon', 'Ekip', 'Bütçe', 'Şunlar konuşuldu', '', ''],
@@ -91,6 +91,37 @@ void main() {
     expect(gonderilen, isNotNull);
     expect(gonderilen, contains('Test soru'));
     expect(gonderilen, contains('danismanlik'));
+  });
+
+  testWidgets('Danışmanlık: soru değiştirilir ve silinir', (t) async {
+    _telefon(t);
+    final gonderilenler = <String>[];
+    VeriDeposu.ben.sahteGonder = (u, g) async {
+      gonderilenler.add(g);
+      return '{"ok":true}';
+    };
+    await t.pumpWidget(_uygulama(const DanismanlikEkran()));
+    await t.pumpAndSettle();
+
+    await t.tap(find.byIcon(Icons.more_vert));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Değiştir'));
+    await t.pumpAndSettle();
+    expect(find.text('Ne yapmalıyım?'), findsWidgets); // form dolu açılır
+    await t.enterText(find.byType(TextField).at(1), 'Yeni soru');
+    await t.tap(find.text('Kaydet'));
+    await t.pumpAndSettle();
+    expect(gonderilenler.last, contains('danismanlikDuzenle'));
+    expect(gonderilenler.last, contains('Yeni soru'));
+    expect(gonderilenler.last, contains('"satir":"2"'));
+
+    await t.tap(find.byIcon(Icons.more_vert));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Sil'));
+    await t.pumpAndSettle();
+    await t.tap(find.widgetWithText(FilledButton, 'Sil'));
+    await t.pumpAndSettle();
+    expect(gonderilenler.last, contains('danismanlikSil'));
   });
 
   testWidgets('Toplantı notları gösterir', (t) async {

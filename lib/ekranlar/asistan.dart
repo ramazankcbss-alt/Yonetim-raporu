@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../bicim.dart';
+import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'arsiv.dart';
@@ -36,6 +37,7 @@ class AsistanEkran extends StatelessWidget {
             style: TextStyle(fontSize: 13.5, color: Renk.soluk, height: 1.4),
           ),
         ),
+        const _AnlikGuncelle(),
         _Bolum(
           ikon: Icons.event_note_outlined,
           baslik: 'Sekreterlik',
@@ -134,6 +136,86 @@ class AsistanEkran extends StatelessWidget {
 }
 
 const _morAsistan = Color(0xFF7C3AED);
+
+/// Asistan'ın en üstünde: kaynak tablolardaki yeni günleri rapora çeker
+/// (Eşitle), ardından rapor ve özel bölümleri (danışmanlık, toplantı…)
+/// yeniden okur. Son güncelleme saatini gösterir.
+class _AnlikGuncelle extends StatefulWidget {
+  const _AnlikGuncelle();
+
+  @override
+  State<_AnlikGuncelle> createState() => _AnlikGuncelleState();
+}
+
+class _AnlikGuncelleState extends State<_AnlikGuncelle> {
+  bool _calisiyor = false;
+
+  Future<void> _guncelle() async {
+    final d = VeriDeposu.ben;
+    setState(() => _calisiyor = true);
+    String mesaj;
+    try {
+      mesaj = await d.esitle();
+      try {
+        await d.ozelGetir();
+      } catch (_) {/* özel bölümler okunamazsa rapor yine güncel */}
+    } catch (e) {
+      // Eşitleme yapılamazsa en azından tablodaki son hali al.
+      await d.yenile();
+      mesaj = d.hata ?? 'Tablodaki son veri alındı (eşitleme yapılamadı: $e).';
+    }
+    if (!mounted) return;
+    setState(() => _calisiyor = false);
+    bildir(context, mesaj);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = VeriDeposu.ben;
+    return ListenableBuilder(
+      listenable: d,
+      builder: (context, _) {
+        final mesgul = _calisiyor || d.yukleniyor || d.esitleniyor;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: Renk.anaAcik,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(children: [
+            const Icon(Icons.cloud_sync_outlined, color: Renk.anaKoyu),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Anlık güncelleme',
+                    style: TextStyle(fontWeight: FontWeight.w700, color: Renk.anaKoyu)),
+                Text(
+                    mesgul
+                        ? 'Yeni veriler çekiliyor…'
+                        : d.sonAlinma == null
+                            ? 'Henüz güncellenmedi'
+                            : 'Son: ${zamanBicim(d.sonAlinma!)}',
+                    style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+              ]),
+            ),
+            mesgul
+                ? const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: SizedBox(
+                        width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4)),
+                  )
+                : FilledButton.icon(
+                    onPressed: _guncelle,
+                    icon: const Icon(Icons.sync, size: 18),
+                    label: const Text('Şimdi güncelle'),
+                  ),
+          ]),
+        );
+      },
+    );
+  }
+}
 
 String _eskOzet(RaporVerisi veri) {
   final min = eskBasabas(veri.eskBilgi);

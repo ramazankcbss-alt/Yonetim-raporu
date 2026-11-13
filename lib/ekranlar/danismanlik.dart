@@ -45,6 +45,63 @@ class _DanismanlikEkranState extends State<DanismanlikEkran> {
     }
   }
 
+  bool _satirVar(DanismanlikKaydi k) {
+    if (k.satir != null) return true;
+    bildir(context,
+        'Değiştirme/silme için Apps Script kodu güncellenip yeni sürüm olarak dağıtılmalı.');
+    return false;
+  }
+
+  Future<void> _duzenle(DanismanlikKaydi k) async {
+    if (!_satirVar(k)) return;
+    final sonuc = await formGoster(
+      context,
+      baslik: 'Soruyu değiştir',
+      gonderYazi: 'Kaydet',
+      alanlar: [
+        AlanTanim('konu', 'Konu', zorunlu: true, baslangic: k.konu),
+        AlanTanim('soru', 'Sormak istediğin',
+            cokSatir: true, zorunlu: true, baslangic: k.soru),
+      ],
+      gonder: (d) => VeriDeposu.ben
+          .danismaDuzenle(k.satir!, k.soru, d['konu'] ?? '', d['soru'] ?? ''),
+    );
+    if (sonuc == true && mounted) {
+      bildir(context, 'Soru değiştirildi; değerlendirme yeniden hazırlanacak.');
+      _yenile();
+    }
+  }
+
+  Future<void> _sil(DanismanlikKaydi k) async {
+    if (!_satirVar(k)) return;
+    final evet = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Soru silinsin mi?'),
+        content: Text(
+            '"${k.konu.isEmpty ? k.soru : k.konu}" sorusu${k.yanit.isEmpty ? '' : ' ve değerlendirmesi'} silinecek. Geri alınamaz.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Vazgeç')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Renk.kirmizi),
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Sil')),
+        ],
+      ),
+    );
+    if (evet != true || !mounted) return;
+    try {
+      await VeriDeposu.ben.danismaSil(k.satir!, k.soru);
+      if (!mounted) return;
+      bildir(context, 'Soru silindi.');
+      _yenile();
+    } catch (e) {
+      if (mounted) bildir(context, '$e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,7 +136,10 @@ class _DanismanlikEkranState extends State<DanismanlikEkran> {
           }
           return ListView(
             padding: const EdgeInsets.all(16),
-            children: [for (final k in liste) _Kart(k: k)],
+            children: [
+              for (final k in liste)
+                _Kart(k: k, duzenle: () => _duzenle(k), sil: () => _sil(k))
+            ],
           );
         },
       ),
@@ -88,9 +148,10 @@ class _DanismanlikEkranState extends State<DanismanlikEkran> {
 }
 
 class _Kart extends StatelessWidget {
-  const _Kart({required this.k});
+  const _Kart({required this.k, required this.duzenle, required this.sil});
 
   final DanismanlikKaydi k;
+  final VoidCallback duzenle, sil;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +182,33 @@ class _Kart extends StatelessWidget {
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: renk)),
+              ),
+              SizedBox(
+                width: 32,
+                height: 24,
+                child: PopupMenuButton<String>(
+                  tooltip: 'Değiştir / Sil',
+                  padding: EdgeInsets.zero,
+                  iconSize: 20,
+                  icon: const Icon(Icons.more_vert, color: Renk.soluk),
+                  onSelected: (s) => s == 'sil' ? sil() : duzenle(),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                        value: 'duzenle',
+                        child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.edit_outlined),
+                            title: Text('Değiştir'))),
+                    PopupMenuItem(
+                        value: 'sil',
+                        child: ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.delete_outline, color: Renk.kirmizi),
+                            title: Text('Sil'))),
+                  ],
+                ),
               ),
             ],
           ),
