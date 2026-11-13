@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../bicim.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
+import '../veri/kategori.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
 import 'esk.dart' show tl;
@@ -26,7 +27,11 @@ class GecmisEkran extends StatelessWidget {
             appBar: AppBar(
               title: const Text('Geçmiş Yıllar'),
               actions: const [TabloGuncelleButonu()],
-              bottom: const TabBar(tabs: [
+              bottom: const TabBar(
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white70,
+                  indicatorColor: Colors.white,
+                  tabs: [
                 Tab(text: 'Göstergeler'),
                 Tab(text: 'Dersler'),
               ]),
@@ -68,33 +73,111 @@ class _Gostergeler extends StatefulWidget {
 }
 
 class _GostergelerState extends State<_Gostergeler> {
-  String _alan = 'Tümü';
-  String _konu = 'Tümü';
+  static const _tumu = 'Tümü';
+  Birim? _birim;
+  String _alan = _tumu; // '@Kök' = işletmenin tamamı, aksi hâlde tam çiftlik adı
+  String _konu = _tumu;
   String _ara = '';
+
+  bool _alanUyar(GecmisVeri x, String alan) =>
+      alan == _tumu || (alan.startsWith('@') ? alanKoku(x.alan) == alan.substring(1) : x.alan == alan);
 
   @override
   Widget build(BuildContext context) {
     final k = widget.kayitlar;
-    final alanlar = ['Tümü', ...{for (final x in k) x.alan}.toList()..sort()];
-    final konular = ['Tümü', ...{for (final x in k) x.konu}.where((e) => e.isNotEmpty).toList()..sort()];
-    final ara = _ara.toLowerCase();
-    final suz = k.where((x) =>
-        (_alan == 'Tümü' || x.alan == _alan) &&
-        (_konu == 'Tümü' || x.konu == _konu) &&
-        (ara.isEmpty ||
-            '${x.gosterge} ${x.alan} ${x.not} ${x.yil}'.toLowerCase().contains(ara)));
+    final birimSay = <Birim, int>{};
+    for (final x in k) {
+      birimSay.update(gecmisBirimi(x), (n) => n + 1, ifAbsent: () => 1);
+    }
+    final birimler = birimSay.keys.toList()..sort((a, b) => a.index.compareTo(b.index));
+
+    // 1) Birim
+    final b1 = k.where((x) => _birim == null || gecmisBirimi(x) == _birim).toList();
+
+    // 2) Çiftlik: ana işletme altında alt bölümler
+    final kokler = <String, Set<String>>{};
+    for (final x in b1) {
+      kokler.putIfAbsent(alanKoku(x.alan), () => {}).add(x.alan);
+    }
+    final ciftlikler = <_Oge>[const _Oge(_tumu, _tumu)];
+    for (final kok in kokler.keys.toList()..sort()) {
+      ciftlikler.add(_Oge('@$kok', kok));
+      final alt = kokler[kok]!.toList()..sort();
+      if (alt.length > 1) {
+        for (final a in alt) {
+          ciftlikler.add(_Oge(a, a, girinti: true));
+        }
+      }
+    }
+    final alan = ciftlikler.any((o) => o.deger == _alan) ? _alan : _tumu;
+    final b2 = b1.where((x) => _alanUyar(x, alan)).toList();
+
+    // 3) Konu: birim seçilmemişse birim başlıkları altında
+    final konuSet = {for (final x in b2) x.konu}.where((e) => e.isNotEmpty).toList()..sort();
+    final konular = <_Oge>[const _Oge(_tumu, _tumu)];
+    if (_birim == null) {
+      for (final b in Birim.values) {
+        final grup = konuSet.where((c) => konuBirimi(c) == b).toList();
+        if (grup.isEmpty) continue;
+        konular.add(_Oge('#${b.name}', birimAdlari[b]!, baslik: true));
+        for (final c in grup) {
+          konular.add(_Oge(c, c, girinti: true));
+        }
+      }
+    } else {
+      konular.addAll([for (final c in konuSet) _Oge(c, c)]);
+    }
+    final konu = konular.any((o) => o.deger == _konu && !o.baslik) ? _konu : _tumu;
+
+    final ara = kucuk(_ara);
+    final suz = b2.where((x) =>
+        (konu == _tumu || x.konu == konu) &&
+        (ara.isEmpty || kucuk('${x.gosterge} ${x.alan} ${x.konu} ${x.not} ${x.yil}').contains(ara)));
     final gruplar = <String, List<GecmisVeri>>{};
+    final grupBirim = <String, Birim>{};
     for (final x in suz) {
-      gruplar.putIfAbsent('${x.alan}|${x.gosterge}', () => []).add(x);
+      final b = gecmisBirimi(x);
+      final anahtar = '${b.index}|${x.alan}|${x.gosterge}';
+      grupBirim[anahtar] = b;
+      gruplar.putIfAbsent(anahtar, () => []).add(x);
     }
     final anahtarlar = gruplar.keys.toList()..sort();
+
+    // Liste: birim seçilmemişse her birimin önüne başlık
+    final satirlar = <Object>[];
+    Birim? onceki;
+    for (final a in anahtarlar) {
+      final b = grupBirim[a]!;
+      if (_birim == null && b != onceki) satirlar.add(b);
+      onceki = b;
+      satirlar.add(a);
+    }
+
     return Column(children: [
+      SizedBox(
+        height: 48,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          children: [
+            _BirimCip(etiket: 'Tümü (${k.length})', ikon: Icons.apps, secili: _birim == null,
+                sec: () => setState(() => _birim = null)),
+            for (final b in birimler)
+              _BirimCip(
+                etiket: '${birimAdlari[b]} (${birimSay[b]})',
+                ikon: _birimIkon(b),
+                secili: _birim == b,
+                sec: () => setState(() => _birim = _birim == b ? null : b),
+              ),
+          ],
+        ),
+      ),
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
         child: Row(children: [
-          Expanded(child: _Secim(deger: _alan, liste: alanlar, etiket: 'Çiftlik', sec: (s) => setState(() => _alan = s))),
+          Expanded(child: _Secim(deger: alan, liste: ciftlikler, etiket: 'Çiftlik', sec: (s) => setState(() => _alan = s))),
           const SizedBox(width: 8),
-          Expanded(child: _Secim(deger: _konu, liste: konular, etiket: 'Konu', sec: (s) => setState(() => _konu = s))),
+          Expanded(child: _Secim(deger: konu, liste: konular, etiket: 'Konu', sec: (s) => setState(() => _konu = s))),
         ]),
       ),
       Padding(
@@ -116,9 +199,21 @@ class _GostergelerState extends State<_Gostergeler> {
       Expanded(
         child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-          itemCount: anahtarlar.length,
+          itemCount: satirlar.length,
           itemBuilder: (_, i) {
-            final l = gruplar[anahtarlar[i]]!
+            final s = satirlar[i];
+            if (s is Birim) {
+              return Padding(
+                padding: EdgeInsets.fromLTRB(4, i == 0 ? 4 : 14, 4, 6),
+                child: Row(children: [
+                  Icon(_birimIkon(s), size: 18, color: Renk.anaKoyu),
+                  const SizedBox(width: 6),
+                  Text(birimAdlari[s]!.toUpperCase(),
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.anaKoyu, letterSpacing: .5)),
+                ]),
+              );
+            }
+            final l = gruplar[s as String]!
               ..sort((a, b) {
                 final c = b.yilNo.compareTo(a.yilNo);
                 return c != 0 ? c : _ayNo(b.ay).compareTo(_ayNo(a.ay));
@@ -152,24 +247,79 @@ class _GostergelerState extends State<_Gostergeler> {
   }
 }
 
+IconData _birimIkon(Birim b) => switch (b) {
+      Birim.ziraat => Icons.agriculture,
+      Birim.hayvancilik => Icons.pets,
+      Birim.mali => Icons.payments_outlined,
+      Birim.isletme => Icons.build_outlined,
+      Birim.diger => Icons.more_horiz,
+    };
+
+class _BirimCip extends StatelessWidget {
+  const _BirimCip({required this.etiket, required this.ikon, required this.secili, required this.sec});
+  final String etiket;
+  final IconData ikon;
+  final bool secili;
+  final VoidCallback sec;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ChoiceChip(
+          avatar: Icon(ikon, size: 16),
+          label: Text(etiket),
+          selected: secili,
+          showCheckmark: false,
+          onSelected: (_) => sec(),
+        ),
+      );
+}
+
 const _aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 int _ayNo(String ay) {
   final i = _aylar.indexWhere((a) => ay.startsWith(a));
   return i < 0 ? 13 : i;
 }
 
+/// Açılır listedeki bir satır: değer, görünen ad, başlık mı, girintili mi.
+class _Oge {
+  const _Oge(this.deger, this.ad, {this.baslik = false, this.girinti = false});
+  final String deger, ad;
+  final bool baslik, girinti;
+}
+
 class _Secim extends StatelessWidget {
   const _Secim({required this.deger, required this.liste, required this.etiket, required this.sec});
   final String deger, etiket;
-  final List<String> liste;
+  final List<_Oge> liste;
   final ValueChanged<String> sec;
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
+        key: ValueKey('$etiket|$deger|${liste.length}'),
         initialValue: deger,
         isExpanded: true,
+        menuMaxHeight: 520,
         decoration: InputDecoration(labelText: etiket, isDense: true),
-        items: [for (final s in liste) DropdownMenuItem(value: s, child: Text(s, overflow: TextOverflow.ellipsis))],
+        selectedItemBuilder: (_) => [
+          for (final o in liste) Text(o.ad, overflow: TextOverflow.ellipsis),
+        ],
+        items: [
+          for (final o in liste)
+            DropdownMenuItem(
+              value: o.deger,
+              enabled: !o.baslik,
+              child: o.baslik
+                  ? Text(o.ad.toUpperCase(),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Renk.anaKoyu))
+                  : Padding(
+                      padding: EdgeInsets.only(left: o.girinti ? 16 : 0),
+                      child: Text(o.ad,
+                          overflow: TextOverflow.ellipsis,
+                          style: o.girinti ? const TextStyle(fontSize: 14) : const TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+            ),
+        ],
         onChanged: (s) => sec(s ?? 'Tümü'),
       );
 }
