@@ -486,6 +486,9 @@ class Kisi {
   final List<String> anahtarlar;
 
   bool get telefonVar => whatsappNumarasi != null;
+
+  /// Görev makamı sırası (küçük olan üstte): yönetim önce, güvenlik en sonda.
+  int get makam => makamSirasi(birim);
   bool get epostaVar => RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(eposta);
 
   /// WhatsApp için uluslararası numara (90…); okunamazsa null.
@@ -562,6 +565,23 @@ class PersonelKisi {
       sicil: r.length > 4 ? _metin(r[4]) : '',
     );
   }
+}
+
+/// Görev/ünvan metninden makam sırası: 0 en üst.
+int makamSirasi(String gorev) {
+  final g = trKucuk(gorev);
+  bool var_(List<String> l) => l.any(g.contains);
+  if (var_(['genel müdür', 'grup müdür', 'direktör'])) return 0;
+  if (var_(['yön.yrd', 'yön. yrd', 'müdür yardımcı', 'müdür yrd'])) return 2;
+  if (var_(['müdür'])) return 1;
+  if (var_(['sorumlu veteriner', 'hekim', 'mühendis', 'uzman', 'zooteknist',
+    'veteriner'])) {
+    return var_(['tekniker']) ? 4 : 3;
+  }
+  if (var_(['formen', 'usta', 'tekniker', 'raporlama', 'kalite'])) return 4;
+  if (var_(['operatör'])) return 5;
+  if (var_(['güvenlik'])) return 7;
+  return 6;
 }
 
 /// Türkçe küçük harfe çevirir (İ→i, I→ı) ve boşlukları sadeleştirir.
