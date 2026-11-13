@@ -880,10 +880,14 @@ class _IletisimSatiri extends StatelessWidget {
 
 /// Mesaj metni ve gönderim. Her gönderimden önce onay sorulur.
 class MesajEkran extends StatefulWidget {
-  const MesajEkran({super.key, required this.kisi, required this.kalemler});
+  const MesajEkran(
+      {super.key, required this.kisi, this.kalemler = const [], this.konu, this.metin});
 
   final Kisi kisi;
   final List<Object> kalemler;
+
+  /// Hazır konu/metin (ör. Danışmanlık değerlendirmesini paylaşırken).
+  final String? konu, metin;
 
   @override
   State<MesajEkran> createState() => _MesajEkranState();
@@ -902,13 +906,14 @@ class _MesajEkranState extends State<MesajEkran> {
       for (final k in widget.kalemler)
         if (k is _Kalem) '• ${k.mesajSatiri}'
     ];
-    _konu = TextEditingController(text: 'Takip edilen işler – ${tarihKisa(DateTime.now())}');
+    _konu = TextEditingController(
+        text: widget.konu ?? 'Takip edilen işler – ${tarihKisa(DateTime.now())}');
     _metin = TextEditingController(
-      text: satirlar.isEmpty
+      text: widget.metin ?? (satirlar.isEmpty
           ? 'Merhaba $ilkAd Bey/Hanım,\n\n\n\nRamazan Kocabaş'
           : 'Merhaba $ilkAd Bey/Hanım,\n\nAşağıdaki konularda son durumu ve '
               'eksikleri iletebilir misiniz?\n\n${satirlar.join('\n')}\n\n'
-              'Teşekkürler,\nRamazan Kocabaş',
+              'Teşekkürler,\nRamazan Kocabaş'),
     );
   }
 

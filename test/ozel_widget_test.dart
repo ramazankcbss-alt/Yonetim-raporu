@@ -22,6 +22,7 @@ final Map<String, dynamic> _ozelJson = {
     ['11.11.2026', 'Uyuşmazlık', 'ESK Ekim kesim farkı', '21 baş fark', 'Gmail'],
   ],
   'danismanlik': [
+    ['10.11.2026', 'Mastit oranı', 'Ekim oranı?', 'Yanıtlandı', '11.11.2026', 'Ekimde %10 yeni vaka.', 3],
     ['11.11.2026', 'Vade kararı', 'Ne yapmalıyım?', 'Yeni', '', '', 2],
   ],
   'toplanti': [
@@ -103,7 +104,7 @@ void main() {
     await t.pumpWidget(_uygulama(const DanismanlikEkran()));
     await t.pumpAndSettle();
 
-    await t.tap(find.byIcon(Icons.more_vert));
+    await t.tap(find.byIcon(Icons.more_vert).first);
     await t.pumpAndSettle();
     await t.tap(find.text('Değiştir'));
     await t.pumpAndSettle();
@@ -115,13 +116,28 @@ void main() {
     expect(gonderilenler.last, contains('Yeni soru'));
     expect(gonderilenler.last, contains('"satir":"2"'));
 
-    await t.tap(find.byIcon(Icons.more_vert));
+    await t.tap(find.byIcon(Icons.more_vert).first);
     await t.pumpAndSettle();
     await t.tap(find.text('Sil'));
     await t.pumpAndSettle();
     await t.tap(find.widgetWithText(FilledButton, 'Sil'));
     await t.pumpAndSettle();
     expect(gonderilenler.last, contains('danismanlikSil'));
+  });
+
+  testWidgets('Danışmanlık: değerlendirme kişiye paylaşılır', (t) async {
+    _telefon(t);
+    await t.pumpWidget(_uygulama(const DanismanlikEkran()));
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(find.text('Paylaş (kişi / WhatsApp)'), 200,
+        scrollable: find.byType(Scrollable).first);
+    await t.tap(find.text('Paylaş (kişi / WhatsApp)'));
+    await t.pumpAndSettle();
+    expect(find.text('Kime gönderilsin?'), findsOneWidget);
+    await t.tap(find.text("WhatsApp'ta kişi seç"));
+    await t.pumpAndSettle();
+    expect(find.text('WhatsApp ile gönder (kişi seç)'), findsOneWidget);
+    expect(find.textContaining('Ekimde %10 yeni vaka.'), findsWidgets);
   });
 
   testWidgets('Toplantı notları gösterir', (t) async {
