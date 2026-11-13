@@ -598,6 +598,103 @@ String trKucuk(String s) => s
     .trim();
 
 // ---------------------------------------------------------------------------
+// ESK (Et ve Süt Kurumu) – Taşağıl bakım besleme
+// ---------------------------------------------------------------------------
+
+/// 'ESK_Aylık' sayfasının bir satırı (bir ay).
+class EskAy {
+  const EskAy({
+    required this.ay,
+    this.gelen,
+    this.hayvanGun,
+    this.ortBas,
+    this.kesim,
+    this.disKesim,
+    this.olen,
+    this.bakim,
+    this.kira,
+    this.sap,
+    this.sapMaliyet,
+    this.gider,
+    this.karZarar,
+    this.durum = '',
+    this.not = '',
+  });
+
+  final String ay, durum, not;
+  final double? gelen, hayvanGun, ortBas, kesim, disKesim, olen;
+  final double? bakim, kira, sap, sapMaliyet, gider, karZarar;
+
+  /// "Ekim 2026" → 2026 (bulunamazsa 0).
+  int get yil {
+    final m = RegExp(r'(\d{4})').firstMatch(ay);
+    return m == null ? 0 : int.parse(m[1]!);
+  }
+
+  bool get tahmini => trKucuk(durum).contains('tahmin');
+  bool get devamEdiyor => trKucuk(durum).contains('devam');
+  double get gelir => (bakim ?? 0) + (kira ?? 0) + (sap ?? 0);
+
+  static EskAy? oku(Object? v) {
+    final r = _liste(v);
+    if (r.isEmpty) return null;
+    final ay = _metin(r[0]);
+    if (ay.isEmpty) return null;
+    double? n(int i) => i < r.length ? sayiOku(r[i]) : null;
+    return EskAy(
+      ay: ay,
+      gelen: n(1),
+      hayvanGun: n(2),
+      ortBas: n(3),
+      kesim: n(4),
+      disKesim: n(5),
+      olen: n(6),
+      bakim: n(7),
+      kira: n(8),
+      sap: n(9),
+      sapMaliyet: n(10),
+      gider: n(11),
+      karZarar: n(12),
+      durum: r.length > 13 ? _metin(r[13]) : '',
+      not: r.length > 14 ? _metin(r[14]) : '',
+    );
+  }
+}
+
+/// 'ESK_Bilgi' sayfasının bir satırı: Bölüm, Başlık, Değer, Açıklama.
+/// Bölüm: Özet, Fiyat, Başabaş, Senaryo, Alım, Fatura, Öneri, Eksik.
+class EskBilgi {
+  const EskBilgi({
+    required this.bolum,
+    required this.baslik,
+    this.deger = '',
+    this.sayi,
+    this.aciklama = '',
+  });
+
+  final String bolum, baslik, deger, aciklama;
+
+  /// Değer sayıysa (TL, baş) burada; yazıysa null.
+  final double? sayi;
+
+  static EskBilgi? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 2) return null;
+    final bolum = _metin(r[0]);
+    final baslik = _metin(r[1]);
+    if (bolum.isEmpty || baslik.isEmpty) return null;
+    final ham = r.length > 2 ? r[2] : null;
+    return EskBilgi(
+      bolum: bolum,
+      baslik: baslik,
+      deger: _metin(ham),
+      sayi: ham is num ? ham.toDouble() : null,
+      aciklama: r.length > 3 ? _metin(r[3]) : '',
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Tüm veri
 // ---------------------------------------------------------------------------
 
@@ -615,6 +712,8 @@ class RaporVerisi {
     this.personel = const [],
     this.kisiler = const [],
     this.personelListesi = const [],
+    this.eskAylik = const [],
+    this.eskBilgi = const [],
     this.olusturma,
   })  : ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -638,6 +737,8 @@ class RaporVerisi {
   final List<PersonelKaydi> personel;
   final List<Kisi> kisiler;
   final List<PersonelKisi> personelListesi;
+  final List<EskAy> eskAylik;
+  final List<EskBilgi> eskBilgi;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -656,6 +757,8 @@ class RaporVerisi {
       personel: oku('personel', PersonelKaydi.oku),
       kisiler: oku('kisiler', Kisi.oku),
       personelListesi: oku('personelListesi', PersonelKisi.oku),
+      eskAylik: oku('eskAylik', EskAy.oku),
+      eskBilgi: oku('eskBilgi', EskBilgi.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }
