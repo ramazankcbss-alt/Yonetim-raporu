@@ -176,7 +176,10 @@ class _AnlikGuncelleState extends State<_AnlikGuncelle> {
       listenable: d,
       builder: (context, _) {
         final mesgul = _calisiyor || d.yukleniyor || d.esitleniyor;
-        return Container(
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: mesgul ? null : _guncelle,
+          child: Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
           decoration: BoxDecoration(
@@ -189,13 +192,16 @@ class _AnlikGuncelleState extends State<_AnlikGuncelle> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('Anlık güncelleme',
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.w700, color: Renk.anaKoyu)),
                 Text(
                     mesgul
                         ? 'Yeni veriler çekiliyor…'
                         : d.sonAlinma == null
                             ? 'Henüz güncellenmedi'
-                            : 'Son: ${zamanBicim(d.sonAlinma!)}',
+                            : 'Son: ${zamanBicim(d.sonAlinma!)} · yeni veri için dokun',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 12, color: Renk.soluk)),
               ]),
             ),
@@ -205,12 +211,13 @@ class _AnlikGuncelleState extends State<_AnlikGuncelle> {
                     child: SizedBox(
                         width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4)),
                   )
-                : FilledButton.icon(
+                : IconButton.filled(
+                    tooltip: 'Şimdi güncelle',
                     onPressed: _guncelle,
-                    icon: const Icon(Icons.sync, size: 18),
-                    label: const Text('Şimdi güncelle'),
+                    icon: const Icon(Icons.sync),
                   ),
           ]),
+        ),
         );
       },
     );
