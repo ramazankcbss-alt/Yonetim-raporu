@@ -25,6 +25,9 @@
 // 2. adımda kopyaladığınız adres (…/exec ile biter):
 var WEB_URL = '';
 
+// Geçmiş yıllar arşivi (Drive: Yönetim Raporu Arşivi / Bilgi Bankası)
+var BILGI_BANKASI_ID = '1x9W9A1Eg7ItOu21lXTtx3vwHN3fFJZp05USSl1-aWLg';
+
 var SAYFALAR = {
   ozet: 'Hayvan_Özet',
   gunluk: 'Hayvan_Günlük',
@@ -149,14 +152,23 @@ function veriTopla_(gun) {
     // Kâr/Zarar, Durum, Not (ESK_Aylık, 2'den)
     eskAylik: basitOku_(SAYFALAR.eskAylik, 15, tz),
     // Bölüm, Başlık, Değer, Açıklama (ESK_Bilgi, 2'den)
-    eskBilgi: basitOku_(SAYFALAR.eskBilgi, 4, tz)
+    eskBilgi: basitOku_(SAYFALAR.eskBilgi, 4, tz),
+    // Bilgi Bankası (ayrı tablo): Yıl, Ay, Alan, Konu, Gösterge, Değer, Birim, Kaynak, Not
+    gecmis: basitOku_('Veriler', 9, tz, BILGI_BANKASI_ID),
+    // Yıl, Alan, Konu, Ne oldu, Sonuç/ders, Kaynak
+    dersler: basitOku_('Dersler', 6, tz, BILGI_BANKASI_ID)
   };
 }
 
 /** Başlık 1. satırda, veri 2'den olan düz bir sayfayı okur (ilk 2 sütun
  * dolu olan satırlar). Tarihler dd.MM.yyyy metnine çevrilir. */
-function basitOku_(ad, sutun, tz) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+function basitOku_(ad, sutun, tz, tabloId) {
+  var ss;
+  try {
+    ss = tabloId ? SpreadsheetApp.openById(tabloId) : SpreadsheetApp.getActiveSpreadsheet();
+  } catch (e) {
+    return [];
+  }
   var sh = ss.getSheetByName(ad);
   if (!sh) return [];
   var son = sh.getLastRow();

@@ -6,6 +6,7 @@ import '../veri/model.dart';
 import 'arsiv.dart';
 import 'danismanlik.dart';
 import 'esk.dart';
+import 'gecmis.dart';
 import 'gunce.dart';
 import 'isakisi.dart';
 import 'isler.dart';
@@ -82,6 +83,16 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.kirmizi,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => EskEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.history_edu_outlined,
+          baslik: 'Geçmiş Yıllar',
+          aciklama: veri.gecmis.isEmpty
+              ? 'Bilgi Bankası: 2018–2026 sürü, süt, kesim, maliyet, tarım ve kâr/zarar'
+              : '${veri.gecmis.length} kayıt · ${veri.dersler.length} ders (2018–2026)',
+          renk: Renk.ana,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => GecmisEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.forum_outlined,
