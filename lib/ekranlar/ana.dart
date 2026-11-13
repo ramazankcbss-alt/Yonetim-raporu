@@ -38,7 +38,7 @@ class AnaEkran extends StatefulWidget {
   State<AnaEkran> createState() => _AnaEkranState();
 }
 
-class _AnaEkranState extends State<AnaEkran> {
+class _AnaEkranState extends State<AnaEkran> with WidgetsBindingObserver {
   int _sekme = 0;
   final d = VeriDeposu.ben;
 
@@ -51,8 +51,23 @@ class _AnaEkranState extends State<AnaEkran> {
   ];
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Uygulama tekrar öne gelince veri 5 dakikadan eskiyse kendiliğinden yenile.
+    if (state != AppLifecycleState.resumed || d.yukleniyor) return;
+    final son = d.sonAlinma;
+    if (son == null || DateTime.now().difference(son).inMinutes >= 5) d.yenile();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       d.yenile();
       if (widget.guncellemeKontrolu) Guncelleme.kontrolEt(context);

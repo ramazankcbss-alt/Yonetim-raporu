@@ -45,10 +45,14 @@ class DanismanlikKaydi {
     this.durum = '',
     this.yanitTarihi,
     this.yanit = '',
+    this.satir,
   });
 
   final DateTime? tarih, yanitTarihi;
   final String konu, soru, durum, yanit;
+
+  /// Tablodaki satır numarası (düzenle/sil için). Eski Apps Script sürümünde yok.
+  final int? satir;
 
   bool get yanitlandi => yanit.trim().isNotEmpty || durum == 'Yanıtlandı';
 
@@ -64,6 +68,7 @@ class DanismanlikKaydi {
       durum: _al(r, 3),
       yanitTarihi: r.length > 4 ? tarihEsnek(r[4]) : null,
       yanit: _al(r, 5),
+      satir: int.tryParse(_al(r, 6).split('.').first),
     );
   }
 }

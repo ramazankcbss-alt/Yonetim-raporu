@@ -247,6 +247,20 @@ class VeriDeposu extends ChangeNotifier {
     await _islem(tur, alan);
   }
 
+  /// Danışmanlık sorusunu değiştirir; soru yeniden "Yeni" olur, eski
+  /// değerlendirme silinir. [eskiSoru] yanlış satırı değiştirmemek içindir.
+  Future<void> danismaDuzenle(int satir, String eskiSoru, String konu, String soru) =>
+      _islem('danismanlikDuzenle', {
+        'satir': '$satir',
+        'eskiSoru': eskiSoru,
+        'konu': konu,
+        'soru': soru,
+      });
+
+  /// Danışmanlık sorusunu tablodan siler.
+  Future<void> danismaSil(int satir, String eskiSoru) =>
+      _islem('danismanlikSil', {'satir': '$satir', 'eskiSoru': eskiSoru});
+
   /// Apps Script'e bir işlem gönderir; cevabı (ok: true) döndürür.
   Future<Map<String, dynamic>> _islem(
       String tur, Map<String, String> alan) async {

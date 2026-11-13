@@ -234,27 +234,31 @@ function islerOku_(tz) {
 function ozelTopla_() {
   var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
   var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
-  function oku(ad, sutun) {
+  // satirNo: true ise her kaydın sonuna tablodaki satır numarası eklenir
+  // (uygulamadan değiştir/sil için).
+  function oku(ad, sutun, satirNo) {
     var sh = ss.getSheetByName(ad);
     if (!sh) return [];
     var son = sh.getLastRow();
     if (son < 2) return [];
     return sh.getRange(2, 1, son - 1, sutun).getValues()
-      .filter(function (r) {
-        return String(r[0]).trim() !== '' || String(r[1]).trim() !== '';
-      })
-      .map(function (r) {
-        return r.map(function (v) {
+      .map(function (r, i) {
+        var satir = r.map(function (v) {
           if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
           if (v === null || v === undefined) return '';
           return v;
         });
+        if (satirNo) satir.push(i + 2);
+        return satir;
+      })
+      .filter(function (r) {
+        return String(r[0]).trim() !== '' || String(r[1]).trim() !== '';
       });
   }
   return {
     ok: true,
     ozelNotlar: oku(OZEL_SAYFALAR.ozelNotlar.ad, OZEL_SAYFALAR.ozelNotlar.sutun),
-    danismanlik: oku(OZEL_SAYFALAR.danismanlik.ad, OZEL_SAYFALAR.danismanlik.sutun),
+    danismanlik: oku(OZEL_SAYFALAR.danismanlik.ad, OZEL_SAYFALAR.danismanlik.sutun, true),
     toplanti: oku(OZEL_SAYFALAR.toplanti.ad, OZEL_SAYFALAR.toplanti.sutun),
     gunluk: oku(OZEL_SAYFALAR.gunluk.ad, OZEL_SAYFALAR.gunluk.sutun),
     kisiOlaylari: oku(OZEL_SAYFALAR.kisiOlaylari.ad, OZEL_SAYFALAR.kisiOlaylari.sutun)
@@ -281,6 +285,23 @@ function doPost(e) {
       var sh = ss.getSheetByName(ad);
       if (!sh) throw new Error(ad + ' sayfası bulunamadı.');
       sh.appendRow(satir);
+    }
+    if (govde.tur === 'danismanlikDuzenle' || govde.tur === 'danismanlikSil') {
+      var dsh = ss.getSheetByName(OZEL_SAYFALAR.danismanlik.ad);
+      var no = parseInt(govde.satir, 10);
+      if (!dsh || !(no >= 2) || no > dsh.getLastRow()) {
+        return json_({ ok: false, hata: 'Soru bulunamadı; listeyi yenileyip tekrar deneyin.' });
+      }
+      var mevcut = String(dsh.getRange(no, 3).getValue()).trim();
+      if (mevcut !== String(govde.eskiSoru || '').trim()) {
+        return json_({ ok: false, hata: 'Tablo bu arada değişmiş; listeyi yenileyip tekrar deneyin.' });
+      }
+      if (govde.tur === 'danismanlikSil') {
+        dsh.deleteRow(no);
+      } else {
+        dsh.getRange(no, 2, 1, 5).setValues([[govde.konu || '', govde.soru || '', 'Yeni', '', '']]);
+      }
+      return json_({ ok: true });
     }
     if (govde.tur === 'danismanlik') {
       ekle(OZEL_SAYFALAR.danismanlik.ad,

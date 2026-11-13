@@ -9,7 +9,7 @@ void main() {
       ],
       'danismanlik': [
         ['11.11.2026', 'Vade', 'Ne yapmalı?', 'Yeni', '', ''],
-        ['10.11.2026', 'Fiyat', 'Soru', 'Yanıtlandı', '11.11.2026', 'Şöyle yap'],
+        ['10.11.2026', 'Fiyat', 'Soru', 'Yanıtlandı', '11.11.2026', 'Şöyle yap', 3],
       ],
       'toplanti': [
         ['11.11.2026', 'Ofis', 'Ali, Veli', 'Bütçe', 'Konuşulanlar', '', ''],
@@ -24,6 +24,8 @@ void main() {
     expect(o.danismanlik.first.yanitlandi, isFalse);
     expect(o.danismanlik[1].yanitlandi, isTrue);
     expect(o.danismanlik[1].yanit, 'Şöyle yap');
+    expect(o.danismanlik.first.satir, isNull);
+    expect(o.danismanlik[1].satir, 3);
     expect(o.toplanti.single.yer, 'Ofis');
     expect(o.toplanti.single.katilimcilar, 'Ali, Veli');
     expect(o.gunce.single.baslik, 'Başlık');
