@@ -26,6 +26,9 @@ void main() {
     expect(v.gecmis[3].yilNo, 2025);
     expect(gecmisDeger(v.gecmis[1]), contains('25'));
     expect(v.dersler.single.sonuc, 'Yonca/pancar daha iyi.');
+    expect(kapsananYillar('2021-2025'), {2021, 2022, 2023, 2024, 2025});
+    expect(kapsananYillar('2025'), {2025});
+    expect(kapsananYillar(''), isEmpty);
   });
 
   testWidgets('geçmiş ekranı gösterir', (t) async {
@@ -33,6 +36,11 @@ void main() {
     await t.pumpWidget(MaterialApp(home: GecmisEkran(veri: v)));
     await t.pumpAndSettle();
     expect(find.text('Ortalama süt verimi'), findsOneWidget);
+    expect(find.text('Yıllık dönem kâr/zarar'), findsOneWidget);
+    await t.tap(find.text('2024 (2)'));
+    await t.pumpAndSettle();
+    expect(find.text('Ortalama süt verimi'), findsOneWidget);
+    expect(find.text('Yıllık dönem kâr/zarar'), findsNothing);
     await t.tap(find.text('Dersler'));
     await t.pumpAndSettle();
     expect(find.text('Buğday zarar etti.'), findsOneWidget);

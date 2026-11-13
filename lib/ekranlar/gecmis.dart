@@ -64,6 +64,44 @@ String gecmisDeger(GecmisVeri x) {
   return x.birim == '%' ? '%${sayi(s, ondalik: o)}' : '${sayi(s, ondalik: o)}$b';
 }
 
+/// Bir yıl alanının kapsadığı yıllar: "2025" → {2025}, "2021-2025" → 2021…2025,
+/// "2023-2024" → {2023, 2024}.
+Set<int> kapsananYillar(String yil) {
+  final y = RegExp(r'20\d\d').allMatches(yil).map((m) => int.parse(m.group(0)!)).toList();
+  if (y.isEmpty) return {};
+  final a = y.reduce((p, q) => p < q ? p : q), b = y.reduce((p, q) => p > q ? p : q);
+  return {for (var i = a; i <= b; i++) i};
+}
+
+/// Yıl seçimi: "Tüm yıllar" + yeniden eskiye yıllar, her birinde kayıt sayısı.
+class _YilSatiri extends StatelessWidget {
+  const _YilSatiri({required this.yillar, required this.secili, required this.sec});
+  final Map<int, int> yillar;
+  final int? secili;
+  final ValueChanged<int?> sec;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = yillar.keys.toList()..sort((a, b) => b.compareTo(a));
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+        children: [
+          _BirimCip(etiket: 'Tüm yıllar', ikon: Icons.calendar_month_outlined, secili: secili == null, sec: () => sec(null)),
+          for (final y in l)
+            _BirimCip(
+                etiket: '$y (${yillar[y]})',
+                ikon: Icons.event_outlined,
+                secili: secili == y,
+                sec: () => sec(secili == y ? null : y)),
+        ],
+      ),
+    );
+  }
+}
+
 class _Gostergeler extends StatefulWidget {
   const _Gostergeler({required this.kayitlar});
   final List<GecmisVeri> kayitlar;
@@ -75,6 +113,7 @@ class _Gostergeler extends StatefulWidget {
 class _GostergelerState extends State<_Gostergeler> {
   static const _tumu = 'Tümü';
   Birim? _birim;
+  int? _yil;
   String _alan = _tumu; // '@Kök' = işletmenin tamamı, aksi hâlde tam çiftlik adı
   String _konu = _tumu;
   String _ara = '';
@@ -84,7 +123,16 @@ class _GostergelerState extends State<_Gostergeler> {
 
   @override
   Widget build(BuildContext context) {
-    final k = widget.kayitlar;
+    final yilSay = <int, int>{};
+    for (final x in widget.kayitlar) {
+      for (final y in kapsananYillar(x.yil)) {
+        yilSay.update(y, (n) => n + 1, ifAbsent: () => 1);
+      }
+    }
+    final yil = yilSay.containsKey(_yil) ? _yil : null;
+    final k = yil == null
+        ? widget.kayitlar
+        : widget.kayitlar.where((x) => kapsananYillar(x.yil).contains(yil)).toList();
     final birimSay = <Birim, int>{};
     for (final x in k) {
       birimSay.update(gecmisBirimi(x), (n) => n + 1, ifAbsent: () => 1);
@@ -154,6 +202,7 @@ class _GostergelerState extends State<_Gostergeler> {
     }
 
     return Column(children: [
+      _YilSatiri(yillar: yilSay, secili: yil, sec: (y) => setState(() => _yil = y)),
       SizedBox(
         height: 48,
         child: ListView(
@@ -324,15 +373,38 @@ class _Secim extends StatelessWidget {
       );
 }
 
-class _Dersler extends StatelessWidget {
+class _Dersler extends StatefulWidget {
   const _Dersler({required this.dersler});
   final List<Ders> dersler;
 
   @override
+  State<_Dersler> createState() => _DerslerState();
+}
+
+class _DerslerState extends State<_Dersler> {
+  int? _yil;
+
+  @override
   Widget build(BuildContext context) {
-    if (dersler.isEmpty) {
+    final tum = widget.dersler;
+    if (tum.isEmpty) {
       return const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(yazi: 'Henüz ders kaydı yok.'));
     }
+    final yilSay = <int, int>{};
+    for (final d in tum) {
+      for (final y in kapsananYillar(d.yil)) {
+        yilSay.update(y, (n) => n + 1, ifAbsent: () => 1);
+      }
+    }
+    final yil = yilSay.containsKey(_yil) ? _yil : null;
+    final dersler = yil == null ? tum : tum.where((d) => kapsananYillar(d.yil).contains(yil)).toList();
+    return Column(children: [
+      _YilSatiri(yillar: yilSay, secili: yil, sec: (y) => setState(() => _yil = y)),
+      Expanded(child: _liste(dersler)),
+    ]);
+  }
+
+  Widget _liste(List<Ders> dersler) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: [
