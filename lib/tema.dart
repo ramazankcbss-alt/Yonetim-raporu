@@ -63,6 +63,15 @@ ThemeData temaOlustur() {
       titleTextStyle: TextStyle(
           fontSize: 19, fontWeight: FontWeight.w600, color: Colors.white),
     ),
+    // Üst yeşil şeritteki sekmeler: seçili beyaz, diğerleri açık beyaz.
+    tabBarTheme: const TabBarThemeData(
+      labelColor: Colors.white,
+      unselectedLabelColor: Color(0xCCFFFFFF),
+      indicatorColor: Colors.white,
+      dividerColor: Colors.transparent,
+      labelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+      unselectedLabelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+    ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
