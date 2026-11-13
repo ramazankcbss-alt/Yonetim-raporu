@@ -159,17 +159,27 @@ class KisiOlayi {
     return (i < 0 ? aciklama : aciklama.substring(0, i)).trim();
   }
 
+  /// Değerlendirmeden sonra gelen hukuki ön bilgi işareti.
+  static const hukukiIsareti = '📘 Hukuki ön bilgi:';
+
   /// Tutanak/savunma için "haklılık" değerlendirmesi (öneri, bilgi amaçlı).
-  /// Biçim: "⚖ Değerlendirme: Kısmen haklı — gerekçe…"; yoksa null.
-  ({String sonuc, String gerekce})? get degerlendirme {
+  /// Biçim: "⚖ Değerlendirme: Kısmen haklı — gerekçe…\n📘 Hukuki ön bilgi: …";
+  /// yoksa null.
+  ({String sonuc, String gerekce, String hukuki})? get degerlendirme {
     final i = aciklama.indexOf(degerlendirmeIsareti);
     if (i < 0) return null;
-    final t = aciklama.substring(i + degerlendirmeIsareti.length).trim();
+    var t = aciklama.substring(i + degerlendirmeIsareti.length).trim();
+    var hukuki = '';
+    final h = t.indexOf(hukukiIsareti);
+    if (h >= 0) {
+      hukuki = t.substring(h + hukukiIsareti.length).trim();
+      t = t.substring(0, h).trim();
+    }
     final m = RegExp(r'^(Haklı|Kısmen haklı|Haksız|Belirsiz|Savunma bekleniyor)\s*[—–-]?\s*',
             caseSensitive: false)
         .firstMatch(t);
-    if (m == null) return (sonuc: 'Değerlendirme', gerekce: t);
-    return (sonuc: m.group(1)!, gerekce: t.substring(m.end).trim());
+    if (m == null) return (sonuc: 'Değerlendirme', gerekce: t, hukuki: hukuki);
+    return (sonuc: m.group(1)!, gerekce: t.substring(m.end).trim(), hukuki: hukuki);
   }
 
   static KisiOlayi? oku(Object? v) {
