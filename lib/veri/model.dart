@@ -663,6 +663,83 @@ class EskAy {
 
 /// 'ESK_Bilgi' sayfasının bir satırı: Bölüm, Başlık, Değer, Açıklama.
 /// Bölüm: Özet, Fiyat, Başabaş, Senaryo, Alım, Fatura, Öneri, Eksik.
+/// Bilgi Bankası'ndaki tek bir geçmiş kayıt (yıl × çiftlik × gösterge).
+class GecmisVeri {
+  const GecmisVeri({
+    required this.yil,
+    this.ay = '',
+    required this.alan,
+    this.konu = '',
+    required this.gosterge,
+    this.deger = '',
+    this.sayi,
+    this.birim = '',
+    this.kaynak = '',
+    this.not = '',
+  });
+
+  final String yil, ay, alan, konu, gosterge, deger, birim, kaynak, not;
+  final double? sayi;
+
+  /// Sıralama için yılın son 4 hanesi ("2021-2025" → 2025).
+  int get yilNo {
+    final m = RegExp(r'(20\d\d)(?!.*20\d\d)').firstMatch(yil);
+    return m == null ? 0 : int.parse(m.group(1)!);
+  }
+
+  static GecmisVeri? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 6) return null;
+    String m(int i) => i < r.length ? _metin(r[i]) : '';
+    if (m(2).isEmpty || m(4).isEmpty) return null;
+    final ham = r[5];
+    double? sayi;
+    if (ham is num) {
+      sayi = ham.toDouble();
+    } else {
+      final t = _metin(ham);
+      if (RegExp(r'^-?\d+([.,]\d+)?$').hasMatch(t)) {
+        sayi = double.tryParse(t.replaceAll(',', '.'));
+      }
+    }
+    return GecmisVeri(
+      yil: m(0),
+      ay: m(1),
+      alan: m(2),
+      konu: m(3),
+      gosterge: m(4),
+      deger: _metin(ham),
+      sayi: sayi,
+      birim: m(6),
+      kaynak: m(7),
+      not: m(8),
+    );
+  }
+}
+
+/// Geçmişten çıkarılan ders / tespit.
+class Ders {
+  const Ders({
+    required this.yil,
+    this.alan = '',
+    this.konu = '',
+    required this.neOldu,
+    this.sonuc = '',
+    this.kaynak = '',
+  });
+
+  final String yil, alan, konu, neOldu, sonuc, kaynak;
+
+  static Ders? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 4) return null;
+    String m(int i) => i < r.length ? _metin(r[i]) : '';
+    if (m(3).isEmpty) return null;
+    return Ders(
+        yil: m(0), alan: m(1), konu: m(2), neOldu: m(3), sonuc: m(4), kaynak: m(5));
+  }
+}
+
 class EskBilgi {
   const EskBilgi({
     required this.bolum,
@@ -714,6 +791,8 @@ class RaporVerisi {
     this.personelListesi = const [],
     this.eskAylik = const [],
     this.eskBilgi = const [],
+    this.gecmis = const [],
+    this.dersler = const [],
     this.olusturma,
   })  : ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -739,6 +818,8 @@ class RaporVerisi {
   final List<PersonelKisi> personelListesi;
   final List<EskAy> eskAylik;
   final List<EskBilgi> eskBilgi;
+  final List<GecmisVeri> gecmis;
+  final List<Ders> dersler;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -759,6 +840,8 @@ class RaporVerisi {
       personelListesi: oku('personelListesi', PersonelKisi.oku),
       eskAylik: oku('eskAylik', EskAy.oku),
       eskBilgi: oku('eskBilgi', EskBilgi.oku),
+      gecmis: oku('gecmis', GecmisVeri.oku),
+      dersler: oku('dersler', Ders.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }
