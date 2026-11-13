@@ -789,7 +789,7 @@ class _OlayKarti extends StatelessWidget {
 /// Tutanak/savunma için haklılık değerlendirmesi kutusu (öneri).
 class _Degerlendirme extends StatelessWidget {
   const _Degerlendirme({required this.d});
-  final ({String sonuc, String gerekce}) d;
+  final ({String sonuc, String gerekce, String hukuki}) d;
 
   @override
   Widget build(BuildContext context) {
@@ -823,9 +823,29 @@ class _Degerlendirme extends StatelessWidget {
             padding: const EdgeInsets.only(top: 4),
             child: Text(d.gerekce, style: const TextStyle(fontSize: 12.5, color: Renk.yazi)),
           ),
+        if (d.hukuki.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(6)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Icon(Icons.menu_book_outlined, size: 15, color: Renk.anaKoyu),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text.rich(TextSpan(children: [
+                  const TextSpan(
+                      text: 'Hukuki ön bilgi ve öneri: ',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: Renk.anaKoyu)),
+                  TextSpan(text: d.hukuki),
+                ]), style: const TextStyle(fontSize: 12.5, color: Renk.yazi)),
+              ),
+            ]),
+          ),
         const Padding(
           padding: EdgeInsets.only(top: 4),
-          child: Text('Öneri, bilgi amaçlıdır; karar İK ve hukuk ile verilir.',
+          child: Text('Öneri, bilgi amaçlıdır; avukat değildir. Karar İK, hukuk ve İSG uzmanı ile verilir.',
               style: TextStyle(fontSize: 11, color: Renk.soluk)),
         ),
       ]),
