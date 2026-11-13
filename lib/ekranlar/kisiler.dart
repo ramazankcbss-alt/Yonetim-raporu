@@ -32,6 +32,9 @@ class KisiIsleri {
   final List<KisiOlayi> olaylar;
 
   int get toplam => isler.length + akis.length;
+
+  /// Hiç açık işi ve olayı yok.
+  bool get kayitsiz => toplam == 0 && olaylar.isEmpty;
   int get olumsuz => olaylar.where((o) => !o.olumlu).length;
   int get olumlu => olaylar.where((o) => o.olumlu).length;
 
@@ -89,9 +92,19 @@ class _KisilerEkranState extends State<KisilerEkran> {
         final veri = VeriDeposu.ben.veri ?? widget.veri;
         final olaylar = VeriDeposu.ben.ozelBellek?.kisiOlaylari ?? const [];
         final bugun = DateTime.now();
-        final liste = [
+        // Görev makamına göre (yönetim üstte), sonra eksik sayısına göre.
+        final tumu = [
           for (final k in veri.kisiler) KisiIsleri(k, veri, olaylar: olaylar)
-        ]..sort((a, b) => b.eksik(bugun).compareTo(a.eksik(bugun)));
+        ]..sort((a, b) {
+            final m = a.kisi.makam.compareTo(b.kisi.makam);
+            if (m != 0) return m;
+            final e = b.eksik(bugun).compareTo(a.eksik(bugun));
+            return e != 0 ? e : a.kisi.ad.compareTo(b.kisi.ad);
+          });
+        // Hiç kaydı olmayanlar takipte kalır ama kalabalık yapmasın diye
+        // altta kapalı bir grupta durur.
+        final liste = [for (final k in tumu) if (!k.kayitsiz) k];
+        final kayitsizlar = [for (final k in tumu) if (k.kayitsiz) k];
         return Scaffold(
           appBar: AppBar(title: const Text('Kişiler')),
           floatingActionButton: FloatingActionButton.extended(
@@ -118,6 +131,28 @@ class _KisilerEkranState extends State<KisilerEkran> {
                       ),
                     ),
                     for (final k in liste) _KisiKarti(ki: k, bugun: bugun),
+                    if (kayitsizlar.isNotEmpty)
+                      Theme(
+                        data: Theme.of(context)
+                            .copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                          tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+                          leading: const Icon(Icons.visibility_off_outlined,
+                              color: Renk.soluk),
+                          title: Text(
+                              'Kaydı olmayan ${kayitsizlar.length} kişi',
+                              style: const TextStyle(
+                                  fontSize: 14, color: Renk.soluk)),
+                          subtitle: const Text(
+                              'Takipte; iş ya da olay çıkınca yukarı taşınır',
+                              style:
+                                  TextStyle(fontSize: 12, color: Renk.soluk)),
+                          children: [
+                            for (final k in kayitsizlar)
+                              _KisiKarti(ki: k, bugun: bugun),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
         );

@@ -79,4 +79,14 @@ void main() {
     expect(o.kisiOlaylari.first.olumlu, isFalse);
     expect(o.kisiOlaylari.last.olumlu, isTrue);
   });
+
+  test('Makam sırası: yönetim üstte, güvenlik altta', () {
+    expect(makamSirasi('Tarım Ve Hayvancılık Grup Müdürü'), 0);
+    expect(makamSirasi('Çiftlikler İşletme Müdürü'), 1);
+    expect(makamSirasi('Şekersüt Çiftlik İşletme Yön. Yrd.'), 2);
+    expect(makamSirasi('Raporlama Uzmanı – Panagro Aslım'), 3);
+    expect(makamSirasi('Veteriner Sağlık Teknikeri'), 4);
+    expect(makamSirasi('Çiftlik İşletme Operatörü'), 5);
+    expect(makamSirasi('Güvenlik Personeli'), 7);
+  });
 }
