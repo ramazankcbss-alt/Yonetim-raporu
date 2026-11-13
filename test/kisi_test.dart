@@ -89,4 +89,19 @@ void main() {
     expect(makamSirasi('Çiftlik İşletme Operatörü'), 5);
     expect(makamSirasi('Güvenlik Personeli'), 7);
   });
+
+  test('Arşiv I sütunundaki geçen kişiler okunur ve eşleşir', () {
+    final a = ArsivKaydi.oku([
+      '14.10.2026', 'Puantaj/İK', 'Taşağıl Savunma Hk.', 'Selin Ak',
+      'Savunmalar istendi', 'Savunma Volkan Taş.pdf', 'Tek seferlik',
+      '1a13a6cc', 'Volkan Taş, Onur Er, Kemal Tan'
+    ])!;
+    expect(a.kisiler, contains('Onur Er'));
+    final k = Kisi.oku(['Onur Er', 'Operatör', '05000000012', '',
+        'Onur Er'])!;
+    expect(k.eslesir([a.kisiler, a.konu, a.gonderen, a.ozet, a.ekler]), isTrue);
+    final b = Kisi.oku(['Sinan Ay', 'Operatör', '', '', 'Sinan Ay'])!;
+    expect(b.eslesir([a.kisiler, a.konu, a.gonderen, a.ozet, a.ekler]),
+        isFalse);
+  });
 }
