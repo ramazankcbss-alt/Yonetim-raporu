@@ -26,6 +26,9 @@ class EskEkran extends StatelessWidget {
               title: const Text('ESK – Et ve Süt Kurumu'),
               actions: const [TabloGuncelleButonu()],
               bottom: const TabBar(
+                labelColor: Colors.white,
+                unselectedLabelColor: Color(0xCCFFFFFF),
+                indicatorColor: Colors.white,
                 tabs: [
                   Tab(text: 'Özet'),
                   Tab(text: 'Aylık'),
