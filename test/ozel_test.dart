@@ -46,4 +46,16 @@ void main() {
     expect(o.toplanti, isEmpty);
     expect(o.gunce, isEmpty);
   });
+
+  test('Kişi olayı: savunma değerlendirmesi ayrılır, mesaj metnine girmez', () {
+    final o = KisiOlayi.oku(['13.11.2026', 'Ali Veli', 'Savunma', 'Isıtıcı',
+        'Savunma alındı.\n⚖ Değerlendirme: Kısmen haklı — Fotoğrafta cihaz yanmış.',
+        'Olumsuz', '', 'E-posta', 'x1'])!;
+    expect(o.olayMetni, 'Savunma alındı.');
+    expect(o.degerlendirme!.sonuc, 'Kısmen haklı');
+    expect(o.degerlendirme!.gerekce, 'Fotoğrafta cihaz yanmış.');
+    final y = KisiOlayi.oku(['13.11.2026', 'Ali Veli', 'Tutanak', 'X', 'Düz metin', 'Olumsuz'])!;
+    expect(y.degerlendirme, isNull);
+    expect(y.olayMetni, 'Düz metin');
+  });
 }

@@ -149,6 +149,29 @@ class KisiOlayi {
 
   bool get olumlu => durum.trim().toLowerCase() == 'olumlu';
 
+  /// Açıklama içinde savunma değerlendirmesinin başladığı işaret.
+  static const degerlendirmeIsareti = '⚖ Değerlendirme:';
+
+  /// Olayın kendi açıklaması (değerlendirme hariç). Kişiye giden mesajlarda
+  /// yalnızca bu kullanılır.
+  String get olayMetni {
+    final i = aciklama.indexOf(degerlendirmeIsareti);
+    return (i < 0 ? aciklama : aciklama.substring(0, i)).trim();
+  }
+
+  /// Tutanak/savunma için "haklılık" değerlendirmesi (öneri, bilgi amaçlı).
+  /// Biçim: "⚖ Değerlendirme: Kısmen haklı — gerekçe…"; yoksa null.
+  ({String sonuc, String gerekce})? get degerlendirme {
+    final i = aciklama.indexOf(degerlendirmeIsareti);
+    if (i < 0) return null;
+    final t = aciklama.substring(i + degerlendirmeIsareti.length).trim();
+    final m = RegExp(r'^(Haklı|Kısmen haklı|Haksız|Belirsiz|Savunma bekleniyor)\s*[—–-]?\s*',
+            caseSensitive: false)
+        .firstMatch(t);
+    if (m == null) return (sonuc: 'Değerlendirme', gerekce: t);
+    return (sonuc: m.group(1)!, gerekce: t.substring(m.end).trim());
+  }
+
   static KisiOlayi? oku(Object? v) {
     final r = _l(v);
     final kisi = _al(r, 1);

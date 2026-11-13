@@ -506,7 +506,7 @@ class _KisiDetayEkranState extends State<KisiDetayEkran> {
                 aciklama: '',
                 uyari: true,
                 mesajSatiri: '${o.konu}'
-                    '${o.aciklama.isNotEmpty ? ' – ${o.aciklama}' : ''}',
+                    '${o.olayMetni.isNotEmpty ? ' – ${o.olayMetni}' : ''}',
               ),
         ];
 
@@ -751,13 +751,14 @@ class _OlayKarti extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 12.5, color: renk, fontWeight: FontWeight.w600),
                 ),
-                if (o.aciklama.isNotEmpty)
+                if (o.olayMetni.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 3),
-                    child: Text(o.aciklama,
+                    child: Text(o.olayMetni,
                         style:
                             const TextStyle(fontSize: 13, color: Renk.yazi)),
                   ),
+                if (o.degerlendirme != null) _Degerlendirme(d: o.degerlendirme!),
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.centerRight,
@@ -781,6 +782,53 @@ class _OlayKarti extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Tutanak/savunma için haklılık değerlendirmesi kutusu (öneri).
+class _Degerlendirme extends StatelessWidget {
+  const _Degerlendirme({required this.d});
+  final ({String sonuc, String gerekce}) d;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = d.sonuc.toLowerCase();
+    final (Color renk, Color zemin) = s.startsWith('haksız')
+        ? (Renk.kirmizi, const Color(0xFFFDECEC))
+        : s.startsWith('kısmen')
+            ? (const Color(0xFFB45309), const Color(0xFFFFF4E0))
+            : s.startsWith('haklı')
+                ? (Renk.yesil, const Color(0xFFE8F5E9))
+                : (Renk.soluk, const Color(0xFFF1F3F1));
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: zemin,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(left: BorderSide(color: renk, width: 3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.balance, size: 16, color: renk),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text('Savunma değerlendirmesi: ${d.sonuc}',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: renk)),
+          ),
+        ]),
+        if (d.gerekce.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(d.gerekce, style: const TextStyle(fontSize: 12.5, color: Renk.yazi)),
+          ),
+        const Padding(
+          padding: EdgeInsets.only(top: 4),
+          child: Text('Öneri, bilgi amaçlıdır; karar İK ve hukuk ile verilir.',
+              style: TextStyle(fontSize: 11, color: Renk.soluk)),
+        ),
+      ]),
     );
   }
 }
