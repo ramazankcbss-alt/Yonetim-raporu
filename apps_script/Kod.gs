@@ -38,7 +38,9 @@ var SAYFALAR = {
   personel: 'Personel',
   kisiler: 'Kişiler',
   mesajKaydi: 'Mesaj_Kaydı',
-  personelListesi: 'Personel_Listesi'
+  personelListesi: 'Personel_Listesi',
+  eskAylik: 'ESK_Aylık',
+  eskBilgi: 'ESK_Bilgi'
 };
 
 // "Eşitle" düğmesinin okuduğu kaynak tablolar.
@@ -141,7 +143,13 @@ function veriTopla_(gun) {
     // Ad Soyad, Görev/Birim, Telefon, E-posta, Eşleşme anahtarları, Not
     kisiler: basitOku_(SAYFALAR.kisiler, 6, tz),
     // Ad Soyad, Görev, Birim, Telefon, Sicil No (tüm çiftlik personeli)
-    personelListesi: basitOku_(SAYFALAR.personelListesi, 5, tz)
+    personelListesi: basitOku_(SAYFALAR.personelListesi, 5, tz),
+    // Ay, Gelen, Hayvan-gün, Ort. baş, Panagro kesim, Dış kesim, Ölen,
+    // Bakım geliri, Kira, Sap satışı, Sap maliyeti, İşletme gideri,
+    // Kâr/Zarar, Durum, Not (ESK_Aylık, 2'den)
+    eskAylik: basitOku_(SAYFALAR.eskAylik, 15, tz),
+    // Bölüm, Başlık, Değer, Açıklama (ESK_Bilgi, 2'den)
+    eskBilgi: basitOku_(SAYFALAR.eskBilgi, 4, tz)
   };
 }
 

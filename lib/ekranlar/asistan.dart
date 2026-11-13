@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../bicim.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'arsiv.dart';
 import 'danismanlik.dart';
+import 'esk.dart';
 import 'gunce.dart';
 import 'isakisi.dart';
 import 'isler.dart';
@@ -74,6 +76,14 @@ class AsistanEkran extends StatelessWidget {
               MaterialPageRoute(builder: (_) => PersonelEkran(veri: veri))),
         ),
         _Bolum(
+          ikon: Icons.agriculture_outlined,
+          baslik: 'ESK – Et ve Süt Kurumu',
+          aciklama: _eskOzet(veri),
+          renk: Renk.kirmizi,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => EskEkran(veri: veri))),
+        ),
+        _Bolum(
           ikon: Icons.forum_outlined,
           baslik: 'Danışmanlık',
           aciklama: 'Bir konuyu sor, görüş ve yol önerisi al',
@@ -113,6 +123,16 @@ class AsistanEkran extends StatelessWidget {
 }
 
 const _morAsistan = Color(0xFF7C3AED);
+
+String _eskOzet(RaporVerisi veri) {
+  final min = eskBasabas(veri.eskBilgi);
+  final aylar = veri.eskAylik.where((a) => a.ortBas != null).toList();
+  if (min == null || aylar.isEmpty) {
+    return 'Taşağıl bakım besleme: aylık kâr/zarar, başabaş, öneriler';
+  }
+  final son = aylar.last;
+  return 'Başabaş ${sayi(min)} baş/gün · ${son.ay}: ort. ${sayi(son.ortBas)} baş';
+}
 
 String _kisiOzet(RaporVerisi veri) {
   if (veri.kisiler.isEmpty) return 'Çalışanların takip ettiği işler ve eksikler';
