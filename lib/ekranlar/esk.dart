@@ -26,12 +26,11 @@ class EskEkran extends StatelessWidget {
               title: const Text('ESK – Et ve Süt Kurumu'),
               actions: const [TabloGuncelleButonu()],
               bottom: const TabBar(
-                isScrollable: true,
                 tabs: [
                   Tab(text: 'Özet'),
                   Tab(text: 'Aylık'),
                   Tab(text: 'Öneriler'),
-                  Tab(text: 'Eksik belgeler'),
+                  Tab(text: 'Eksikler'),
                 ],
               ),
             ),
