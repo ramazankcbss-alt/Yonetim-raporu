@@ -89,4 +89,19 @@ void main() {
     expect(makamSirasi('Çiftlik İşletme Operatörü'), 5);
     expect(makamSirasi('Güvenlik Personeli'), 7);
   });
+
+  test('Arşiv I sütunundaki geçen kişiler okunur ve eşleşir', () {
+    final a = ArsivKaydi.oku([
+      '14.10.2026', 'Puantaj/İK', 'Taşağıl Savunma Hk.', 'Özge Demirel',
+      'Savunmalar istendi', 'Savunma Hakan Cerit.pdf', 'Tek seferlik',
+      '1a13a6cc', 'Hakan Cerit, Abdullah Akman, Ümit Buldu'
+    ])!;
+    expect(a.kisiler, contains('Abdullah Akman'));
+    final k = Kisi.oku(['Abdullah Akman', 'Operatör', '05442178005', '',
+        'Abdullah Akman'])!;
+    expect(k.eslesir([a.kisiler, a.konu, a.gonderen, a.ozet, a.ekler]), isTrue);
+    final b = Kisi.oku(['Vedat Kaya', 'Operatör', '', '', 'Vedat Kaya'])!;
+    expect(b.eslesir([a.kisiler, a.konu, a.gonderen, a.ozet, a.ekler]),
+        isFalse);
+  });
 }

@@ -403,17 +403,21 @@ class ArsivKaydi {
     this.ozet = '',
     this.ekler = '',
     this.periyot = '',
+    this.kisiler = '',
   });
 
   final DateTime? tarih;
   final String konu, kategori, gonderen, ozet, ekler, periyot;
+
+  /// Yazışmada adı/e-postası geçen personel (I sütunu, virgülle).
+  final String kisiler;
 
   bool get ekliMi => ekler.trim().isNotEmpty;
   bool get aylikMi => periyot.trim().isNotEmpty;
 
   /// Serbest metin aramasında taranan birleşik alan (küçük harf).
   String get aranabilir =>
-      [konu, kategori, gonderen, ozet, ekler, periyot]
+      [konu, kategori, gonderen, ozet, ekler, periyot, kisiler]
           .join(' ')
           .toLowerCase();
 
@@ -430,6 +434,7 @@ class ArsivKaydi {
       ozet: r.length > 4 ? _metin(r[4]) : '',
       ekler: r.length > 5 ? _metin(r[5]) : '',
       periyot: r.length > 6 ? _metin(r[6]) : '',
+      kisiler: r.length > 8 ? _metin(r[8]) : '',
     );
   }
 }
