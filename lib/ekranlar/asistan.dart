@@ -4,6 +4,7 @@ import '../bicim.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
+import 'araclar.dart';
 import 'arsiv.dart';
 import 'danismanlik.dart';
 import 'esk.dart';
@@ -96,6 +97,17 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.ana,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => GecmisEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.agriculture_outlined,
+          baslik: 'Araçlar',
+          aciklama: veri.arac.bos
+              ? 'Araç Takip: kullanım, bakım, arıza ve mutabakat kontrolü'
+              : '${veri.arac.araclar.length} araç · ${veri.arac.aktif.length} aktif kullanım · '
+                  '${veri.arac.ariza.where((x) => !x.kapali).length} açık arıza',
+          renk: Renk.anaKoyu,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => AraclarEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.vaccines_outlined,

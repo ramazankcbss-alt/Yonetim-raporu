@@ -53,6 +53,9 @@ var CANLI_HAYVAN_VARSAYILAN_ID = '17XVTYfpnwZi98-yGVWpFyHscyEdh1TcjSMvP2UYmvHY';
 // Özel bölümler ("Özel Notlar – Sadece Ramazan Kocabaş" dosyası). Bu dosya
 // paylaşılmadığı için yalnızca sahibi (siz) okuyup yazabilir; Apps Script
 // sizin adınıza çalıştığından erişebilir.
+// Araç Takip uygulamasının tablosu (salt okunur).
+var ARAC_TABLO_ID = '1Pw9GSj3_d6T5epCgBLDwzRnrWiHYsLRp3Ifdx3rCybs';
+
 var OZEL_DOSYA_ID = '1-XtWC5sj1RydL01_Exf3Dh8EQDkBqPj3wl1NM9HzX6o';
 var OZEL_SAYFALAR = {
   ozelNotlar: { ad: 'Notlar', sutun: 5 },
@@ -156,7 +159,14 @@ function veriTopla_(gun) {
     // Bilgi Bankası (ayrı tablo): Yıl, Ay, Alan, Konu, Gösterge, Değer, Birim, Kaynak, Not
     gecmis: basitOku_('Veriler', 9, tz, BILGI_BANKASI_ID),
     // Yıl, Alan, Konu, Ne oldu, Sonuç/ders, Kaynak
-    dersler: basitOku_('Dersler', 6, tz, BILGI_BANKASI_ID)
+    dersler: basitOku_('Dersler', 6, tz, BILGI_BANKASI_ID),
+    // Araç Takip (ayrı tablo, salt okunur)
+    aracListe: basitOku_('Araçlar', 12, tz, ARAC_TABLO_ID),
+    aracKullanim: sonSatirlar_(basitOku_('Kullanım', 21, tz, ARAC_TABLO_ID), 800),
+    aracPlan: basitOku_('Bakım_Plan', 5, tz, ARAC_TABLO_ID),
+    aracBakim: sonSatirlar_(basitOku_('Bakım_Kayıt', 13, tz, ARAC_TABLO_ID), 500),
+    aracAriza: sonSatirlar_(basitOku_('Arıza', 13, tz, ARAC_TABLO_ID), 400),
+    aracMutabakat: sonSatirlar_(basitOku_('Mutabakat', 8, tz, ARAC_TABLO_ID), 400)
   };
 }
 
@@ -184,6 +194,11 @@ function basitOku_(ad, sutun, tz, tabloId) {
         return v;
       });
     });
+}
+
+/** Listenin son [n] satırı (en eskiler atılır). */
+function sonSatirlar_(l, n) {
+  return l.length > n ? l.slice(l.length - n) : l;
 }
 
 /** İş Akışı sayfasını okur (başlık 1. satırda, veri 2'den; 12 sütun). */
