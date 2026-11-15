@@ -111,7 +111,10 @@ class _KullanimSatiri extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baslik = [if (aracGoster) x.arac, if (personelGoster) x.personel].join(' · ');
+    final baslik = [
+      if (aracGoster) x.birlesik else if (x.ekipman.isNotEmpty) '+ ${x.ekipman.join(', ')}',
+      if (personelGoster) x.personel,
+    ].join(' · ');
     final alt = [
       '${x.baslangic}${x.bitis.isEmpty ? '' : ' → ${x.bitis.split(' ').last}'}',
       if (x.saat != null) '${_sayi(x.saat)} saat',
@@ -150,7 +153,7 @@ class _Genel extends StatelessWidget {
       children: [
         Row(
           children: [
-            _Sayac('Araç', '${a.araclar.length}', Renk.ana),
+            _Sayac('Araç', '${a.araclar.where((x) => !x.ekipman).length}', Renk.ana),
             _Sayac('Aktif kullanım', '${aktif.length}', Renk.mavi),
             _Sayac('Arızalı', '$arizali', Renk.kirmizi),
             _Sayac('Bakım uyarısı', '${uyari.length}', Renk.amber),
@@ -225,10 +228,12 @@ class _ArizaSatiri extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
         contentPadding: EdgeInsets.zero,
-        title: Text('${x.arac} · ${x.aciklama}', maxLines: 2, overflow: TextOverflow.ellipsis),
+        title: Text('${x.yer == 'Makine-Ekipman' ? 'Makine-ekipman' : 'Araç'} ${x.arac} · ${x.aciklama}',
+            maxLines: 2, overflow: TextOverflow.ellipsis),
         subtitle: Text([
           '${x.zaman} · ${x.bildiren}',
           if (x.gun != null) '${x.gun} gün',
+          if (x.birlikte.isNotEmpty) 'Birlikte: ${x.birlikte}',
           if (x.not.isNotEmpty) x.not,
         ].join(' · ')),
         trailing: _Etiket(x.durum),
@@ -244,29 +249,40 @@ class _AracListesi extends StatelessWidget {
   const _AracListesi({required this.a});
   final AracVerisi a;
 
+  Widget _kart(BuildContext context, AracKaydi x) => Card(
+        elevation: 0,
+        margin: const EdgeInsets.only(bottom: 8),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Renk.cizgi)),
+        child: ListTile(
+          leading: Icon(x.ekipman ? Icons.construction_outlined : Icons.agriculture_outlined,
+              color: x.durum == 'Arızalı' ? Renk.kirmizi : Renk.ana),
+          title: Text(x.baslik, style: const TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: Text('${x.alt}\n${x.ekipman ? 'Çalışma saati' : 'Motor saati'}: ${_sayi(x.sayac)}'),
+          isThreeLine: true,
+          trailing: _Etiket(x.durum),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _AracDetay(a: a, arac: x))),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final l = [...a.araclar]..sort((x, y) => x.no.compareTo(y.no));
     if (l.isEmpty) return const _Bilgi('Kayıtlı araç yok.');
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: l.length,
-      itemBuilder: (_, i) {
-        final x = l[i];
-        return Card(
-          elevation: 0,
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Renk.cizgi)),
-          child: ListTile(
-            title: Text(x.baslik, style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text('${x.alt}\nMotor saati: ${_sayi(x.sayac)}'),
-            isThreeLine: true,
-            trailing: _Etiket(x.durum),
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _AracDetay(a: a, arac: x))),
-          ),
+    final araclar = l.where((x) => !x.ekipman).toList();
+    final ekipman = l.where((x) => x.ekipman).toList();
+    Widget baslik(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+          child: Text(t, style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.soluk)),
         );
-      },
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        baslik('Araçlar (${araclar.length})'),
+        for (final x in araclar) _kart(context, x),
+        if (ekipman.isNotEmpty) baslik('Makine-Ekipman (${ekipman.length})'),
+        for (final x in ekipman) _kart(context, x),
+      ],
     );
   }
 }
@@ -312,7 +328,7 @@ class _AracDetay extends StatelessWidget {
                       Text(arac.baslik, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
                       Text(arac.alt, style: const TextStyle(color: Renk.soluk)),
                       const SizedBox(height: 4),
-                      Text('Motor saati: ${_sayi(arac.sayac)} · Durum: ${arac.durum}'),
+                      Text('${arac.ekipman ? 'Çalışma saati' : 'Motor saati'}: ${_sayi(arac.sayac)} · Durum: ${arac.durum}'),
                     ],
                   ),
                 ),

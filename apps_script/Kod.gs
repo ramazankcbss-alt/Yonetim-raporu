@@ -97,7 +97,9 @@ function veriTopla_(gun) {
     if (!sh) return [];
     var son = sh.getLastRow();
     if (son < 2) return [];
-    return sh.getRange(2, 1, son - 1, sutun).getValues();
+    // sutun = 0: sayfadaki tüm sütunlar (sonradan eklenen sütunlar için yeniden dağıtım gerekmez)
+  var w = sutun > 0 ? sutun : Math.max(1, sh.getLastColumn());
+  return sh.getRange(2, 1, son - 1, w).getValues();
   }
   function hucre(v) {
     if (v instanceof Date) return Utilities.formatDate(v, tz, 'yyyy-MM-dd');
@@ -161,12 +163,12 @@ function veriTopla_(gun) {
     // Yıl, Alan, Konu, Ne oldu, Sonuç/ders, Kaynak
     dersler: basitOku_('Dersler', 6, tz, BILGI_BANKASI_ID),
     // Araç Takip (ayrı tablo, salt okunur)
-    aracListe: basitOku_('Araçlar', 12, tz, ARAC_TABLO_ID),
-    aracKullanim: sonSatirlar_(basitOku_('Kullanım', 21, tz, ARAC_TABLO_ID), 800),
-    aracPlan: basitOku_('Bakım_Plan', 5, tz, ARAC_TABLO_ID),
-    aracBakim: sonSatirlar_(basitOku_('Bakım_Kayıt', 13, tz, ARAC_TABLO_ID), 500),
-    aracAriza: sonSatirlar_(basitOku_('Arıza', 13, tz, ARAC_TABLO_ID), 400),
-    aracMutabakat: sonSatirlar_(basitOku_('Mutabakat', 8, tz, ARAC_TABLO_ID), 400)
+    aracListe: basitOku_('Araçlar', 0, tz, ARAC_TABLO_ID),
+    aracKullanim: sonSatirlar_(basitOku_('Kullanım', 0, tz, ARAC_TABLO_ID), 800),
+    aracPlan: basitOku_('Bakım_Plan', 0, tz, ARAC_TABLO_ID),
+    aracBakim: sonSatirlar_(basitOku_('Bakım_Kayıt', 0, tz, ARAC_TABLO_ID), 500),
+    aracAriza: sonSatirlar_(basitOku_('Arıza', 0, tz, ARAC_TABLO_ID), 400),
+    aracMutabakat: sonSatirlar_(basitOku_('Mutabakat', 0, tz, ARAC_TABLO_ID), 400)
   };
 }
 

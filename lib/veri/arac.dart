@@ -22,14 +22,20 @@ DateTime? zamanOku(String s) {
 }
 
 class AracKaydi {
-  const AracKaydi(this.no, this.tur, this.model, this.plaka, this.ciftlik, this.sayac, this.durum);
+  const AracKaydi(this.no, this.tur, this.model, this.plaka, this.ciftlik, this.sayac, this.durum,
+      [this.sinif = 'Araç']);
   final String no, tur, model, plaka, ciftlik, durum;
+  /// 'Araç' ya da 'Makine-Ekipman' (pulluk, mibzer, römork vb.).
+  final String sinif;
+  bool get ekipman => sinif == 'Makine-Ekipman';
   final double? sayac;
   static AracKaydi? oku(List<Object?> r) {
     final no = _m(_h(r, 0));
     if (no.isEmpty) return null;
     final d = _m(_h(r, 6));
-    return AracKaydi(no, _m(_h(r, 1)), _m(_h(r, 2)), _m(_h(r, 3)), _m(_h(r, 4)), _s(_h(r, 5)), d.isEmpty ? 'Aktif' : d);
+    final sinif = _m(_h(r, 12));
+    return AracKaydi(no, _m(_h(r, 1)), _m(_h(r, 2)), _m(_h(r, 3)), _m(_h(r, 4)), _s(_h(r, 5)), d.isEmpty ? 'Aktif' : d,
+        sinif == 'Makine-Ekipman' ? sinif : 'Araç');
   }
 
   String get baslik => [no, tur].where((x) => x.isNotEmpty).join(' · ');
@@ -55,6 +61,10 @@ class AracKullanim {
   String get durum => _m(_h(r, 17));
   String get onaylayan => _m(_h(r, 18));
   String get sekil => _m(_h(r, 20));
+  /// Araca bağlı kullanılan makine-ekipman numaraları.
+  List<String> get ekipman =>
+      _m(_h(r, 22)).split(',').map((x) => x.trim()).where((x) => x.isNotEmpty).toList();
+  String get birlesik => [arac, ...ekipman].join(' + ');
   DateTime? get bas => zamanOku(baslangic);
   DateTime? get son => zamanOku(bitis);
   bool get devamEdiyor => durum == 'Devam ediyor';
@@ -109,6 +119,8 @@ class AracAriza {
   String get guncelleyen => _m(_h(r, 9));
   String get not => _m(_h(r, 11));
   String get kapanis => _m(_h(r, 12));
+  String get yer => _m(_h(r, 13)).isEmpty ? 'Araç' : _m(_h(r, 13));
+  String get birlikte => _m(_h(r, 14));
   bool get kapali => durum == 'Onarıldı' || durum == 'Geçersiz bildirim';
 
   /// Arızalı kalınan süre (gün); açık arızada bugüne kadar.
@@ -180,7 +192,7 @@ class AracVerisi {
 
   /// Bir aracın kullanım geçmişi, yeniden eskiye.
   List<AracKullanim> aracGecmisi(String no) {
-    final l = kullanim.where((x) => x.arac == no).toList();
+    final l = kullanim.where((x) => x.arac == no || x.ekipman.contains(no)).toList();
     l.sort((a, b) => (b.bas ?? DateTime(0)).compareTo(a.bas ?? DateTime(0)));
     return l;
   }
