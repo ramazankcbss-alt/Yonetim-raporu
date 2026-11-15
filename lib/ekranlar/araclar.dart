@@ -13,7 +13,7 @@ class AraclarEkran extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = veri.arac;
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Araçlar'),
@@ -22,6 +22,7 @@ class AraclarEkran extends StatelessWidget {
             tabAlignment: TabAlignment.start,
             tabs: [
               Tab(text: 'Genel Durum'),
+              Tab(text: 'İş Emirleri'),
               Tab(text: 'Araçlar'),
               Tab(text: 'Personel'),
               Tab(text: 'Mutabakat Kontrolü'),
@@ -35,6 +36,7 @@ class AraclarEkran extends StatelessWidget {
             : TabBarView(
                 children: [
                   _Genel(a: a),
+                  _IsEmirleri(a: a),
                   _AracListesi(a: a),
                   _PersonelListesi(a: a),
                   _Mutabakat(a: a),
@@ -75,6 +77,8 @@ class _Etiket extends StatelessWidget {
         return (Renk.yesil, Renk.yesilAcik);
       case 'Devam ediyor':
       case 'Atölyede':
+      case 'Verildi':
+      case 'Başladı':
         return (Renk.mavi, Renk.maviAcik);
       case 'Tamamlandı':
       case 'Parça bekleniyor':
@@ -608,6 +612,84 @@ class AracPersonelGecmisiEkran extends StatelessWidget {
                 for (final x in g) _KullanimSatiri(x, personelGoster: false),
               ],
             ),
+    );
+  }
+}
+
+/// Formenlerin personele verdiği iş emirleri: kim, nerede, hangi işi, hangi araç ve makine-ekipmanla.
+class _IsEmirleri extends StatefulWidget {
+  const _IsEmirleri({required this.a});
+  final AracVerisi a;
+
+  @override
+  State<_IsEmirleri> createState() => _IsEmirleriState();
+}
+
+class _IsEmirleriState extends State<_IsEmirleri> {
+  int _gun = 0; // 0 bugün, -1 dün, 1 yarın, 99 tümü
+
+  @override
+  Widget build(BuildContext context) {
+    final bugun = DateTime.now();
+    final hedef = DateTime(bugun.year, bugun.month, bugun.day).add(Duration(days: _gun == 99 ? 0 : _gun));
+    final l = widget.a.isEmri.where((e) {
+      if (_gun == 99) return true;
+      final g = e.gun;
+      return g != null && g.year == hedef.year && g.month == hedef.month && g.day == hedef.day;
+    }).toList()
+      ..sort((x, y) {
+        final f = x.formen.compareTo(y.formen);
+        return f != 0 ? f : x.personel.compareTo(y.personel);
+      });
+    final sayim = <String, int>{};
+    for (final e in l) {
+      sayim[e.durum] = (sayim[e.durum] ?? 0) + 1;
+    }
+    final formenler = <String, List<AracIsEmri>>{};
+    for (final e in l) {
+      (formenler[e.formen.isEmpty ? 'Formen belirtilmemiş' : e.formen] ??= []).add(e);
+    }
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        Wrap(
+          spacing: 6,
+          children: [
+            for (final (d, ad) in const [(-1, 'Dün'), (0, 'Bugün'), (1, 'Yarın'), (99, 'Tümü')])
+              ChoiceChip(label: Text(ad), selected: _gun == d, onSelected: (_) => setState(() => _gun = d)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (l.isEmpty)
+          const _Bilgi('Bu gün için iş emri yok.')
+        else ...[
+          Text(
+            ['${l.length} iş emri', for (final e in sayim.entries) '${e.value} ${e.key.toLowerCase()}'].join(' · '),
+            style: const TextStyle(color: Renk.soluk),
+          ),
+          const SizedBox(height: 8),
+          for (final f in formenler.entries)
+            Panel(
+              baslik: '${f.key} (${f.value.length})',
+              child: Column(
+                children: [
+                  for (final e in f.value)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${e.personel} · ${e.is_}'),
+                      subtitle: Text([
+                        if (_gun == 99) e.tarih,
+                        [e.yerTuru, e.yer].where((x) => x.isNotEmpty).join(': '),
+                        e.aracMetni.isEmpty ? 'Araçsız iş' : e.aracMetni,
+                        if (e.aciklama.isNotEmpty) e.aciklama,
+                      ].where((x) => x.isNotEmpty).join(' · ')),
+                      trailing: _Etiket(e.durum),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ],
     );
   }
 }

@@ -168,7 +168,8 @@ function veriTopla_(gun) {
     aracPlan: basitOku_('Bakım_Plan', 0, tz, ARAC_TABLO_ID),
     aracBakim: sonSatirlar_(basitOku_('Bakım_Kayıt', 0, tz, ARAC_TABLO_ID), 500),
     aracAriza: sonSatirlar_(basitOku_('Arıza', 0, tz, ARAC_TABLO_ID), 400),
-    aracMutabakat: sonSatirlar_(basitOku_('Mutabakat', 0, tz, ARAC_TABLO_ID), 400)
+    aracMutabakat: sonSatirlar_(basitOku_('Mutabakat', 0, tz, ARAC_TABLO_ID), 400),
+    aracIsEmri: sonSatirlar_(basitOku_('İş_Emirleri', 0, tz, ARAC_TABLO_ID), 600)
   };
 }
 

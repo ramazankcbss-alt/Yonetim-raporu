@@ -14,6 +14,10 @@ void main() {
       ['K00002', '14.11.2026', 'TRK-07', 'Can Kaya', '05000000001', 'Panagro - Aslım', '14.11.2026 13:00',
         '', '1234', '', '', '', '', '', '', '', '', 'Devam ediyor'],
     ],
+    'aracIsEmri': [
+      ['E00001', '15.11.2026', '05000000001', 'Can Kaya', '05000000009', 'Arda Koç', 'Panagro - Aslım',
+        'Ahır', '3 nolu ahır', 'Balya taşıma', 'MNT-02', 'BLK-01', '', 'Verildi'],
+    ],
     'aracPlan': [
       ['TRK-07', 'Motor yağı ve yağ filtresi', '250', '1000', ''],
     ],
@@ -21,6 +25,8 @@ void main() {
 
   test('araç verisi okunur, bakım uyarısı ve olay sorgulama çalışır', () {
     expect(v.araclar.first.sayac, 1240);
+    expect(v.isEmri.single.aracMetni, 'MNT-02 + BLK-01');
+    expect(v.isEmri.single.acik, isTrue);
     expect(v.araclar.last.ekipman, isTrue);
     expect(v.kullanim.first.birlesik, 'TRK-07 + PLK-02');
     expect(v.aracGecmisi('PLK-02').single.personel, 'Ali Veli');

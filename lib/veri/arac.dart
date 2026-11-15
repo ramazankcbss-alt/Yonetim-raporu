@@ -144,6 +144,28 @@ class AracMutabakat {
   String get personel => _m(_h(r, 6));
 }
 
+/// Formenin personele verdiği iş emri (İş_Emirleri sayfası).
+class AracIsEmri {
+  const AracIsEmri(this.r);
+  final List<Object?> r;
+  String get no => _m(_h(r, 0));
+  String get tarih => _m(_h(r, 1));
+  String get personel => _m(_h(r, 3));
+  String get formen => _m(_h(r, 5));
+  String get ciftlik => _m(_h(r, 6));
+  String get yerTuru => _m(_h(r, 7));
+  String get yer => _m(_h(r, 8));
+  String get is_ => _m(_h(r, 9));
+  String get arac => _m(_h(r, 10));
+  String get ekipman => _m(_h(r, 11));
+  String get aciklama => _m(_h(r, 12));
+  String get durum => _m(_h(r, 13));
+  String get kullanimNo => _m(_h(r, 14));
+  DateTime? get gun => zamanOku(tarih);
+  bool get acik => durum == 'Verildi' || durum == 'Başladı';
+  String get aracMetni => [arac, ekipman].where((x) => x.isNotEmpty).join(' + ');
+}
+
 /// Periyodik bakım durumu (plan + güncel sayaç).
 class BakimDurumu {
   const BakimDurumu(this.arac, this.plan, this.kalan);
@@ -157,6 +179,7 @@ class AracVerisi {
   const AracVerisi({
     this.araclar = const [],
     this.kullanim = const [],
+    this.isEmri = const [],
     this.plan = const [],
     this.bakim = const [],
     this.ariza = const [],
@@ -165,6 +188,7 @@ class AracVerisi {
 
   factory AracVerisi.json(Map<String, dynamic> j) => AracVerisi(
         araclar: _satirlar(j['aracListe']).map(AracKaydi.oku).whereType<AracKaydi>().toList(),
+        isEmri: _satirlar(j['aracIsEmri']).map(AracIsEmri.new).where((x) => x.no.isNotEmpty).toList(),
         kullanim: _satirlar(j['aracKullanim']).map(AracKullanim.new).where((x) => x.no.isNotEmpty).toList(),
         plan: _satirlar(j['aracPlan']).map(AracBakimPlani.oku).whereType<AracBakimPlani>().toList(),
         bakim: _satirlar(j['aracBakim']).map(AracBakimKaydi.new).where((x) => x.arac.isNotEmpty).toList(),
@@ -174,12 +198,13 @@ class AracVerisi {
 
   final List<AracKaydi> araclar;
   final List<AracKullanim> kullanim;
+  final List<AracIsEmri> isEmri;
   final List<AracBakimPlani> plan;
   final List<AracBakimKaydi> bakim;
   final List<AracAriza> ariza;
   final List<AracMutabakat> mutabakat;
 
-  bool get bos => araclar.isEmpty && kullanim.isEmpty;
+  bool get bos => araclar.isEmpty && kullanim.isEmpty && isEmri.isEmpty;
 
   AracKaydi? arac(String no) {
     for (final a in araclar) {
