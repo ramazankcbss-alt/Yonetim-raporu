@@ -6,6 +6,7 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import '../veri/ozel.dart';
+import 'araclar.dart';
 import 'bilesenler.dart';
 
 /// Bir kişinin takip ettiği / sorumlu olduğu açık işler ve olayları.
@@ -113,7 +114,17 @@ class _KisilerEkranState extends State<KisilerEkran> {
         final liste = [for (final k in tumu) if (!k.kayitsiz) k];
         final kayitsizlar = [for (final k in tumu) if (k.kayitsiz) k];
         return Scaffold(
-          appBar: AppBar(title: const Text('Kişiler')),
+          appBar: AppBar(
+            title: const Text('Kişiler'),
+            actions: [
+              IconButton(
+                tooltip: 'Araçlar',
+                icon: const Icon(Icons.agriculture_outlined),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => AraclarEkran(veri: veri))),
+              ),
+            ],
+          ),
           floatingActionButton: FloatingActionButton.extended(
             onPressed: () => kisiEkle(context, veri),
             icon: const Icon(Icons.person_add_alt_1),
@@ -137,7 +148,7 @@ class _KisilerEkranState extends State<KisilerEkran> {
                             fontSize: 13.5, color: Renk.soluk, height: 1.4),
                       ),
                     ),
-                    for (final k in liste) _KisiKarti(ki: k, bugun: bugun),
+                    for (final k in liste) _KisiKarti(ki: k, bugun: bugun, veri: veri),
                     if (kayitsizlar.isNotEmpty)
                       Theme(
                         data: Theme.of(context)
@@ -156,7 +167,7 @@ class _KisilerEkranState extends State<KisilerEkran> {
                                   TextStyle(fontSize: 12, color: Renk.soluk)),
                           children: [
                             for (final k in kayitsizlar)
-                              _KisiKarti(ki: k, bugun: bugun),
+                              _KisiKarti(ki: k, bugun: bugun, veri: veri),
                           ],
                         ),
                       ),
@@ -326,15 +337,17 @@ class _PersonelSeciciState extends State<_PersonelSecici> {
 }
 
 class _KisiKarti extends StatelessWidget {
-  const _KisiKarti({required this.ki, required this.bugun});
+  const _KisiKarti({required this.ki, required this.bugun, required this.veri});
 
   final KisiIsleri ki;
   final DateTime bugun;
+  final RaporVerisi veri;
 
   @override
   Widget build(BuildContext context) {
     final k = ki.kisi;
     final eksik = ki.eksik(bugun);
+    final aracKaydi = veri.arac.kullanim.any((x) => x.personel == k.ad);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -360,7 +373,18 @@ class _KisiKarti extends StatelessWidget {
             if (ki.olumlu > 0) '${ki.olumlu} olumlu',
           ].join(' · '),
         ),
-        trailing: eksik > 0
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (aracKaydi)
+              IconButton(
+                tooltip: 'Araç kullanımı',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.agriculture_outlined, color: Renk.ana),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => AracPersonelGecmisiEkran(veri: veri, ad: k.ad))),
+              ),
+            eksik > 0
             ? Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -372,6 +396,8 @@ class _KisiKarti extends StatelessWidget {
                         fontWeight: FontWeight.w700, color: Renk.amber)),
               )
             : const Icon(Icons.chevron_right, color: Renk.soluk),
+          ],
+        ),
         onTap: () => Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => KisiDetayEkran(kisiAdi: k.ad))),
       ),

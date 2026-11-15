@@ -561,3 +561,37 @@ class _MutabakatState extends State<_Mutabakat> {
     );
   }
 }
+
+/// Bir personelin araç kullanım geçmişi (Kişiler ekranından açılır).
+/// Kişi bazlı toplam çalışma saati gösterilmez.
+class AracPersonelGecmisiEkran extends StatelessWidget {
+  const AracPersonelGecmisiEkran({super.key, required this.veri, required this.ad});
+  final RaporVerisi veri;
+  final String ad;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = veri.arac.personelGecmisi(ad);
+    final uygunsuz = g.where((x) => x.eksikKontroller.isNotEmpty).length;
+    return Scaffold(
+      appBar: AppBar(title: Text('Araç Kullanımı · $ad')),
+      body: g.isEmpty
+          ? const _Bilgi('Bu personele ait araç kullanım kaydı yok.')
+          : ListView(
+              padding: const EdgeInsets.all(12),
+              children: [
+                Text(
+                  [
+                    '${g.length} kayıt',
+                    '${{for (final x in g) x.arac}.length} araç',
+                    if (uygunsuz > 0) '$uygunsuz bakım uygunsuzluğu',
+                  ].join(' · '),
+                  style: const TextStyle(color: Renk.soluk),
+                ),
+                const SizedBox(height: 6),
+                for (final x in g) _KullanimSatiri(x, personelGoster: false),
+              ],
+            ),
+    );
+  }
+}
