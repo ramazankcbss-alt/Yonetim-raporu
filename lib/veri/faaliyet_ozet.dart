@@ -36,7 +36,7 @@ String kurumsalFaaliyet(String ham) {
   s = s.replaceAll(RegExp(r'\(\s*,\s*'), '(').replaceAll(RegExp(r'\s*,\s*\)'), ')');
   s = s.replaceAll(_bosParantez, '');
   s = s.replaceAll(RegExp(r'\s+'), ' ');
-  s = s.replaceAll(RegExp(r'\s+([.,;:)])'), r'$1');
+  s = s.replaceAllMapped(RegExp(r'\s+([.,;:)])'), (m) => m[1]!);
   // Cümle sonlarını maddeye çevir ("7. pivot" gibi sıra sayılarına dokunma).
   s = s.replaceAll(RegExp(r'(?<!\d)\.\s*[–-]\s*'), '; ');
   s = s.replaceAll(RegExp(r'(?<!\d)\.\s+'), '; ');
