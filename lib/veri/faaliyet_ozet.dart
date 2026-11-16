@@ -314,9 +314,9 @@ void _ekle(Map<String, _Toplam> m, String etiket, double miktar,
 }
 
 int _sira(String etiket) {
-  if (etiket.endsWith('ekimi') || etiket == 'Ekim') return -1;
   final i = _isler.indexWhere((e) => e.etiket == etiket);
-  return i < 0 ? 99 : i;
+  if (i >= 0) return i;
+  return etiket.endsWith(' ekimi') || etiket == 'Ekim' ? -1 : 99;
 }
 
 String _buyuk(String s) => _buyukBasla(s);
