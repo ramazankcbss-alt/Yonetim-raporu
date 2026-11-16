@@ -57,6 +57,9 @@ var CANLI_HAYVAN_VARSAYILAN_ID = '17XVTYfpnwZi98-yGVWpFyHscyEdh1TcjSMvP2UYmvHY';
 // sizin adınıza çalıştığından erişebilir.
 // Araç Takip uygulamasının tablosu (salt okunur).
 var ARAC_TABLO_ID = '1Pw9GSj3_d6T5epCgBLDwzRnrWiHYsLRp3Ifdx3rCybs';
+// "Bakım Onarım Kayıtları" tablosu (Günlük Tarım Bildirimi formundan aktarılır,
+// bakım onarım formeni onaylar). Salt okunur; kişisel veri içermez.
+var BAKIM_TABLO_ID = '1S-2ziLyY2UdjOk6SM7A8Da2D_nPEhCa5R8yFMs5daaI';
 
 var OZEL_DOSYA_ID = '1-XtWC5sj1RydL01_Exf3Dh8EQDkBqPj3wl1NM9HzX6o';
 var OZEL_SAYFALAR = {
@@ -172,7 +175,11 @@ function veriTopla_(gun) {
     aracBakim: sonSatirlar_(basitOku_('Bakım_Kayıt', 0, tz, ARAC_TABLO_ID), 500),
     aracAriza: sonSatirlar_(basitOku_('Arıza', 0, tz, ARAC_TABLO_ID), 400),
     aracMutabakat: [], // KVKK: Mutabakat kontrolü uygulamadan kaldırıldı
-    aracIsEmri: sonSatirlar_(basitOku_('İş_Emirleri', 0, tz, ARAC_TABLO_ID), 600)
+    aracIsEmri: sonSatirlar_(basitOku_('İş_Emirleri', 0, tz, ARAC_TABLO_ID), 600),
+    // Bakım Onarım Kayıtları: No, Bildirim zamanı, Çiftlik, Bildiren (görev),
+    // Makine/ekipman, İşlem türü, Çalışma saati/km, Yapılan iş, Malzeme/parça,
+    // Tedarik durumu, Servis, Durum, Onay (Evet/boş), Onay zamanı
+    bakimOnarim: sonSatirlar_(bakimOnarimOku_(tz), 600)
   };
 }
 
@@ -833,6 +840,49 @@ function formBildirimleri_() {
       if (al(r, 'Malzeme notu', m)) mm += '; ' + al(r, 'Malzeme notu', m);
       sonuc.push([tarih, ciftlik, mm.replace(/[\r\n]+/g, ' '), kaynak]);
     }
+  }
+  return sonuc;
+}
+
+// ---------------------------------------------------------------------------
+// Bakım Onarım Kayıtları (ayrı tablo, salt okunur). Sütunlar başlık adına göre
+// okunur; tabloya sonradan sütun eklense de sıra bozulmaz. Tabloda kişi adı
+// yoktur ("Bildiren" görevdir); başka sütun eklenirse uygulamaya gönderilmez.
+// ---------------------------------------------------------------------------
+
+function bakimOnarimOku_(tz) {
+  var sh;
+  try {
+    var t = SpreadsheetApp.openById(BAKIM_TABLO_ID);
+    sh = t.getSheetByName('Kayıtlar') || t.getSheets()[0];
+  } catch (e) {
+    return [];
+  }
+  if (!sh || sh.getLastRow() < 2) return [];
+  var v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  var bas = v[0].map(function (h) { return String(h).trim(); });
+  var alanlar = ['Kayıt No', 'Bildirim zamanı', 'Çiftlik', 'Bildiren', 'Makine / ekipman',
+    'İşlem türü', 'Çalışma saati / km', 'Yapılan iş', 'Kullanılan malzeme / yedek parça',
+    'Tedarik durumu', 'Servis', 'Durum', 'Onay', 'Onay zamanı'];
+  var sut = alanlar.map(function (a) { return bas.indexOf(a); });
+  function metin(x, zamanli) {
+    if (x instanceof Date) return Utilities.formatDate(x, tz, zamanli ? 'dd.MM.yyyy HH:mm' : 'dd.MM.yyyy');
+    return String(x === null || x === undefined ? '' : x).replace(/[\r\n]+/g, ' ').trim();
+  }
+  var sonuc = [];
+  for (var k = 1; k < v.length; k++) {
+    var r = v[k];
+    var satir = sut.map(function (i, n) {
+      if (i < 0) return '';
+      var x = r[i];
+      if (n === 12) return x === true || String(x).toUpperCase() === 'TRUE' ? 'Evet' : '';
+      return metin(x, n === 1 || n === 13);
+    });
+    // Çiftlik: eski form sürümünde "Bakım Onarım" seçeneği de yazılıyordu
+    satir[2] = satir[2].split(',').map(function (c) { return c.trim(); })
+      .filter(function (c) { return c && c !== 'Bakım Onarım'; }).join(', ');
+    if (!satir[4] && !satir[7]) continue; // makine ve yapılan iş boşsa kayıt değil
+    sonuc.push(satir);
   }
   return sonuc;
 }

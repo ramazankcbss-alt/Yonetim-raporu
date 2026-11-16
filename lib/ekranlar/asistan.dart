@@ -5,6 +5,7 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'araclar.dart';
+import 'bakim_onarim.dart';
 import 'esk.dart';
 import 'gecmis.dart';
 import 'hastalik.dart';
@@ -27,7 +28,7 @@ class AsistanEkran extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.only(left: 2, bottom: 8),
           child: Text(
-            'Toplantılarını kaydeder, ESK, geçmiş yıllar, araç ve hastalık '
+            'Toplantılarını kaydeder, ESK, geçmiş yıllar, araç, bakım onarım ve hastalık '
             'verilerini tek yerde toplar.',
             style: TextStyle(fontSize: 13.5, color: Renk.soluk, height: 1.4),
           ),
@@ -61,6 +62,18 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.anaKoyu,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => AraclarEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.build_outlined,
+          baslik: 'Bakım Onarım',
+          aciklama: veri.bakimOnarim.bos
+              ? 'Günlük Tarım Bildirimi formundan gelen bakım onarım kayıtları'
+              : '${veri.bakimOnarim.onayli.length} onaylı · '
+                  '${veri.bakimOnarim.onayBekleyen.length} onay bekleyen · '
+                  '${veri.bakimOnarim.acik.length} açık iş',
+          renk: Renk.turuncu,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => BakimOnarimEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.vaccines_outlined,

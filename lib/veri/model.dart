@@ -10,8 +10,10 @@
 //    kayıtlarından (Hayvan_Günlük) hesaplanır.
 
 import 'arac.dart';
+import 'bakim_onarim.dart';
 
 export 'arac.dart';
+export 'bakim_onarim.dart';
 
 /// Türkçe yazılmış ya da sayı olarak gelen değeri okur ("12.648" → 12648,
 /// "22,4" → 22.4). Boş veya okunamayan değer için null döner.
@@ -808,8 +810,10 @@ class RaporVerisi {
     this.gecmis = const [],
     this.dersler = const [],
     this.arac = const AracVerisi(),
+    List<BakimOnarimKaydi> bakimOnarim = const [],
     this.olusturma,
-  })  : ozet = List.unmodifiable(
+  })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
+        ozet = List.unmodifiable(
             [...ozet]..sort((a, b) => a.tarih.compareTo(b.tarih))),
         gunluk = List.unmodifiable(
             [...gunluk]..sort((a, b) => a.tarih.compareTo(b.tarih))),
@@ -836,6 +840,7 @@ class RaporVerisi {
   final List<GecmisVeri> gecmis;
   final List<Ders> dersler;
   final AracVerisi arac;
+  final BakimOnarimOzeti bakimOnarim;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -859,6 +864,7 @@ class RaporVerisi {
       gecmis: oku('gecmis', GecmisVeri.oku),
       dersler: oku('dersler', Ders.oku),
       arac: AracVerisi.json(j),
+      bakimOnarim: oku('bakimOnarim', BakimOnarimKaydi.oku),
       olusturma: DateTime.tryParse(_metin(j['olusturma'])),
     );
   }
