@@ -756,58 +756,70 @@ function formBildirimleri_() {
     var t = SpreadsheetApp.openById(FORM_TABLO_ID);
     sh = t.getSheets().filter(function (x) {
       return x.getLastColumn() > 0 &&
-        x.getRange(1, 1, 1, x.getLastColumn()).getValues()[0].indexOf('Bildirim türü') >= 0;
+        x.getRange(1, 1, 1, x.getLastColumn()).getValues()[0].indexOf('Çiftlik') >= 0;
     })[0];
   } catch (e) {
     return [];
   }
   if (!sh || sh.getLastRow() < 2) return [];
   var v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  // Formda aynı başlık birden çok kez geçer (1. iş, 2. iş…): her başlığın
+  // sütunları sırayla tutulur, n. iş n. sütundan okunur.
   var b = {};
-  v[0].forEach(function (h, i) { b[String(h).trim()] = i; });
-  function al(r, ad) {
-    var i = b[ad];
-    if (i === undefined) return '';
-    var x = r[i];
+  v[0].forEach(function (h, i) {
+    var a = String(h).trim();
+    (b[a] = b[a] || []).push(i);
+  });
+  function al(r, ad, n) {
+    var s = b[ad];
+    if (!s || s[n || 0] === undefined) return '';
+    var x = r[s[n || 0]];
     return x instanceof Date ? x : String(x === null || x === undefined ? '' : x).trim();
   }
   function sayi(x) {
     var n = parseFloat(String(x).replace(',', '.'));
     return isNaN(n) ? '' : String(Math.round(n * 100) / 100).replace('.', ',');
   }
+  var isAdet = (b['İş türü'] || []).length;
+  var mAdet = (b['Hareket'] || []).length;
   var sonuc = [];
   for (var k = 1; k < v.length; k++) {
     var r = v[k];
-    var tarih = al(r, 'Tarih');
+    var tarih = al(r, 'Tarih (bugünden farklıysa)');
+    if (!(tarih instanceof Date)) tarih = al(r, 'Tarih');
     if (!(tarih instanceof Date)) tarih = al(r, 'Zaman damgası');
     if (!(tarih instanceof Date)) continue;
     var ciftlik = al(r, 'Çiftlik');
     if (!ciftlik) continue;
-    var metin = '';
-    if (al(r, 'Bildirim türü') === 'Malzeme giriş / çıkış') {
-      var giris = al(r, 'Hareket').indexOf('Giriş') === 0;
-      var yer = al(r, 'Nereden / nereye');
-      var yerMetin = yer === 'Dış tedarik' ? 'dış tedarik'
-        : yer === 'Diğer' || !yer ? 'diğer'
-        : yer + (giris ? ' çiftliğinden' : ' çiftliğine');
-      var miktar = sayi(al(r, 'Miktar'));
-      if (!miktar) continue;
-      metin = (giris ? 'Malzeme girişi: ' : 'Malzeme çıkışı: ') + miktar + ' ' +
-        al(r, 'Birim') + ' ' + al(r, 'Malzeme adı / çeşit') + ' (' + yerMetin + ')';
-      if (al(r, 'Belge no')) metin += '; Belge no: ' + al(r, 'Belge no');
-      if (al(r, 'Malzeme notu')) metin += '; ' + al(r, 'Malzeme notu');
-    } else {
-      var is = al(r, 'İş türü'), urun = al(r, 'Ürün');
-      var dk = sayi(al(r, 'Yapılan alan (dekar)'));
+
+    for (var n = 0; n < isAdet; n++) {
+      var is = al(r, 'İş türü', n), urun = al(r, 'Ürün', n);
+      var dk = sayi(al(r, 'Yapılan alan (dekar)', n));
       if (!is || !dk) continue;
       var etiket = is === 'Ekim' ? (urun && urun !== 'Diğer' ? urun + ' ekimi' : 'Ekim')
         : is + (urun && urun !== 'Diğer' && is !== 'Şeker pancarı sökümü' ? ' – ' + urun : '');
-      metin = etiket + ': ' + dk + ' dekar';
-      if (al(r, 'Pivot / parsel')) metin += ' (' + al(r, 'Pivot / parsel') + ')';
-      if (al(r, 'İş durumu') === 'Tamamlandı') metin += ', tamamlandı';
-      if (al(r, 'Faaliyet notu')) metin += '; ' + al(r, 'Faaliyet notu');
+      var metin = etiket + ': ' + dk + ' dekar';
+      if (al(r, 'Pivot / parsel', n)) metin += ' (' + al(r, 'Pivot / parsel', n) + ')';
+      if (al(r, 'İş durumu', n) === 'Tamamlandı') metin += ', tamamlandı';
+      if (al(r, 'Faaliyet notu', n)) metin += '; ' + al(r, 'Faaliyet notu', n);
+      sonuc.push([tarih, ciftlik, metin.replace(/[\r\n]+/g, ' '), 'Form']);
     }
-    sonuc.push([tarih, ciftlik, metin.replace(/[\r\n]+/g, ' '), 'Form']);
+
+    for (var m = 0; m < mAdet; m++) {
+      var hareket = al(r, 'Hareket', m);
+      var miktar = sayi(al(r, 'Miktar', m));
+      if (!hareket || !miktar) continue;
+      var giris = hareket.indexOf('Giriş') === 0;
+      var yer = al(r, 'Nereden / nereye', m);
+      var yerMetin = yer === 'Dış tedarik' ? 'dış tedarik'
+        : yer === 'Diğer' || !yer ? 'diğer'
+        : yer + (giris ? ' çiftliğinden' : ' çiftliğine');
+      var mm = (giris ? 'Malzeme girişi: ' : 'Malzeme çıkışı: ') + miktar + ' ' +
+        al(r, 'Birim', m) + ' ' + al(r, 'Malzeme adı / çeşit', m) + ' (' + yerMetin + ')';
+      if (al(r, 'Belge no', m)) mm += '; Belge no: ' + al(r, 'Belge no', m);
+      if (al(r, 'Malzeme notu', m)) mm += '; ' + al(r, 'Malzeme notu', m);
+      sonuc.push([tarih, ciftlik, mm.replace(/[\r\n]+/g, ' '), 'Form']);
+    }
   }
   return sonuc;
 }
