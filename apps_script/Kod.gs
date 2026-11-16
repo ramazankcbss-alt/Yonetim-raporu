@@ -770,11 +770,20 @@ function formBildirimleri_() {
     var a = String(h).trim();
     (b[a] = b[a] || []).push(i);
   });
+  function deger(x) {
+    return x instanceof Date ? x : String(x === null || x === undefined ? '' : x).trim();
+  }
+  // n verilmezse: aynı başlıklı sütunlardan ilk dolu olan (form yeniden
+  // düzenlendiğinde eski sütunlar tabloda kalır).
   function al(r, ad, n) {
     var s = b[ad];
-    if (!s || s[n || 0] === undefined) return '';
-    var x = r[s[n || 0]];
-    return x instanceof Date ? x : String(x === null || x === undefined ? '' : x).trim();
+    if (!s) return '';
+    if (n !== undefined) return s[n] === undefined ? '' : deger(r[s[n]]);
+    for (var i = 0; i < s.length; i++) {
+      var x = deger(r[s[i]]);
+      if (x !== '') return x;
+    }
+    return '';
   }
   function sayi(x) {
     var n = parseFloat(String(x).replace(',', '.'));
