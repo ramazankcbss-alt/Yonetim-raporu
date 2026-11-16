@@ -13,7 +13,7 @@ class AraclarEkran extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = veri.arac;
     return DefaultTabController(
-      length: 5,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Araçlar'),
@@ -25,7 +25,6 @@ class AraclarEkran extends StatelessWidget {
               Tab(text: 'İş Emirleri'),
               Tab(text: 'Araçlar'),
               Tab(text: 'Personel'),
-              Tab(text: 'Mutabakat Kontrolü'),
             ],
           ),
         ),
@@ -39,7 +38,6 @@ class AraclarEkran extends StatelessWidget {
                   _IsEmirleri(a: a),
                   _AracListesi(a: a),
                   _PersonelListesi(a: a),
-                  _Mutabakat(a: a),
                 ],
               ),
       ),
@@ -505,85 +503,6 @@ class _PersonelListesi extends StatelessWidget {
 
 // ---------------------------------------------------------------------------
 
-class _Mutabakat extends StatefulWidget {
-  const _Mutabakat({required this.a});
-  final AracVerisi a;
-
-  @override
-  State<_Mutabakat> createState() => _MutabakatState();
-}
-
-class _MutabakatState extends State<_Mutabakat> {
-  static const _sonuclar = ['Kritik Bulgu', 'Mutabakat Farkı', 'Belge Eksikliği', 'Mutabık'];
-  String? _filtre;
-
-  @override
-  Widget build(BuildContext context) {
-    final tum = widget.a.mutabakat.reversed.toList();
-    final l = _filtre == null ? tum : tum.where((x) => x.sonuc == _filtre).toList();
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        const Text(
-          'Bakım, onarım ve araç kullanım kayıtları; satınalma talepleri, faturalar, ödemeler, '
-          'tarım faaliyetleri ve mesajlarla her gün karşılaştırılır.',
-          style: TextStyle(color: Renk.soluk),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            ChoiceChip(
-              label: Text('Tümü (${tum.length})'),
-              selected: _filtre == null,
-              onSelected: (_) => setState(() => _filtre = null),
-            ),
-            for (final s in _sonuclar)
-              ChoiceChip(
-                label: Text('$s (${tum.where((x) => x.sonuc == s).length})'),
-                selected: _filtre == s,
-                onSelected: (_) => setState(() => _filtre = _filtre == s ? null : s),
-              ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        if (l.isEmpty)
-          const _Bilgi('Mutabakat kaydı yok.')
-        else
-          for (final x in l)
-            Panel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _Etiket(x.sonuc),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text([x.arac, x.konu].where((s) => s.isNotEmpty).join(' · '),
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(x.aciklama),
-                  const SizedBox(height: 4),
-                  Text(
-                    [x.tarih, if (x.personel.isNotEmpty) x.personel, if (x.kaynaklar.isNotEmpty) x.kaynaklar]
-                        .join(' · '),
-                    style: const TextStyle(color: Renk.soluk, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-      ],
-    );
-  }
-}
-
-/// Bir personelin araç kullanım geçmişi (Kişiler ekranından açılır).
-/// Kişi bazlı toplam çalışma saati gösterilmez.
 class AracPersonelGecmisiEkran extends StatelessWidget {
   const AracPersonelGecmisiEkran({super.key, required this.veri, required this.ad});
   final RaporVerisi veri;

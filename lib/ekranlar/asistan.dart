@@ -5,18 +5,11 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'araclar.dart';
-import 'arsiv.dart';
-import 'danismanlik.dart';
 import 'esk.dart';
 import 'gecmis.dart';
 import 'hastalik.dart';
 import 'gunce.dart';
-import 'isakisi.dart';
-import 'isler.dart';
-import 'kisiler.dart';
-import 'personel.dart';
 import 'kilit.dart';
-import 'ozel_notlar.dart';
 import 'toplanti.dart';
 
 /// Asistan sekmesi: sekreterlik, danışmanlık, toplantı notları, özel notlar
@@ -34,52 +27,12 @@ class AsistanEkran extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.only(left: 2, bottom: 8),
           child: Text(
-            'Sekreterin ve danışmanın. İşleri takip eder, toplantılarını '
-            'kaydeder, sana özel notlarını tutar.',
+            'Toplantılarını kaydeder, ESK, geçmiş yıllar, araç ve hastalık '
+            'verilerini tek yerde toplar.',
             style: TextStyle(fontSize: 13.5, color: Renk.soluk, height: 1.4),
           ),
         ),
         const _AnlikGuncelle(),
-        _Bolum(
-          ikon: Icons.event_note_outlined,
-          baslik: 'Sekreterlik',
-          aciklama: '${veri.isler.length} iş · bekleyen, devam eden, tamamlanan',
-          renk: Renk.ana,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => IslerEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.people_alt_outlined,
-          baslik: 'Kişiler',
-          aciklama: _kisiOzet(veri),
-          renk: Renk.yesil,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => KisilerEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.account_tree_outlined,
-          baslik: 'İş Akışı',
-          aciklama: _akisOzet(veri),
-          renk: _morAsistan,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => IsAkisiEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.inventory_2_outlined,
-          baslik: 'Belge Havuzu',
-          aciklama: _arsivOzet(veri),
-          renk: Renk.mavi,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => ArsivEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.badge_outlined,
-          baslik: 'Personel / Puantaj',
-          aciklama: _personelOzet(veri),
-          renk: Renk.turuncu,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => PersonelEkran(veri: veri))),
-        ),
         _Bolum(
           ikon: Icons.agriculture_outlined,
           baslik: 'ESK – Et ve Süt Kurumu',
@@ -102,7 +55,7 @@ class AsistanEkran extends StatelessWidget {
           ikon: Icons.agriculture_outlined,
           baslik: 'Araçlar',
           aciklama: veri.arac.bos
-              ? 'Araç Takip: kullanım, bakım, arıza ve mutabakat kontrolü'
+              ? 'Araç Takip: kullanım, bakım ve arıza'
               : '${veri.arac.araclar.length} araç · ${veri.arac.aktif.length} aktif kullanım · '
                   '${veri.arac.ariza.where((x) => !x.kapali).length} açık arıza',
           renk: Renk.anaKoyu,
@@ -118,29 +71,12 @@ class AsistanEkran extends StatelessWidget {
               MaterialPageRoute(builder: (_) => HastalikEkran(veri: veri))),
         ),
         _Bolum(
-          ikon: Icons.forum_outlined,
-          baslik: 'Danışmanlık',
-          aciklama: 'Bir konuyu sor, görüş ve yol önerisi al',
-          renk: Renk.mavi,
-          ac: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const DanismanlikEkran())),
-        ),
-        _Bolum(
           ikon: Icons.groups_outlined,
           baslik: 'Toplantı Notları',
           aciklama: 'Toplantıları kaydet; zamanla birleştirip analiz et',
           renk: Renk.yesil,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ToplantiEkran())),
-        ),
-        _Bolum(
-          ikon: Icons.lock_outline,
-          baslik: 'Özel Notlar',
-          aciklama: 'Olumsuzluk, uyuşmazlık ve öneriler — yalnızca sana özel',
-          renk: Renk.turuncu,
-          ac: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const KilitKapisi(
-                  baslik: 'Özel Notlar', child: OzelNotlarEkran()))),
         ),
         _Bolum(
           ikon: Icons.menu_book_outlined,
@@ -156,7 +92,6 @@ class AsistanEkran extends StatelessWidget {
   }
 }
 
-const _morAsistan = Color(0xFF7C3AED);
 
 /// Asistan'ın en üstünde: kaynak tablolardaki yeni günleri rapora çeker
 /// (Eşitle), ardından rapor ve özel bölümleri (danışmanlık, toplantı…)
@@ -255,40 +190,9 @@ String _eskOzet(RaporVerisi veri) {
   return 'Başabaş ${sayi(min)} baş/gün · ${son.ay}: ort. ${sayi(son.ortBas)} baş';
 }
 
-String _kisiOzet(RaporVerisi veri) {
-  if (veri.kisiler.isEmpty) return 'Çalışanların takip ettiği işler ve eksikler';
-  final bugun = DateTime.now();
-  final eksik = veri.kisiler
-      .map((k) => KisiIsleri(k, veri).eksik(bugun))
-      .fold<int>(0, (a, b) => a + b);
-  return '${veri.kisiler.length} kişi'
-      '${eksik > 0 ? ' · $eksik eksik/bekleyen iş' : ''} · mesajla hatırlat';
-}
 
-String _arsivOzet(RaporVerisi veri) {
-  final n = veri.arsiv.length;
-  return n == 0
-      ? 'Gelen mail ve belgeleri ara, bul'
-      : '$n belge · ara, bul, kategoriye göre süz';
-}
 
-String _personelOzet(RaporVerisi veri) {
-  final n = veri.personel.length;
-  return n == 0
-      ? 'Puantaj, fazla mesai, İK — özet'
-      : '$n kayıt · puantaj, mesai, İK (özet)';
-}
 
-String _akisOzet(RaporVerisi veri) {
-  final acik = veri.akis.where((k) => !k.tamam).length;
-  final finans = veri.akis.where((k) => k.finansta).length;
-  if (veri.akis.isEmpty) {
-    return 'Sipariş → satınalma → fatura → ödeme akışı';
-  }
-  return finans > 0
-      ? '$acik açık iş · $finans ödeme aşamasında'
-      : '$acik açık iş · sipariştan finansa';
-}
 
 class _Bolum extends StatelessWidget {
   const _Bolum({

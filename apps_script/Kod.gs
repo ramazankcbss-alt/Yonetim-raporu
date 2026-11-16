@@ -140,18 +140,18 @@ function veriTopla_(gun) {
     besi: dolu(satirlar(SAYFALAR.besi, 4)),
     // No, Konu, Çiftlik/Birim, Kaynak, Açılış, Durum, Son değişiklik,
     // Son durum, Sorumlu (Kontrol Paneli sayfası, 8. satırdan itibaren)
-    isler: islerOku_(tz),
+    isler: [], // KVKK: Kontrol Paneli uygulamadan kaldırıldı
     // No, Başlık, Bölüm, Durum/son gelişme, Firma, Tutar, Anahtar, Açılış,
     // Son güncelleme, Kaynak, Sonraki adım, Detay (İş Akışı sayfası, 2'den)
-    isakisi: isAkisiOku_(tz),
+    isakisi: [], // KVKK: İş Akışı uygulamadan kaldırıldı
     // Tarih, Kategori, Konu, Gönderen, Özet, Ekler, Periyot (Arşiv, 2'den)
-    arsiv: basitOku_(SAYFALAR.arsiv, 7, tz),
+    arsiv: [], // KVKK: Belge Havuzu uygulamadan kaldırıldı
     // Dönem, Tür, Konu, Gönderen, Özet, Belge, Tarih (Personel, 2'den)
-    personel: basitOku_(SAYFALAR.personel, 7, tz),
+    personel: [], // KVKK: Personel/Puantaj uygulamadan kaldırıldı
     // Ad Soyad, Görev/Birim, Telefon, E-posta, Eşleşme anahtarları, Not
-    kisiler: basitOku_(SAYFALAR.kisiler, 6, tz),
+    kisiler: [], // KVKK: Kişiler uygulamadan kaldırıldı
     // Ad Soyad, Görev, Birim, Telefon, Sicil No (tüm çiftlik personeli)
-    personelListesi: basitOku_(SAYFALAR.personelListesi, 5, tz),
+    personelListesi: [], // KVKK: telefon ve sicil bilgisi gönderilmez
     // Ay, Gelen, Hayvan-gün, Ort. baş, Panagro kesim, Dış kesim, Ölen,
     // Bakım geliri, Kira, Sap satışı, Sap maliyeti, İşletme gideri,
     // Kâr/Zarar, Durum, Not (ESK_Aylık, 2'den)
@@ -168,7 +168,7 @@ function veriTopla_(gun) {
     aracPlan: basitOku_('Bakım_Plan', 0, tz, ARAC_TABLO_ID),
     aracBakim: sonSatirlar_(basitOku_('Bakım_Kayıt', 0, tz, ARAC_TABLO_ID), 500),
     aracAriza: sonSatirlar_(basitOku_('Arıza', 0, tz, ARAC_TABLO_ID), 400),
-    aracMutabakat: sonSatirlar_(basitOku_('Mutabakat', 0, tz, ARAC_TABLO_ID), 400),
+    aracMutabakat: [], // KVKK: Mutabakat kontrolü uygulamadan kaldırıldı
     aracIsEmri: sonSatirlar_(basitOku_('İş_Emirleri', 0, tz, ARAC_TABLO_ID), 600)
   };
 }
@@ -275,11 +275,11 @@ function ozelTopla_() {
   }
   return {
     ok: true,
-    ozelNotlar: oku(OZEL_SAYFALAR.ozelNotlar.ad, OZEL_SAYFALAR.ozelNotlar.sutun),
-    danismanlik: oku(OZEL_SAYFALAR.danismanlik.ad, OZEL_SAYFALAR.danismanlik.sutun, true),
+    ozelNotlar: [], // KVKK: Özel Notlar uygulamadan kaldırıldı
+    danismanlik: [], // KVKK: Danışmanlık uygulamadan kaldırıldı
     toplanti: oku(OZEL_SAYFALAR.toplanti.ad, OZEL_SAYFALAR.toplanti.sutun),
     gunluk: oku(OZEL_SAYFALAR.gunluk.ad, OZEL_SAYFALAR.gunluk.sutun),
-    kisiOlaylari: oku(OZEL_SAYFALAR.kisiOlaylari.ad, OZEL_SAYFALAR.kisiOlaylari.sutun)
+    kisiOlaylari: [] // KVKK: kişi olayları uygulamadan kaldırıldı
   };
 }
 
@@ -293,9 +293,11 @@ function doPost(e) {
   try {
     var govde = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     if (govde.tur === 'esitle') return json_(esitle_());
-    if (govde.tur === 'mesaj') return json_(mesajGonder_(govde));
-    if (govde.tur === 'kisi') return json_(kisiGuncelle_(govde));
-    if (govde.tur === 'olay') return json_(olayDurumu_(govde));
+    // KVKK: kişi, olay, mesaj ve danışmanlık işlemleri kapatıldı.
+    if (['mesaj', 'kisi', 'olay', 'danismanlik', 'danismanlikDuzenle', 'danismanlikSil']
+        .indexOf(govde.tur) >= 0) {
+      return json_({ ok: false, hata: 'Bu bölüm KVKK kapsamında kaldırıldı.' });
+    }
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
     var bugun = Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy');
