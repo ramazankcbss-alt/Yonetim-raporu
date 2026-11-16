@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../bicim.dart';
 import '../tema.dart';
+import '../veri/faaliyet_ozet.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
@@ -184,10 +185,48 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
                   style: TextStyle(color: Renk.soluk))
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [for (final f in tarim) FaaliyetSatiri(kayit: f)],
+                  children: [
+                    for (final o in faaliyetOzeti(tarim)) _CiftlikOzeti(o)
+                  ],
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// Bir çiftliğin haftalık faaliyet özeti (raporda gönderilen biçimle aynı).
+class _CiftlikOzeti extends StatelessWidget {
+  const _CiftlikOzeti(this.ozet);
+
+  final FaaliyetOzeti ozet;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = ciftlikRengi(ozet.ciftlik);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.only(left: 10),
+        decoration: BoxDecoration(
+            border: Border(left: BorderSide(color: r, width: 4))),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(ozet.ciftlik,
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: r)),
+            const SizedBox(height: 4),
+            for (final m in ozet.maddeler)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text('• $m',
+                    style: const TextStyle(
+                        fontSize: 14, color: Renk.yazi, height: 1.35)),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../bicim.dart';
 import '../servis/veri_servisi.dart';
+import '../veri/faaliyet_ozet.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 
@@ -84,8 +85,10 @@ Future<Uint8List> gunlukRaporPdf(
       if (faaliyetler.isEmpty)
         _not('Bu gün için tarım kaydı bulunmuyor.')
       else
-        _tablo(const ['Çiftlik', 'Faaliyet'],
-            [for (final f in faaliyetler) [f.ciftlik, f.faaliyet]],
+        _tablo(const ['Çiftlik', 'Faaliyet'], [
+          for (final o in faaliyetOzeti(faaliyetler))
+            [o.ciftlik, _maddeler(o.maddeler)]
+        ],
             genislik: const {0: pw.FlexColumnWidth(1.1), 1: pw.FlexColumnWidth(6)},
             metin: const {0, 1}),
       if (digerSonlar.isNotEmpty) ...[
@@ -96,7 +99,7 @@ Future<Uint8List> gunlukRaporPdf(
         pw.SizedBox(height: 3),
         _tablo(const ['Çiftlik', 'Tarih', 'Faaliyet'], [
           for (final f in digerSonlar)
-            [f.ciftlik, tarihKisa(f.tarih), f.faaliyet]
+            [f.ciftlik, tarihKisa(f.tarih), faaliyetMaddeleri(f.faaliyet).join('; ')]
         ],
             genislik: const {
               0: pw.FlexColumnWidth(1.1),
@@ -165,15 +168,15 @@ Future<Uint8List> haftalikRaporPdf(
       if (tarim.isEmpty)
         _not('Bu hafta için tarım kaydı bulunmuyor.')
       else
-        _tablo(const ['Tarih', 'Çiftlik', 'Faaliyet'], [
-          for (final f in tarim) [tarihKisa(f.tarih), f.ciftlik, f.faaliyet]
+        _tablo(const ['Çiftlik', 'Haftalık Özet'], [
+          for (final o in faaliyetOzeti(tarim))
+            [o.ciftlik, _maddeler(o.maddeler)]
         ],
             genislik: const {
               0: pw.FlexColumnWidth(1.1),
-              1: pw.FlexColumnWidth(1.1),
-              2: pw.FlexColumnWidth(5.2),
+              1: pw.FlexColumnWidth(6.3),
             },
-            metin: const {0, 1, 2}),
+            metin: const {0, 1}),
       if (v.ekim.isNotEmpty) ...[
         _bolum('Ekim Alanları (dekar)'),
         _tablo(ekimBasliklari, ekimSatirlari(v.ekim),
@@ -336,6 +339,9 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
     ],
   );
 }
+
+String _maddeler(List<String> m) =>
+    m.length == 1 ? m.first : m.map((e) => '• $e').join('\n');
 
 pw.Widget _tablo(
   List<String> basliklar,
