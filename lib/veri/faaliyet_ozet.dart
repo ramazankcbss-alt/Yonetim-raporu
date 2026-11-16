@@ -142,23 +142,19 @@ class _Toplam {
       kumulatif != null && kumulatif! > toplam ? kumulatif! : toplam;
 }
 
-/// Genel Müdürlük raporu için çiftlik bazında kısa özet.
-List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
-  // Aynı çiftlik ve gün için formen formu varsa icmal kaydı ikinci kez sayılmaz.
-  final formGunleri = {
-    for (final k in kayitlar)
-      if (k.formdan) '${k.ciftlik}|${k.tarih.year}-${k.tarih.month}-${k.tarih.day}'
-  };
-  final sirali = [
-    for (final k in kayitlar)
-      if (k.formdan ||
-          !formGunleri.contains(
-              '${k.ciftlik}|${k.tarih.year}-${k.tarih.month}-${k.tarih.day}'))
-        k
-  ]..sort((a, b) => a.tarih.compareTo(b.tarih));
+class _Toplanan {
   final ciftlikler = <String, Map<String, _Toplam>>{};
   final malzemeler = <String, Map<String, double>>{};
   final tedarikler = <String, List<String>>{};
+}
+
+/// Kayıtları çiftlik ve iş türü bazında toplar (tek kaynak için).
+_Toplanan _topla(List<TarimKaydi> kayitlar) {
+  final t = _Toplanan();
+  final sirali = [...kayitlar]..sort((a, b) => a.tarih.compareTo(b.tarih));
+  final ciftlikler = t.ciftlikler;
+  final malzemeler = t.malzemeler;
+  final tedarikler = t.tedarikler;
   final gorulen = <String, Set<String>>{};
 
   for (final k in sirali) {
@@ -215,23 +211,90 @@ List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
     }
   }
 
+  return t;
+}
+
+/// İcmal ile formen formunun karşılaştırma sonucu (bir çiftlik, bir iş türü).
+class TeyitSatiri {
+  const TeyitSatiri(this.ciftlik, this.is_, this.icmal, this.form, this.durum);
+  final String ciftlik;
+  final String is_;
+  final double? icmal;
+  final double? form;
+  final String durum; // Teyitli, Fark var, İcmalde yok, Formda yok
+
+  String get icmalMetin => icmal == null ? '–' : _dk(icmal!);
+  String get formMetin => form == null ? '–' : _dk(form!);
+}
+
+const teyitTolerans = 0.05; // %5'e kadar fark teyitli sayılır
+
+/// Formen bildirimi olan çiftliklerde iş türü bazında haftalık karşılaştırma.
+List<TeyitSatiri> teyitDurumu(List<TarimKaydi> kayitlar) {
+  final ic = _topla([for (final k in kayitlar) if (!k.formdan) k]);
+  final fo = _topla([for (final k in kayitlar) if (k.formdan) k]);
+  final sonuc = <TeyitSatiri>[];
+  final ciftlikler = fo.ciftlikler.keys.toList()..sort();
+  for (final c in ciftlikler) {
+    final a = ic.ciftlikler[c] ?? {};
+    final b = fo.ciftlikler[c] ?? {};
+    final etiketler = {...a.keys, ...b.keys}.toList()
+      ..sort((x, y) {
+        final f = _sira(x).compareTo(_sira(y));
+        return f != 0 ? f : x.compareTo(y);
+      });
+    for (final e in etiketler) {
+      final i = (a[e]?.deger ?? 0) > 0 ? a[e]!.deger : null;
+      final f = (b[e]?.deger ?? 0) > 0 ? b[e]!.deger : null;
+      if (i == null && f == null) continue;
+      final String durum;
+      if (i != null && f != null) {
+        final fark = (i - f).abs();
+        durum = fark <= 1 || fark <= teyitTolerans * (i > f ? i : f)
+            ? 'Teyitli'
+            : 'Fark var';
+      } else {
+        durum = i == null ? 'İcmalde yok' : 'Formda yok';
+      }
+      sonuc.add(TeyitSatiri(c, e, i, f, durum));
+    }
+  }
+  return sonuc;
+}
+
+/// Genel Müdürlük raporu için çiftlik bazında kısa özet.
+/// İcmal ve formen formu karşılaştırılır: ikisi de varsa icmal esas alınır,
+/// yalnızca formda olan iş de rapora girer (uygulamada "icmalde yok" işaretli).
+List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
+  final ic = _topla([for (final k in kayitlar) if (!k.formdan) k]);
+  final fo = _topla([for (final k in kayitlar) if (k.formdan) k]);
+
   final sonuc = <FaaliyetOzeti>[];
-  final adlar = {...ciftlikler.keys, ...tedarikler.keys, ...malzemeler.keys}
-      .toList()
+  final adlar = {
+    ...ic.ciftlikler.keys, ...ic.tedarikler.keys, ...ic.malzemeler.keys,
+    ...fo.ciftlikler.keys, ...fo.tedarikler.keys, ...fo.malzemeler.keys,
+  }.toList()
     ..sort();
   for (final c in adlar) {
-    final m = ciftlikler[c] ?? {};
-    final etiketler = m.keys.toList()
-      ..sort((a, b) {
-        final f = _sira(a).compareTo(_sira(b));
-        return f != 0 ? f : a.compareTo(b);
+    final a = ic.ciftlikler[c] ?? {};
+    final b = fo.ciftlikler[c] ?? {};
+    final etiketler = {...a.keys, ...b.keys}.toList()
+      ..sort((x, y) {
+        final f = _sira(x).compareTo(_sira(y));
+        return f != 0 ? f : x.compareTo(y);
       });
+    final formMalzeme = fo.malzemeler[c] ?? const <String, double>{};
+    final icMalzeme = ic.malzemeler[c] ?? const <String, double>{};
     final maddeler = <String>[
       for (final e in etiketler)
-        if (m[e]!.deger > 0)
-          '$e: ${_dk(m[e]!.deger)}${m[e]!.tamam ? ' (tamamlandı)' : ''}',
-      for (final t in tedarikler[c] ?? const <String>[]) t,
-      for (final e in (malzemeler[c] ?? const <String, double>{}).entries)
+        if ((a[e]?.deger ?? 0) > 0 || (b[e]?.deger ?? 0) > 0)
+          '$e: ${_dk((a[e]?.deger ?? 0) > 0 ? a[e]!.deger : b[e]!.deger)}'
+              '${(a[e]?.tamam ?? false) || (b[e]?.tamam ?? false) ? ' (tamamlandı)' : ''}',
+      // Formda malzeme hareketi varsa icmaldeki serbest tedarik notu tekrar yazılmaz.
+      if (formMalzeme.isEmpty)
+        for (final t in ic.tedarikler[c] ?? const <String>[]) t,
+      for (final t in fo.tedarikler[c] ?? const <String>[]) t,
+      for (final e in {...icMalzeme, ...formMalzeme}.entries)
         _malzemeSatiri(e.key, e.value),
     ];
     if (maddeler.isNotEmpty) sonuc.add(FaaliyetOzeti(c, maddeler));

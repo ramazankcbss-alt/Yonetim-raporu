@@ -98,4 +98,25 @@ void main() {
       'Malzeme girişi: 25 ton Halis buğday tohumu (dış tedarik)',
     ]);
   });
+
+  test('İcmal–form karşılaştırması: fark varsa icmal esas, yalnızca formdaki iş işaretli', () {
+    final kayitlar = [
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Aslım', faaliyet: 'Buğday ekimi yapıldı, 100 dekar'),
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Aslım', faaliyet: 'Buğday ekimi: 120 dekar', kaynak: 'Form'),
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Aslım', faaliyet: 'Tarla sürümü: 300 dekar', kaynak: 'Form'),
+      TarimKaydi(tarih: DateTime(2026, 11, 17), ciftlik: 'Aslım', faaliyet: '200 dekar merdane çekimi'),
+      TarimKaydi(tarih: DateTime(2026, 11, 17), ciftlik: 'Aslım', faaliyet: 'Merdane çekimi: 198 dekar', kaynak: 'Form'),
+    ];
+    final t = {for (final x in teyitDurumu(kayitlar)) x.is_: x.durum};
+    expect(t, {
+      'Buğday ekimi': 'Fark var',
+      'Tarla sürümü': 'İcmalde yok',
+      'Merdane çekimi': 'Teyitli',
+    });
+    expect(yoneticiOzeti(kayitlar).single.maddeler, [
+      'Buğday ekimi: 100 dekar',
+      'Tarla sürümü: 300 dekar',
+      'Merdane çekimi: 200 dekar',
+    ]);
+  });
 }

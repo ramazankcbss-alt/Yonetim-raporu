@@ -178,6 +178,21 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
                   ilkSutunGenislik: 150,
                 ),
         ),
+        if (teyitDurumu(tarim).isNotEmpty)
+          Panel(
+            baslik: 'İcmal – Formen Bildirimi Karşılaştırması',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                    'Fark olan kalemlerde raporda icmal esas alınır; '
+                    'icmalde olmayan iş formdan rapora girer.',
+                    style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+                const SizedBox(height: 6),
+                for (final t in teyitDurumu(tarim)) _TeyitSatiriWidget(t),
+              ],
+            ),
+          ),
         Panel(
           baslik: 'Haftanın Tarımsal Faaliyetleri',
           child: tarim.isEmpty
@@ -226,6 +241,50 @@ class _CiftlikOzeti extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _TeyitSatiriWidget extends StatelessWidget {
+  const _TeyitSatiriWidget(this.t);
+
+  final TeyitSatiri t;
+
+  @override
+  Widget build(BuildContext context) {
+    final renk = switch (t.durum) {
+      'Teyitli' => const Color(0xFF3B6D11),
+      'Fark var' => const Color(0xFFA32D2D),
+      _ => const Color(0xFF854F0B),
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${t.ciftlik} · ${t.is_}',
+                    style: const TextStyle(
+                        fontSize: 13.5, fontWeight: FontWeight.w600)),
+                Text('İcmal: ${t.icmalMetin}   Form: ${t.formMetin}',
+                    style: const TextStyle(fontSize: 12.5, color: Renk.soluk)),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+                color: renk.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6)),
+            child: Text(t.durum,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: renk)),
+          ),
+        ],
       ),
     );
   }
