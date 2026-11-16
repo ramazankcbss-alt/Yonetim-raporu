@@ -109,15 +109,12 @@ void main() {
     await t.scrollUntilVisible(paylas, 300, scrollable: liste);
     expect(paylas, findsOneWidget);
 
-    // Asistan → Sekreterlik (İşler)
+    // Asistan: KVKK kapsamında kaldırılan bölümler görünmez
     await t.tap(find.text('Asistan'));
     await t.pumpAndSettle();
-    expect(find.text('Sekreterlik'), findsOneWidget);
-    await t.tap(find.text('Sekreterlik'));
-    await t.pumpAndSettle();
-    expect(find.text('Sekreterlik — İşler'), findsOneWidget);
-    expect(find.textContaining('Vetkim ödemesi'), findsOneWidget);
-    expect(find.text('Bekleyen işler (1)'), findsOneWidget);
+    expect(find.text('Toplantı Notları'), findsOneWidget);
+    expect(find.text('Sekreterlik'), findsNothing);
+    expect(find.text('Personel / Puantaj'), findsNothing);
   });
 
   test('PDF raporları oluşur', () async {

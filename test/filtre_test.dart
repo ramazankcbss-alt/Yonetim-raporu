@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:yonetim_raporu/ekranlar/isler.dart';
 import 'package:yonetim_raporu/ekranlar/tarim.dart';
 import 'package:yonetim_raporu/tema.dart';
 import 'package:yonetim_raporu/veri/model.dart';
@@ -77,26 +76,4 @@ void main() {
     });
   });
 
-  group('IslerEkran sayaç filtresi', () {
-    testWidgets('Bekliyor sayacına dokununca sadece bekleyenler', (t) async {
-      _telefon(t);
-      final veri = RaporVerisi.json(ornekJson);
-      await t.pumpWidget(_uygulama(IslerEkran(veri: veri)));
-      await t.pumpAndSettle();
-
-      expect(find.text('Bekleyen işler (1)'), findsOneWidget);
-      expect(find.text('Devam eden işler (1)'), findsOneWidget);
-
-      await t.tap(find.text('Bekliyor'));
-      await t.pumpAndSettle();
-
-      expect(find.text('Bekleyen işler (1)'), findsOneWidget);
-      expect(find.text('Devam eden işler (1)'), findsNothing);
-
-      // Tekrar dokun → tümü döner.
-      await t.tap(find.text('Bekliyor'));
-      await t.pumpAndSettle();
-      expect(find.text('Devam eden işler (1)'), findsOneWidget);
-    });
-  });
 }
