@@ -13,7 +13,7 @@ void main() {
       '',
     ])!;
     expect(k.ad, 'Selin Ak');
-    expect(k.anahtarlar, ['özge', 'demirel']);
+    expect(k.anahtarlar, ['selin', 'ak']);
     expect(k.whatsappNumarasi, '905321112233');
     expect(k.epostaVar, isTrue);
   });
@@ -36,7 +36,7 @@ void main() {
 
   test('İş eşleşmesi Türkçe büyük/küçük harften etkilenmez', () {
     final k = Kisi.oku(['Kemal Tan', '', '', '', 'Kemal Tan, Tan'])!;
-    const i = Is(no: 1, konu: 'ESK kesim', sorumlu: 'ÜMİT BULDU');
+    const i = Is(no: 1, konu: 'ESK kesim', sorumlu: 'KEMAL TAN');
     const j = Is(no: 2, konu: 'Başka iş', sorumlu: 'Selin Ak');
     expect(k.isEslesir(i), isTrue);
     expect(k.isEslesir(j), isFalse);
