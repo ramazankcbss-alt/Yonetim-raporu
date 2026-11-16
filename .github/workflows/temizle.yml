@@ -1,0 +1,20 @@
+name: Eski sürümleri temizle
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  temizle:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          R: ${{ github.repository }}
+        run: |
+          KALSIN=$(gh api repos/$R/releases/latest -q .tag_name)
+          echo "Kalacak: $KALSIN"
+          for t in $(gh release list -R $R -L 300 --json tagName -q '.[].tagName'); do
+            [ "$t" = "$KALSIN" ] || gh release delete "$t" -R $R -y
+          done
+          for t in $(gh api "repos/$R/tags?per_page=100" --paginate -q '.[].name'); do
+            [ "$t" = "$KALSIN" ] || gh api -X DELETE "repos/$R/git/refs/tags/$t"
+          done
