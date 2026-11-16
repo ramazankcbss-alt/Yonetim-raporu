@@ -9,7 +9,7 @@ void main() {
       'Çiftlikler',
       '0532 111 22 33',
       'ornek1@ornek.com',
-      'Özge, Ak',
+      'Selin, Ak',
       '',
     ])!;
     expect(k.ad, 'Selin Ak');
