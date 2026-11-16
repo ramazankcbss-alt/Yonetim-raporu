@@ -112,7 +112,7 @@ void main() {
     // Asistan: KVKK kapsamında kaldırılan bölümler görünmez
     await t.tap(find.text('Asistan'));
     await t.pumpAndSettle();
-    expect(find.text('Toplantı Notları'), findsOneWidget);
+    expect(find.text('ESK – Et ve Süt Kurumu'), findsOneWidget);
     expect(find.text('Sekreterlik'), findsNothing);
     expect(find.text('Personel / Puantaj'), findsNothing);
   });
