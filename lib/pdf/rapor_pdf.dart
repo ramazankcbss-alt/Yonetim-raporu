@@ -165,11 +165,11 @@ Future<Uint8List> haftalikRaporPdf(
             suruSatirlari(gunler.first, gunler.last),
             genislik: _suruGenislik),
       _bolum('Tarımsal Faaliyetler'),
-      if (tarim.isEmpty)
-        _not('Bu hafta için tarım kaydı bulunmuyor.')
+      if (yoneticiOzeti(tarim).isEmpty)
+        _not('Bu hafta için raporlanacak tarımsal faaliyet bulunmuyor.')
       else
         _tablo(const ['Çiftlik', 'Haftalık Özet'], [
-          for (final o in faaliyetOzeti(tarim))
+          for (final o in yoneticiOzeti(tarim))
             [o.ciftlik, _maddeler(o.maddeler)]
         ],
             genislik: const {

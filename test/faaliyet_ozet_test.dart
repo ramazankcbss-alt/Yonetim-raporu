@@ -42,4 +42,40 @@ void main() {
     expect(o.map((e) => e.ciftlik), ['Aslım', 'Şekersüt']);
     expect(o[1].maddeler, ['Tarla sürümü bitti']);
   });
+
+  test('Yalnızca ad-soyad içeren parantez çıkarılır', () {
+    expect(faaliyetMaddeleri('Buğday ekimi yapıldı: 83 dekar (Ali Veli, İsa Can)'),
+        ['Buğday ekimi yapıldı: 83 dekar']);
+  });
+
+  TarimKaydi k(int g, String c, String f) =>
+      TarimKaydi(tarih: DateTime(2026, 11, g), ciftlik: c, faaliyet: f);
+
+  test('Yönetici özeti: günlük kayıtlar toplanır, ara bilgiler atılır', () {
+    final o = yoneticiOzeti([
+      k(10, 'Taşağıl', '15 ton Halis buğday tohumu teslim alındı'),
+      k(10, 'Taşağıl', 'Buğday ekimi yapılıyor, 120 dekar, dekara 25 kg Halis tohum'),
+      k(11, 'Taşağıl', 'Şeker pancarı: söküm makinesi geldi, sökümüne başlandı'),
+      k(11, 'Taşağıl', 'Buğday: ekime başlandı, 50 dekar, dekara 15 kg DAP (Ali Veli)'),
+      k(12, 'Taşağıl', '50 dekar merdane çekimi'),
+      k(13, 'Taşağıl', 'Şeker pancarı sökümü bitti; Söküm makinesi Şekersüt çiftliğine gönderildi'),
+      k(14, 'Taşağıl', '220 dekar merdane çekimi; Buğday: toplam 420 dekar ekim yapıldı'),
+      k(12, 'Fidanlık', 'Buğday ekimi yapıldı: 83 dekar (Ali Veli)'),
+      k(14, 'Fidanlık', 'Ekim bitti: toplam 669 dekar Touareg arpa ve 150 dekar buğday ekildi'),
+      k(13, 'Aslım', 'Pancar söküm makinesi arızalandı; Kalan sökülecek alan 150 dekar'),
+      k(14, 'Aslım', '6. pivot etrafı 110 dekar ve 7. pivot 240 dekar alanda kombine çekimi tamamlandı'),
+      k(14, 'Aslım', 'Arpa ekimine başlandı, dekara 25 kg tohum (7. pivot, Operatör: Ali Veli)'),
+      k(15, 'Şekersüt', 'Deneme pancarlarının sökümü bitti (85 dekar); sökümü devam ediyor: 425 dekar'),
+      k(16, 'Şekersüt', 'Formen bildirimi (icmalde henüz yok): şeker pancarı sökümü bitti, toplam 700 dekar; söküm makinesi Aslım\'a gönderildi'),
+    ]);
+    final m = {for (final x in o) x.ciftlik: x.maddeler};
+    expect(m['Taşağıl'], [
+      'Buğday ekimi: 420 dekar',
+      'Merdane çekimi: 270 dekar',
+      '15 ton Halis buğday tohumu teslim alındı',
+    ]);
+    expect(m['Fidanlık'], ['Arpa ekimi: 669 dekar (tamamlandı)', 'Buğday ekimi: 150 dekar (tamamlandı)']);
+    expect(m['Aslım'], ['Hasat (kombine): 350 dekar (tamamlandı)']);
+    expect(m['Şekersüt'], ['Şeker pancarı sökümü: 700 dekar (tamamlandı)']);
+  });
 }
