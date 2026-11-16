@@ -84,6 +84,15 @@ class KisilerEkran extends StatefulWidget {
 }
 
 class _KisilerEkranState extends State<KisilerEkran> {
+  String _ara = '';
+  final _araKontrol = TextEditingController();
+
+  @override
+  void dispose() {
+    _araKontrol.dispose();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -111,8 +120,12 @@ class _KisilerEkranState extends State<KisilerEkran> {
           });
         // Hiç kaydı olmayanlar takipte kalır ama kalabalık yapmasın diye
         // altta kapalı bir grupta durur.
-        final liste = [for (final k in tumu) if (!k.kayitsiz) k];
-        final kayitsizlar = [for (final k in tumu) if (k.kayitsiz) k];
+        final q = trKucuk(_ara.trim());
+        bool uyar(KisiIsleri k) =>
+            q.isEmpty || trKucuk('${k.kisi.ad} ${k.kisi.birim} ${k.kisi.not}').contains(q);
+        final aramada = q.isNotEmpty;
+        final liste = [for (final k in tumu) if ((aramada || !k.kayitsiz) && uyar(k)) k];
+        final kayitsizlar = aramada ? <KisiIsleri>[] : [for (final k in tumu) if (k.kayitsiz) k];
         return Scaffold(
           appBar: AppBar(
             title: const Text('Kişiler'),
@@ -130,7 +143,7 @@ class _KisilerEkranState extends State<KisilerEkran> {
             icon: const Icon(Icons.person_add_alt_1),
             label: const Text('Kişi ekle'),
           ),
-          body: liste.isEmpty
+          body: tumu.isEmpty
               ? const BosDurum(
                   ikon: Icons.people_outline,
                   yazi: 'Kişi listesi boş. Sağ alttaki "Kişi ekle" ile '
@@ -148,6 +161,34 @@ class _KisilerEkranState extends State<KisilerEkran> {
                             fontSize: 13.5, color: Renk.soluk, height: 1.4),
                       ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: TextField(
+                        controller: _araKontrol,
+                        onChanged: (v) => setState(() => _ara = v),
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: 'Kişi ara (ad, görev, birim)',
+                          suffixIcon: _ara.isEmpty
+                              ? null
+                              : IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () {
+                                    _araKontrol.clear();
+                                    FocusScope.of(context).unfocus();
+                                    setState(() => _ara = '');
+                                  },
+                                ),
+                        ),
+                      ),
+                    ),
+                    if (aramada && liste.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Text('Aramaya uyan kişi yok.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Renk.soluk)),
+                      ),
                     for (final k in liste) _KisiKarti(ki: k, bugun: bugun, veri: veri),
                     if (kayitsizlar.isNotEmpty)
                       Theme(
