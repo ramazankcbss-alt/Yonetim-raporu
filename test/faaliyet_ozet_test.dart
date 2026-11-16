@@ -119,4 +119,14 @@ void main() {
       'Merdane çekimi: 200 dekar',
     ]);
   });
+
+  test('Kontrol bekleyen formen kaydı rapora girmez, ekranda işaretli görünür', () {
+    final kayitlar = [
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Aslım', faaliyet: 'Arpa ekimi: 200 dekar', kaynak: 'Form-Bekliyor'),
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Aslım', faaliyet: 'Tarla sürümü: 150 dekar', kaynak: 'Form'),
+    ];
+    expect(yoneticiOzeti(kayitlar).single.maddeler, ['Tarla sürümü: 150 dekar']);
+    expect(faaliyetOzeti(kayitlar).single.maddeler.first, 'Arpa ekimi: 200 dekar (kontrol bekliyor)');
+    expect(kontrolBekleyen(kayitlar), 1);
+  });
 }

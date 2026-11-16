@@ -63,7 +63,8 @@ List<FaaliyetOzeti> faaliyetOzeti(List<TarimKaydi> kayitlar) {
     final liste = m.putIfAbsent(k.ciftlik, () => []);
     final g = gorulen.putIfAbsent(k.ciftlik, () => {});
     for (final madde in faaliyetMaddeleri(k.faaliyet)) {
-      if (g.add(_anahtar(madde))) liste.add(madde);
+      final m = k.kontrolBekliyor ? '$madde (kontrol bekliyor)' : madde;
+      if (g.add(_anahtar(m))) liste.add(m);
     }
   }
   final ciftlikler = m.keys.toList()..sort();
@@ -230,7 +231,9 @@ class TeyitSatiri {
 const teyitTolerans = 0.05; // %5'e kadar fark teyitli sayılır
 
 /// Formen bildirimi olan çiftliklerde iş türü bazında haftalık karşılaştırma.
-List<TeyitSatiri> teyitDurumu(List<TarimKaydi> kayitlar) {
+List<TeyitSatiri> teyitDurumu(List<TarimKaydi> tumKayitlar) {
+  // Kontrol bekleyen formen kayıtları rapora girmez.
+  final kayitlar = [for (final k in tumKayitlar) if (!k.kontrolBekliyor) k];
   final ic = _topla([for (final k in kayitlar) if (!k.formdan) k]);
   final fo = _topla([for (final k in kayitlar) if (k.formdan) k]);
   final sonuc = <TeyitSatiri>[];
@@ -265,7 +268,9 @@ List<TeyitSatiri> teyitDurumu(List<TarimKaydi> kayitlar) {
 /// Genel Müdürlük raporu için çiftlik bazında kısa özet.
 /// İcmal ve formen formu karşılaştırılır: ikisi de varsa icmal esas alınır,
 /// yalnızca formda olan iş de rapora girer (uygulamada "icmalde yok" işaretli).
-List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
+List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> tumKayitlar) {
+  // Kontrol bekleyen formen kayıtları rapora girmez.
+  final kayitlar = [for (final k in tumKayitlar) if (!k.kontrolBekliyor) k];
   final ic = _topla([for (final k in kayitlar) if (!k.formdan) k]);
   final fo = _topla([for (final k in kayitlar) if (k.formdan) k]);
 
@@ -338,3 +343,7 @@ String _binlik(int n) {
   }
   return b.toString();
 }
+
+/// Kontrol bekleyen formen kaydı sayısı.
+int kontrolBekleyen(List<TarimKaydi> kayitlar) =>
+    kayitlar.where((k) => k.kontrolBekliyor).length;

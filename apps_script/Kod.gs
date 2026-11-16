@@ -800,6 +800,10 @@ function formBildirimleri_() {
     if (!(tarih instanceof Date)) continue;
     var ciftlik = al(r, 'Çiftlik');
     if (!ciftlik) continue;
+    // Sedef Hanım kontrolü: reddedilen kullanılmaz, işaretlenmemiş "bekliyor"
+    var kontrol = al(r, 'Kontrol durumu');
+    if (kontrol === 'Reddedildi') continue;
+    var kaynak = kontrol === 'Onaylandı' ? 'Form' : 'Form-Bekliyor';
 
     for (var n = 0; n < isAdet; n++) {
       var is = al(r, 'İş türü', n), urun = al(r, 'Ürün', n);
@@ -811,7 +815,7 @@ function formBildirimleri_() {
       if (al(r, 'Pivot / parsel', n)) metin += ' (' + al(r, 'Pivot / parsel', n) + ')';
       if (al(r, 'İş durumu', n) === 'Tamamlandı') metin += ', tamamlandı';
       if (al(r, 'Faaliyet notu', n)) metin += '; ' + al(r, 'Faaliyet notu', n);
-      sonuc.push([tarih, ciftlik, metin.replace(/[\r\n]+/g, ' '), 'Form']);
+      sonuc.push([tarih, ciftlik, metin.replace(/[\r\n]+/g, ' '), kaynak]);
     }
 
     for (var m = 0; m < mAdet; m++) {
@@ -827,7 +831,7 @@ function formBildirimleri_() {
         al(r, 'Birim', m) + ' ' + al(r, 'Malzeme adı / çeşit', m) + ' (' + yerMetin + ')';
       if (al(r, 'Belge no', m)) mm += '; Belge no: ' + al(r, 'Belge no', m);
       if (al(r, 'Malzeme notu', m)) mm += '; ' + al(r, 'Malzeme notu', m);
-      sonuc.push([tarih, ciftlik, mm.replace(/[\r\n]+/g, ' '), 'Form']);
+      sonuc.push([tarih, ciftlik, mm.replace(/[\r\n]+/g, ' '), kaynak]);
     }
   }
   return sonuc;

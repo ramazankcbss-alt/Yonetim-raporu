@@ -182,9 +182,11 @@ class TarimKaydi {
   final String ciftlik;
   final String faaliyet;
 
-  /// 'Form': formen bildirim formundan; boş: tarım günlük icmalinden.
+  /// 'Form': formen bildirimi (kontrol edilip onaylandı);
+  /// 'Form-Bekliyor': formen bildirimi, kontrol bekliyor; boş: tarım icmali.
   final String kaynak;
-  bool get formdan => kaynak == 'Form';
+  bool get formdan => kaynak.startsWith('Form');
+  bool get kontrolBekliyor => kaynak == 'Form-Bekliyor';
 
   static TarimKaydi? oku(Object? v) {
     final r = _liste(v);

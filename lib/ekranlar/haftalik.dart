@@ -178,7 +178,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
                   ilkSutunGenislik: 150,
                 ),
         ),
-        if (teyitDurumu(tarim).isNotEmpty)
+        if (teyitDurumu(tarim).isNotEmpty || kontrolBekleyen(tarim) > 0)
           Panel(
             baslik: 'İcmal – Formen Bildirimi Karşılaştırması',
             child: Column(
@@ -189,6 +189,17 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
                     'icmalde olmayan iş formdan rapora girer.',
                     style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
                 const SizedBox(height: 6),
+                if (kontrolBekleyen(tarim) > 0)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                        'Sedef Hanım kontrolü bekleyen formen kaydı: '
+                        '${kontrolBekleyen(tarim)} (rapora girmez)',
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF854F0B))),
+                  ),
                 for (final t in teyitDurumu(tarim)) _TeyitSatiriWidget(t),
               ],
             ),

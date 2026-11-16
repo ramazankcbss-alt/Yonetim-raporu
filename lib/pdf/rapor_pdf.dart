@@ -44,7 +44,9 @@ Future<Uint8List> gunlukRaporPdf(
   final oz = canliHayvanOzeti(v, gun, gun);
   final bugun = v.gunlukBul(gun);
   final onceki = v.oncekiGunluk(gun);
-  final faaliyetler = v.tarimDonem(gun, gun);
+  final faaliyetler = [
+    for (final f in v.tarimDonem(gun, gun)) if (!f.kontrolBekliyor) f
+  ];
   final kayitli = {for (final f in faaliyetler) f.ciftlik};
   final digerSonlar = [
     for (final s in v.sonFaaliyetler(gun))
@@ -122,7 +124,9 @@ Future<Uint8List> haftalikRaporPdf(
   final g = haftalikGostergeler(v, pazartesi);
   final oz = canliHayvanOzeti(v, pazartesi, son);
   final gunler = v.gunlukDonem(pazartesi, son);
-  final tarim = v.tarimDonem(pazartesi, son);
+  final tarim = [
+    for (final f in v.tarimDonem(pazartesi, son)) if (!f.kontrolBekliyor) f
+  ];
 
   final doc = pw.Document(
       title: '${a.baslik} — ${isoHafta(pazartesi)}. Hafta',
