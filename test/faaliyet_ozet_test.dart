@@ -78,4 +78,24 @@ void main() {
     expect(m['Aslım'], ['Hasat (kombine): 350 dekar (tamamlandı)']);
     expect(m['Şekersüt'], ['Şeker pancarı sökümü: 700 dekar (tamamlandı)']);
   });
+
+  test('Form kayıtları: malzeme toplanır, aynı gün icmal ikinci kez sayılmaz', () {
+    final o = yoneticiOzeti([
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Taşağıl',
+          faaliyet: 'Buğday ekimi: 120 dekar (7. pivot), tamamlandı; dekara 25 kg tohum', kaynak: 'Form'),
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Taşağıl',
+          faaliyet: 'Buğday ekimi yapılıyor, 120 dekar'),
+      TarimKaydi(tarih: DateTime(2026, 11, 16), ciftlik: 'Taşağıl',
+          faaliyet: 'Malzeme girişi: 15 ton Halis buğday tohumu (dış tedarik); Belge no: 123', kaynak: 'Form'),
+      TarimKaydi(tarih: DateTime(2026, 11, 17), ciftlik: 'Taşağıl',
+          faaliyet: 'Malzeme girişi: 10 ton Halis buğday tohumu (dış tedarik)', kaynak: 'Form'),
+      TarimKaydi(tarih: DateTime(2026, 11, 17), ciftlik: 'Taşağıl',
+          faaliyet: 'Merdane çekimi – Buğday: 45,5 dekar', kaynak: 'Form'),
+    ]);
+    expect(o.single.maddeler, [
+      'Buğday ekimi: 120 dekar (tamamlandı)',
+      'Merdane çekimi: 46 dekar',
+      'Malzeme girişi: 25 ton Halis buğday tohumu (dış tedarik)',
+    ]);
+  });
 }

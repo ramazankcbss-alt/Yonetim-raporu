@@ -48,6 +48,8 @@ var SAYFALAR = {
 
 // "Eşitle" düğmesinin okuduğu kaynak tablolar.
 var TARIM_ICMAL_ID = '1TF7yInFvLGCVjtxhK24YlKNVtHnhJ7TBEUANFGn5Pyg';
+// Formenlerin "Günlük Tarım Bildirimi" Google Formu yanıt tablosu
+var FORM_TABLO_ID = '17Q8craqrYd9UZ-QlOPp7M9qw6Rt16UjppgEypLquCVY';
 var CANLI_HAYVAN_VARSAYILAN_ID = '17XVTYfpnwZi98-yGVWpFyHscyEdh1TcjSMvP2UYmvHY';
 
 // Özel bölümler ("Özel Notlar – Sadece Ramazan Kocabaş" dosyası). Bu dosya
@@ -130,8 +132,9 @@ function veriTopla_(gun) {
     // Tarih, Fethiye (Toplam, Sağmal, Kuru Gebe, Erkek, Süt, Satılan),
     // Erentepe (Toplam, Sağmal, Kuru Gebe, Erkek, Süt, Satılan)
     hayvanGunluk: tarihli(satirlar(SAYFALAR.gunluk, 13), 0),
-    // Tarih, Çiftlik, Faaliyet
-    tarim: tarihli(satirlar(SAYFALAR.tarim, 3), 0),
+    // Tarih, Çiftlik, Faaliyet[, Kaynak] — icmal + formen bildirim formu
+    tarim: tarihli(satirlar(SAYFALAR.tarim, 3), 0)
+      .concat(tarihli(formBildirimleri_(), 0)),
     // Çiftlik, Ürün, Plan (da), Ekilen (da)
     ekim: dolu(satirlar(SAYFALAR.ekim, 4)),
     // Ürün, Çiftlik, Alan (da), Toplam (kg), Verim (kg/da), Kayıt Tarihi
@@ -738,4 +741,73 @@ function olayDurumu_(g) {
 /** Elle deneme: Apps Script editöründe çalıştırıp günlüğe bakın. */
 function esitleDene() {
   Logger.log(JSON.stringify(esitle_()));
+}
+
+
+// ---------------------------------------------------------------------------
+// FORMEN BİLDİRİM FORMU: yanıtlar tarım kaydına çevrilir (okuma anında; tabloya
+// kopyalanmaz). KVKK: formda kişi bilgisi toplanmaz; not alanlarındaki olası
+// kişi adları uygulamada raporlanmadan önce ayıklanır.
+// ---------------------------------------------------------------------------
+
+function formBildirimleri_() {
+  var sh;
+  try {
+    var t = SpreadsheetApp.openById(FORM_TABLO_ID);
+    sh = t.getSheets().filter(function (x) {
+      return x.getLastColumn() > 0 &&
+        x.getRange(1, 1, 1, x.getLastColumn()).getValues()[0].indexOf('Bildirim türü') >= 0;
+    })[0];
+  } catch (e) {
+    return [];
+  }
+  if (!sh || sh.getLastRow() < 2) return [];
+  var v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+  var b = {};
+  v[0].forEach(function (h, i) { b[String(h).trim()] = i; });
+  function al(r, ad) {
+    var i = b[ad];
+    if (i === undefined) return '';
+    var x = r[i];
+    return x instanceof Date ? x : String(x === null || x === undefined ? '' : x).trim();
+  }
+  function sayi(x) {
+    var n = parseFloat(String(x).replace(',', '.'));
+    return isNaN(n) ? '' : String(Math.round(n * 100) / 100).replace('.', ',');
+  }
+  var sonuc = [];
+  for (var k = 1; k < v.length; k++) {
+    var r = v[k];
+    var tarih = al(r, 'Tarih');
+    if (!(tarih instanceof Date)) tarih = al(r, 'Zaman damgası');
+    if (!(tarih instanceof Date)) continue;
+    var ciftlik = al(r, 'Çiftlik');
+    if (!ciftlik) continue;
+    var metin = '';
+    if (al(r, 'Bildirim türü') === 'Malzeme giriş / çıkış') {
+      var giris = al(r, 'Hareket').indexOf('Giriş') === 0;
+      var yer = al(r, 'Nereden / nereye');
+      var yerMetin = yer === 'Dış tedarik' ? 'dış tedarik'
+        : yer === 'Diğer' || !yer ? 'diğer'
+        : yer + (giris ? ' çiftliğinden' : ' çiftliğine');
+      var miktar = sayi(al(r, 'Miktar'));
+      if (!miktar) continue;
+      metin = (giris ? 'Malzeme girişi: ' : 'Malzeme çıkışı: ') + miktar + ' ' +
+        al(r, 'Birim') + ' ' + al(r, 'Malzeme adı / çeşit') + ' (' + yerMetin + ')';
+      if (al(r, 'Belge no')) metin += '; Belge no: ' + al(r, 'Belge no');
+      if (al(r, 'Malzeme notu')) metin += '; ' + al(r, 'Malzeme notu');
+    } else {
+      var is = al(r, 'İş türü'), urun = al(r, 'Ürün');
+      var dk = sayi(al(r, 'Yapılan alan (dekar)'));
+      if (!is || !dk) continue;
+      var etiket = is === 'Ekim' ? (urun && urun !== 'Diğer' ? urun + ' ekimi' : 'Ekim')
+        : is + (urun && urun !== 'Diğer' && is !== 'Şeker pancarı sökümü' ? ' – ' + urun : '');
+      metin = etiket + ': ' + dk + ' dekar';
+      if (al(r, 'Pivot / parsel')) metin += ' (' + al(r, 'Pivot / parsel') + ')';
+      if (al(r, 'İş durumu') === 'Tamamlandı') metin += ', tamamlandı';
+      if (al(r, 'Faaliyet notu')) metin += '; ' + al(r, 'Faaliyet notu');
+    }
+    sonuc.push([tarih, ciftlik, metin.replace(/[\r\n]+/g, ' '), 'Form']);
+  }
+  return sonuc;
 }

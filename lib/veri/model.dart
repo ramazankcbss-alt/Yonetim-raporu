@@ -173,11 +173,18 @@ class GunlukSatir {
 
 class TarimKaydi {
   const TarimKaydi(
-      {required this.tarih, required this.ciftlik, required this.faaliyet});
+      {required this.tarih,
+      required this.ciftlik,
+      required this.faaliyet,
+      this.kaynak = ''});
 
   final DateTime tarih;
   final String ciftlik;
   final String faaliyet;
+
+  /// 'Form': formen bildirim formundan; boş: tarım günlük icmalinden.
+  final String kaynak;
+  bool get formdan => kaynak == 'Form';
 
   static TarimKaydi? oku(Object? v) {
     final r = _liste(v);
@@ -186,7 +193,8 @@ class TarimKaydi {
     final c = _metin(r[1]);
     final f = _metin(r[2]);
     if (c.isEmpty || f.isEmpty) return null;
-    return TarimKaydi(tarih: t, ciftlik: c, faaliyet: f);
+    return TarimKaydi(
+        tarih: t, ciftlik: c, faaliyet: f, kaynak: r.length > 3 ? _metin(r[3]) : '');
   }
 
   /// Faaliyet hayvancılığa mı ait? Değilse ziraat (bitkisel) sayılır.

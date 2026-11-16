@@ -112,14 +112,17 @@ const _urunler = [
   'fiğ', 'yulaf', 'nohut', 'fasulye', 'patates', 'silajlık',
 ];
 final _ekim = RegExp(r'(^|[^a-zçğıöşü])ek(im|il|iyor|me)');
-final _dekar = RegExp(r'(\d[\d.]*)\s*dekar\b');
+final _dekar = RegExp(r'(\d[\d.,]*)\s*dekar\b');
 final _tamam = RegExp(r'bitti|tamamland');
+// Form kaydı: "Malzeme girişi: 15 ton Halis buğday tohumu (dış tedarik)"
+final _malzeme = RegExp(r'^Malzeme (girişi|çıkışı): ([\d.,]+) (\S+) (.+?) \((.+)\)$');
 final _tedarik = RegExp(r'\bton\b.*(teslim|tedarik|alındı|geldi)');
 
 String _kucuk(String s) =>
     s.replaceAll('İ', 'i').replaceAll('I', 'ı').toLowerCase();
 
-double _sayi(String s) => double.tryParse(s.replaceAll('.', '')) ?? 0;
+double _sayi(String s) =>
+    double.tryParse(s.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
 
 String _dk(double d) {
   final t = d.round().toString();
@@ -141,8 +144,20 @@ class _Toplam {
 
 /// Genel Müdürlük raporu için çiftlik bazında kısa özet.
 List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
-  final sirali = [...kayitlar]..sort((a, b) => a.tarih.compareTo(b.tarih));
+  // Aynı çiftlik ve gün için formen formu varsa icmal kaydı ikinci kez sayılmaz.
+  final formGunleri = {
+    for (final k in kayitlar)
+      if (k.formdan) '${k.ciftlik}|${k.tarih.year}-${k.tarih.month}-${k.tarih.day}'
+  };
+  final sirali = [
+    for (final k in kayitlar)
+      if (k.formdan ||
+          !formGunleri.contains(
+              '${k.ciftlik}|${k.tarih.year}-${k.tarih.month}-${k.tarih.day}'))
+        k
+  ]..sort((a, b) => a.tarih.compareTo(b.tarih));
   final ciftlikler = <String, Map<String, _Toplam>>{};
+  final malzemeler = <String, Map<String, double>>{};
   final tedarikler = <String, List<String>>{};
   final gorulen = <String, Set<String>>{};
 
@@ -150,7 +165,14 @@ List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
     final m = ciftlikler.putIfAbsent(k.ciftlik, () => {});
     for (final madde in faaliyetMaddeleri(k.faaliyet)) {
       final s = _kucuk(madde);
-      if (s.contains('kalan')) continue;
+      if (s.contains('kalan') || s.startsWith('belge no')) continue;
+      final mz = _malzeme.firstMatch(madde);
+      if (mz != null) {
+        final anahtar = '${mz[1]}|${mz[3]}|${mz[4]}|${mz[5]}';
+        final mm = malzemeler.putIfAbsent(k.ciftlik, () => {});
+        mm[anahtar] = (mm[anahtar] ?? 0) + _sayi(mz[2]!);
+        continue;
+      }
       if (_tedarik.hasMatch(s)) {
         final g = gorulen.putIfAbsent(k.ciftlik, () => {});
         if (g.add(_anahtar(madde))) {
@@ -194,7 +216,9 @@ List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
   }
 
   final sonuc = <FaaliyetOzeti>[];
-  final adlar = {...ciftlikler.keys, ...tedarikler.keys}.toList()..sort();
+  final adlar = {...ciftlikler.keys, ...tedarikler.keys, ...malzemeler.keys}
+      .toList()
+    ..sort();
   for (final c in adlar) {
     final m = ciftlikler[c] ?? {};
     final etiketler = m.keys.toList()
@@ -207,6 +231,8 @@ List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> kayitlar) {
         if (m[e]!.deger > 0)
           '$e: ${_dk(m[e]!.deger)}${m[e]!.tamam ? ' (tamamlandı)' : ''}',
       for (final t in tedarikler[c] ?? const <String>[]) t,
+      for (final e in (malzemeler[c] ?? const <String, double>{}).entries)
+        _malzemeSatiri(e.key, e.value),
     ];
     if (maddeler.isNotEmpty) sonuc.add(FaaliyetOzeti(c, maddeler));
   }
@@ -231,3 +257,21 @@ int _sira(String etiket) {
 }
 
 String _buyuk(String s) => _buyukBasla(s);
+
+String _malzemeSatiri(String anahtar, double miktar) {
+  final p = anahtar.split('|');
+  final m = miktar == miktar.roundToDouble()
+      ? _binlik(miktar.round())
+      : miktar.toStringAsFixed(2).replaceAll('.', ',');
+  return 'Malzeme ${p[0]}: $m ${p[1]} ${p[2]} (${p[3]})';
+}
+
+String _binlik(int n) {
+  final t = n.toString();
+  final b = StringBuffer();
+  for (var i = 0; i < t.length; i++) {
+    if (i > 0 && (t.length - i) % 3 == 0) b.write('.');
+    b.write(t[i]);
+  }
+  return b.toString();
+}
