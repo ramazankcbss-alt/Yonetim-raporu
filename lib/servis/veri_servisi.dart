@@ -189,7 +189,13 @@ class VeriDeposu extends ChangeNotifier {
     veri = v;
     sonAlinma = simdi;
     hata = null;
+    final kanca = veriGeldi;
+    if (kanca != null) unawaited(kanca(v, ham));
   }
+
+  /// Yeni veri alındığında çağrılır (uygulamada haftalık raporu Drive
+  /// arşivine kaydetmek için kullanılır; testlerde boş kalır).
+  Future<void> Function(RaporVerisi v, String ham)? veriGeldi;
 
   static Future<String> _istek(Uri adres) async {
     final r = await http.get(adres).timeout(const Duration(seconds: 45));

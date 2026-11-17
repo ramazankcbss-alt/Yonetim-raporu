@@ -893,8 +893,10 @@ function bakimOnarimOku_(tz) {
 
 /**
  * Uygulamada oluşturulan haftalık rapor PDF'ini "Haftalık Faaliyet Raporları"
- * klasörüne kaydeder. Aynı içerik zaten varsa yeniden kaydetmez; aynı haftanın
- * farklı içerikli bir sürümü varsa eskisini silmeden yeni sürüm olarak ekler.
+ * klasörüne kaydeder. Her hafta için tek dosya tutulur: dosya varsa içeriği
+ * güncellenir (Drive eski içeriği "Sürümleri yönet" altında saklar), yoksa
+ * oluşturulur. İçerik aynıysa hiçbir şey yapılmaz.
+ * Gerekli: Hizmetler → Drive API (gelişmiş hizmet).
  * KVKK: PDF'te kişi adı bulunmaz; klasör kimseyle paylaşılmaz.
  */
 function raporKaydet_(g) {
@@ -910,23 +912,23 @@ function raporKaydet_(g) {
     return Utilities.base64Encode(
       Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, b));
   };
-  var yeniOzet = ozet(bayt);
+  var blob = Utilities.newBlob(bayt, 'application/pdf', ad);
   var klasor = DriveApp.getFolderById(RAPOR_KLASOR_ID);
-  var kok = ad.replace(/\.pdf$/, '');
-  var surum = 0;
-  var it = klasor.getFiles();
-  while (it.hasNext()) {
-    var f = it.next();
-    var n = f.getName();
-    if (n !== ad && n.indexOf(kok + '_surum') !== 0) continue;
-    if (ozet(f.getBlob().getBytes()) === yeniOzet) {
-      return { ok: true, mesaj: 'Rapor Drive\'da zaten kayıtlı: ' + n };
-    }
-    surum++;
+  var it = klasor.getFilesByName(ad);
+  var mevcut = it.hasNext() ? it.next() : null;
+  if (!mevcut) {
+    klasor.createFile(blob);
+    return { ok: true, mesaj: 'Rapor Drive\'a kaydedildi: ' + ad };
   }
-  var yeniAd = surum === 0 ? ad : kok + '_surum' + (surum + 1) + '.pdf';
-  klasor.createFile(Utilities.newBlob(bayt, 'application/pdf', yeniAd));
-  return { ok: true, mesaj: 'Rapor Drive\'a kaydedildi: Haftalık Faaliyet Raporları / ' + yeniAd };
+  if (ozet(mevcut.getBlob().getBytes()) === ozet(bayt)) {
+    return { ok: true, mesaj: 'Drive\'daki rapor zaten güncel: ' + ad };
+  }
+  if (typeof Drive === 'undefined') {
+    return { ok: false, hata: 'Raporu güncellemek için Apps Script\'te ' +
+      'Hizmetler → Drive API eklenmelidir.' };
+  }
+  Drive.Files.update({}, mevcut.getId(), blob);
+  return { ok: true, mesaj: 'Drive\'daki rapor güncellendi: ' + ad };
 }
 
 /**

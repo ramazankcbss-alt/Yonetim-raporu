@@ -6,6 +6,7 @@ import 'package:printing/printing.dart';
 
 import '../bicim.dart';
 import '../pdf/rapor_pdf.dart';
+import '../servis/rapor_arsivi.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
@@ -134,6 +135,19 @@ class _RaporEkranState extends State<RaporEkran> {
             mesgul: _kaydediliyor,
             onTap: hazir ? () => _driveKaydet(v, hafta!, ayar) : null,
           ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 6, 4, 0),
+            child: Text(
+              'Bu haftanın raporu, yeni veri geldikçe Drive\'da otomatik güncellenir.',
+              style: TextStyle(fontSize: 12, color: Renk.soluk),
+            ),
+          ),
+          if (RaporArsivi.sonDurum != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+              child: Text('Son otomatik kayıt: ${RaporArsivi.sonDurum}',
+                  style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+            ),
         ],
         const SizedBox(height: 10),
         Buton(

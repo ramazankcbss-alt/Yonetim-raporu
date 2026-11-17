@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'ekranlar/ana.dart';
+import 'servis/rapor_arsivi.dart';
 import 'servis/veri_servisi.dart';
 import 'tema.dart';
 
@@ -11,6 +12,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr_TR');
   await VeriDeposu.ben.baslat();
+  VeriDeposu.ben.veriGeldi = RaporArsivi.guncelle;
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
