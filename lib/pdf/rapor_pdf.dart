@@ -443,7 +443,9 @@ pw.Widget _dipnot() => pw.Padding(
       padding: const pw.EdgeInsets.only(top: 12),
       child: pw.Text(
         '* ESK-Taşağıl besi hayvanları ve kesilen danaları çiftlikler toplamına '
-        'dahil değildir; personel ve taşeron toplamına dahildir. "Diğer" satırı '
+        'dahil değildir. Özet göstergelerde "Çiftliklerimiz" personel/taşeron '
+        'sayısı ESK-Taşağıl hariçtir; işletme tablosundaki ÇİFTLİKLER TOPLAM '
+        'satırında ESK-Taşağıl personeli dahildir. "Diğer" satırı '
         'güvenlik, Çumpaş, Konya Merkez ve yönetici personelidir. '
         'Kaynak: CANLI HAYVAN GÜNCEL ÖZET RAPORU ve TARIM GÜNLÜK İCMAL kayıtları.',
         style: const pw.TextStyle(fontSize: 7, color: _soluk),
