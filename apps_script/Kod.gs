@@ -61,6 +61,8 @@ var ARAC_TABLO_ID = '1Pw9GSj3_d6T5epCgBLDwzRnrWiHYsLRp3Ifdx3rCybs';
 // bakım onarım formeni onaylar). Salt okunur; kişisel veri içermez.
 var BAKIM_TABLO_ID = '1S-2ziLyY2UdjOk6SM7A8Da2D_nPEhCa5R8yFMs5daaI';
 
+/** Haftalık faaliyet raporu PDF'lerinin kaydedildiği Drive klasörü (paylaşılmaz). */
+var RAPOR_KLASOR_ID = '1cZ7Hh5QEyEn52zflngLl6vZJsijU8PxG';
 var OZEL_DOSYA_ID = '1-XtWC5sj1RydL01_Exf3Dh8EQDkBqPj3wl1NM9HzX6o';
 var OZEL_SAYFALAR = {
   ozelNotlar: { ad: 'Notlar', sutun: 5 },
@@ -308,6 +310,7 @@ function doPost(e) {
         .indexOf(govde.tur) >= 0) {
       return json_({ ok: false, hata: 'Bu bölüm KVKK kapsamında kaldırıldı.' });
     }
+    if (govde.tur === 'raporKaydet') return json_(raporKaydet_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
     var bugun = Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy');
@@ -885,4 +888,43 @@ function bakimOnarimOku_(tz) {
     sonuc.push(satir);
   }
   return sonuc;
+}
+
+
+/**
+ * Uygulamada oluşturulan haftalık rapor PDF'ini "Haftalık Faaliyet Raporları"
+ * klasörüne kaydeder. Aynı içerik zaten varsa yeniden kaydetmez; aynı haftanın
+ * farklı içerikli bir sürümü varsa eskisini silmeden yeni sürüm olarak ekler.
+ * KVKK: PDF'te kişi adı bulunmaz; klasör kimseyle paylaşılmaz.
+ */
+function raporKaydet_(g) {
+  var ad = String(g.ad || '');
+  if (!/^Haftalik_Rapor_\d{1,2}_Hafta_\d{4}\.pdf$/.test(ad)) {
+    return { ok: false, hata: 'Geçersiz rapor adı.' };
+  }
+  var bayt = Utilities.base64Decode(String(g.pdf || ''));
+  if (bayt.length < 100 || bayt.length > 5 * 1024 * 1024) {
+    return { ok: false, hata: 'Rapor dosyası okunamadı.' };
+  }
+  var ozet = function (b) {
+    return Utilities.base64Encode(
+      Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, b));
+  };
+  var yeniOzet = ozet(bayt);
+  var klasor = DriveApp.getFolderById(RAPOR_KLASOR_ID);
+  var kok = ad.replace(/\.pdf$/, '');
+  var surum = 0;
+  var it = klasor.getFiles();
+  while (it.hasNext()) {
+    var f = it.next();
+    var n = f.getName();
+    if (n !== ad && n.indexOf(kok + '_surum') !== 0) continue;
+    if (ozet(f.getBlob().getBytes()) === yeniOzet) {
+      return { ok: true, mesaj: 'Rapor Drive\'da zaten kayıtlı: ' + n };
+    }
+    surum++;
+  }
+  var yeniAd = surum === 0 ? ad : kok + '_surum' + (surum + 1) + '.pdf';
+  klasor.createFile(Utilities.newBlob(bayt, 'application/pdf', yeniAd));
+  return { ok: true, mesaj: 'Rapor Drive\'a kaydedildi: Haftalık Faaliyet Raporları / ' + yeniAd };
 }

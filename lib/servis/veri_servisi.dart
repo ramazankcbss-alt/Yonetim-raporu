@@ -311,6 +311,13 @@ class VeriDeposu extends ChangeNotifier {
     }
   }
 
+  /// Haftalık rapor PDF'ini Drive'daki "Haftalık Faaliyet Raporları"
+  /// klasörüne kaydeder; sunucunun bilgi mesajını döner.
+  Future<String> raporuDriveKaydet(String ad, List<int> pdf) async {
+    final j = await _islem('raporKaydet', {'ad': ad, 'pdf': base64Encode(pdf)});
+    return (j['mesaj'] ?? 'Rapor Drive\'a kaydedildi.').toString();
+  }
+
   /// Kişiler sayfasındaki kişiye uygulamanın sahibi adına e-posta gönderir.
   Future<void> epostaGonder(String ad, String konu, String metin) async {
     await _islem('mesaj', {'ad': ad, 'konu': konu, 'metin': metin});

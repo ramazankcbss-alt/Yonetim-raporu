@@ -287,7 +287,7 @@ pw.Widget _not(String s) => pw.Padding(
 
 pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
   final kutular = <(String, String, String?)>[
-    ('Toplam Hayvan', sayi(g.toplamHayvan), 'ESK-Taşağıl besi hariç'),
+    ('Toplam Hayvan', sayi(g.toplamHayvan), null),
     ('Sağılan Hayvan', sayi(g.sagilan), null),
     (
       haftalik ? 'Haftalık Süt' : 'Süt Üretimi',
@@ -297,20 +297,26 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
           : 'Ort. ${sayi(g.ortVerim, ondalik: 1)} kg/baş${haftalik ? '/gün' : ''}'
     ),
     ('Satılan Süt', kg(g.satilan), 'Fethiye + Erentepe'),
-    ('Personel / Taşeron', '${sayi(g.personel)} / ${sayi(g.taseron)}', null),
+    (
+      'Personel / Taşeron',
+      '${sayi(g.ciftlikPersonel)} / ${sayi(g.ciftlikTaseron)}',
+      null
+    ),
     (
       'Doğan Buzağı',
       sayi(g.dogan),
       g.olenBuzagi == null ? null : 'Ölen buzağı: ${sayi(g.olenBuzagi)}'
     ),
-    (
-      'Kesilen Dana',
-      sayi(g.kesilenDana),
-      g.eskKesilen == null ? null : 'ESK-Taşağıl: ${sayi(g.eskKesilen)}'
-    ),
-    haftalik
-        ? ('İnek/Düve Kesim-Satış', sayi(g.kesimSatis), null)
-        : ('ESK-Taşağıl Besi', sayi(g.eskBesiHayvan), 'Toplama dahil değil'),
+    ('Kesilen Dana', sayi(g.kesilenDana), null),
+    if (haftalik) ('İnek/Düve Kesim-Satış', sayi(g.kesimSatis), null),
+  ];
+
+  final eskPers = g.eskPersonel ?? 0, eskTas = g.eskTaseron ?? 0;
+  final eskKutular = <(String, String, String?)>[
+    ('Besi Hayvanı', sayi(g.eskBesiHayvan), null),
+    ('Kesilen Dana', sayi(g.eskKesilen), haftalik ? 'Hafta toplamı' : null),
+    if (eskPers > 0 || eskTas > 0)
+      ('Personel / Taşeron', '${sayi(eskPers)} / ${sayi(eskTas)}', null),
   ];
 
   pw.Widget kutu((String, String, String?) k) => pw.Container(
@@ -334,12 +340,39 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
         ),
       );
 
-  return pw.Table(
-    children: [
-      for (var i = 0; i < kutular.length; i += 4)
-        pw.TableRow(children: [
-          for (var j = i; j < i + 4 && j < kutular.length; j++) kutu(kutular[j]),
+  pw.Widget izgara(List<(String, String, String?)> liste) => pw.Table(
+        children: [
+          for (var i = 0; i < liste.length; i += 4)
+            pw.TableRow(children: [
+              for (var j = i; j < i + 4; j++)
+                j < liste.length ? kutu(liste[j]) : pw.SizedBox(),
+            ]),
+        ],
+      );
+
+  pw.Widget altBaslik(String baslik, String? aciklama) => pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 4, bottom: 2, left: 2),
+        child: pw.Row(children: [
+          pw.Text(baslik,
+              style: pw.TextStyle(
+                  fontSize: 9, fontWeight: pw.FontWeight.bold, color: _anaKoyu)),
+          if (aciklama != null)
+            pw.Text('  ·  $aciklama',
+                style: const pw.TextStyle(fontSize: 7.5, color: _soluk)),
         ]),
+      );
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+    children: [
+      altBaslik('Çiftliklerimiz', null),
+      izgara(kutular),
+      if (g.eskVar) ...[
+        pw.SizedBox(height: 4),
+        altBaslik('ESK-Taşağıl Çiftliği (Besi)',
+            'Çiftliklerimiz toplamına dahil değildir'),
+        izgara(eskKutular),
+      ],
     ],
   );
 }

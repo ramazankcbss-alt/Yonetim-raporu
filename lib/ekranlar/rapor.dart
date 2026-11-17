@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -23,6 +24,7 @@ class RaporEkran extends StatefulWidget {
 
 class _RaporEkranState extends State<RaporEkran> {
   bool _haftalik = false;
+  bool _kaydediliyor = false;
   DateTime? _gun;
   DateTime? _hafta;
   bool _mesgul = false;
@@ -123,6 +125,16 @@ class _RaporEkranState extends State<RaporEkran> {
           renk: ButonRenk.ikincil,
           onTap: hazir ? () => _onizle(v, gun, hafta, ayar) : null,
         ),
+        if (_haftalik) ...[
+          const SizedBox(height: 10),
+          Buton(
+            yazi: 'Drive\'a kaydet (Haftalık Faaliyet Raporları)',
+            ikon: Icons.cloud_upload_outlined,
+            renk: ButonRenk.ikincil,
+            mesgul: _kaydediliyor,
+            onTap: hazir ? () => _driveKaydet(v, hafta!, ayar) : null,
+          ),
+        ],
         const SizedBox(height: 10),
         Buton(
           yazi: 'Paylaş (e-posta, WhatsApp…)',
@@ -163,11 +175,35 @@ class _RaporEkranState extends State<RaporEkran> {
     ));
   }
 
+  Future<void> _driveKaydet(RaporVerisi v, DateTime hafta, RaporAyari a) async {
+    try {
+      final b = await haftalikRaporPdf(v, hafta, a);
+      await _driveyeYaz(b, haftalikDosyaAdi(hafta));
+    } catch (e) {
+      if (mounted) bildir(context, 'Rapor oluşturulamadı: $e');
+    }
+  }
+
+  Future<void> _driveyeYaz(Uint8List b, String ad) async {
+    if (_kaydediliyor) return;
+    setState(() => _kaydediliyor = true);
+    try {
+      final m = await VeriDeposu.ben.raporuDriveKaydet(ad, b);
+      if (mounted) bildir(context, m);
+    } catch (e) {
+      if (mounted) bildir(context, 'Drive\'a kaydedilemedi: $e');
+    } finally {
+      if (mounted) setState(() => _kaydediliyor = false);
+    }
+  }
+
   Future<void> _paylas(
       RaporVerisi v, DateTime? gun, DateTime? hafta, RaporAyari a) async {
     setState(() => _mesgul = true);
     try {
       final b = await _olustur(v, gun, hafta, a);
+      // Haftalık rapor paylaşılırken Drive'daki arşive de otomatik kaydedilir.
+      if (_haftalik) unawaited(_driveyeYaz(b, haftalikDosyaAdi(hafta!)));
       await Printing.sharePdf(bytes: b, filename: _dosyaAdi(gun, hafta));
     } catch (e) {
       if (mounted) bildir(context, 'Rapor oluşturulamadı: $e');
