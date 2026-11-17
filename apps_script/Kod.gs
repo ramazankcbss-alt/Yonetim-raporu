@@ -928,3 +928,13 @@ function raporKaydet_(g) {
   klasor.createFile(Utilities.newBlob(bayt, 'application/pdf', yeniAd));
   return { ok: true, mesaj: 'Rapor Drive\'a kaydedildi: Haftalık Faaliyet Raporları / ' + yeniAd };
 }
+
+/**
+ * Bir kez editörden çalıştırın: Drive'a rapor kaydetme iznini ister
+ * (izin ekranında Google Drive kutusunu işaretleyin). Dosya oluşturmaz.
+ */
+function driveIzniVer() {
+  ScriptApp.requireScopes(ScriptApp.AuthMode.FULL,
+    ['https://www.googleapis.com/auth/drive']);
+  Logger.log('Drive izni var. Klasör: ' + DriveApp.getFolderById(RAPOR_KLASOR_ID).getName());
+}
