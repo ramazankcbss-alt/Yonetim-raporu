@@ -81,6 +81,91 @@ class GostergeKarti extends StatelessWidget {
   }
 }
 
+/// Gösterge grupları arasında ayırıcı başlık.
+class BolumBasligi extends StatelessWidget {
+  const BolumBasligi(this.baslik, {super.key, this.ikon, this.renk = Renk.ana, this.aciklama});
+
+  final String baslik;
+  final IconData? ikon;
+  final Color renk;
+  final String? aciklama;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 14, 2, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            if (ikon != null) ...[
+              Icon(ikon, size: 20, color: renk),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(baslik,
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: renk)),
+            ),
+          ]),
+          if (aciklama != null) ...[
+            const SizedBox(height: 2),
+            Text(aciklama!,
+                style: const TextStyle(fontSize: 12.5, color: Renk.soluk)),
+          ],
+          const SizedBox(height: 4),
+          Divider(height: 1, color: renk.withValues(alpha: 0.35)),
+        ],
+      ),
+    );
+  }
+}
+
+/// ESK-Taşağıl Çiftliği (besi) göstergeleri: çiftliklerimizden ayrı bölüm.
+class EskBolumu extends StatelessWidget {
+  const EskBolumu({super.key, required this.g, this.kesilenAlt});
+
+  final Gostergeler g;
+  final String? kesilenAlt;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!g.eskVar) return const SizedBox.shrink();
+    final pers = g.eskPersonel ?? 0, tas = g.eskTaseron ?? 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const BolumBasligi('ESK-Taşağıl Çiftliği (Besi)',
+            ikon: Icons.agriculture_outlined,
+            renk: Renk.turuncu,
+            aciklama: 'Çiftliklerimiz toplamına dahil değildir.'),
+        GostergeIzgarasi(kartlar: [
+          GostergeKarti(
+            baslik: 'Besi Hayvanı',
+            deger: sayi(g.eskBesiHayvan),
+            ikon: Icons.pets,
+            renk: Renk.turuncu,
+          ),
+          GostergeKarti(
+            baslik: 'Kesilen Dana',
+            deger: sayi(g.eskKesilen),
+            ikon: Icons.content_cut,
+            renk: Renk.turuncu,
+            alt: kesilenAlt,
+          ),
+          if (pers > 0 || tas > 0)
+            GostergeKarti(
+              baslik: 'Personel / Taşeron',
+              deger: '${sayi(pers)} / ${sayi(tas)}',
+              ikon: Icons.groups_outlined,
+              renk: Renk.amber,
+            ),
+        ]),
+      ],
+    );
+  }
+}
+
 /// Kartları telefonda 2, tablette 4 sütun dizer.
 class GostergeIzgarasi extends StatelessWidget {
   const GostergeIzgarasi({super.key, required this.kartlar});

@@ -1098,11 +1098,22 @@ class Gostergeler {
     this.kesimSatis,
     this.eskBesiHayvan,
     this.eskKesilen,
+    this.eskPersonel,
+    this.eskTaseron,
   });
 
   final double? toplamHayvan, sagilan, sut, ortVerim, satilan;
   final double? personel, taseron, dogan, kesilenDana, olenBuzagi, kesimSatis;
-  final double? eskBesiHayvan, eskKesilen;
+  final double? eskBesiHayvan, eskKesilen, eskPersonel, eskTaseron;
+
+  /// Personel ve taşeron: ESK-Taşağıl hariç, yalnızca çiftliklerimiz.
+  double? get ciftlikPersonel =>
+      personel == null ? null : personel! - (eskPersonel ?? 0);
+  double? get ciftlikTaseron =>
+      taseron == null ? null : taseron! - (eskTaseron ?? 0);
+
+  /// ESK-Taşağıl için gösterilecek veri var mı.
+  bool get eskVar => eskBesiHayvan != null || eskKesilen != null;
 }
 
 /// Tek bir günün göstergeleri.
@@ -1127,6 +1138,8 @@ Gostergeler gunlukGostergeler(RaporVerisi v, DateTime d) {
     kesimSatis: ozVar ? oz.toplam.kesimSatis : null,
     eskBesiHayvan: ozVar ? esk?.hayvan : null,
     eskKesilen: ozVar ? esk?.kesilenDana : null,
+    eskPersonel: ozVar ? esk?.personel : null,
+    eskTaseron: ozVar ? esk?.taseron : null,
   );
 }
 
@@ -1156,6 +1169,8 @@ Gostergeler haftalikGostergeler(RaporVerisi v, DateTime bas) {
     kesimSatis: ozVar ? oz.toplam.kesimSatis : null,
     eskBesiHayvan: ozVar ? esk?.hayvan : null,
     eskKesilen: ozVar ? esk?.kesilenDana : null,
+    eskPersonel: ozVar ? esk?.personel : null,
+    eskTaseron: ozVar ? esk?.taseron : null,
   );
 }
 

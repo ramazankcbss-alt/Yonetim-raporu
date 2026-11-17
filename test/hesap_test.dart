@@ -98,6 +98,12 @@ void main() {
     expect(g.dogan, 3);
     expect(g.kesilenDana, 0);
     expect(g.eskBesiHayvan, 3686);
+    // Çiftliklerimiz ile ESK-Taşağıl ayrı gösterilir.
+    expect(g.eskPersonel, 6);
+    expect(g.eskTaseron, 7);
+    expect(g.ciftlikPersonel, 85);
+    expect(g.ciftlikTaseron, 3);
+    expect(g.eskVar, isTrue);
   });
 
   test('Tablolar', () {

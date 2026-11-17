@@ -59,12 +59,12 @@ class _GunlukEkranState extends State<GunlukEkran> {
             yazi: 'Bu gün için işletme özeti yok; yalnızca Fethiye ve '
                 'Erentepe günlük süt verisi gösteriliyor.',
           ),
+        const BolumBasligi('Çiftliklerimiz', ikon: Icons.home_work_outlined),
         GostergeIzgarasi(kartlar: [
           GostergeKarti(
             baslik: 'Toplam Hayvan',
             deger: sayi(g.toplamHayvan),
             ikon: Icons.pets,
-            alt: 'ESK-Taşağıl besi hariç',
           ),
           GostergeKarti(
             baslik: 'Sağılan Hayvan',
@@ -90,7 +90,7 @@ class _GunlukEkranState extends State<GunlukEkran> {
           ),
           GostergeKarti(
             baslik: 'Personel / Taşeron',
-            deger: '${sayi(g.personel)} / ${sayi(g.taseron)}',
+            deger: '${sayi(g.ciftlikPersonel)} / ${sayi(g.ciftlikTaseron)}',
             ikon: Icons.groups_outlined,
             renk: Renk.amber,
           ),
@@ -108,18 +108,9 @@ class _GunlukEkranState extends State<GunlukEkran> {
             deger: sayi(g.kesilenDana),
             ikon: Icons.content_cut,
             renk: Renk.turuncu,
-            alt: g.eskKesilen == null
-                ? null
-                : 'ESK-Taşağıl: ${sayi(g.eskKesilen)}',
-          ),
-          GostergeKarti(
-            baslik: 'ESK-Taşağıl Besi',
-            deger: sayi(g.eskBesiHayvan),
-            ikon: Icons.agriculture_outlined,
-            renk: Renk.turuncu,
-            alt: 'Çiftlikler toplamına dahil değil',
           ),
         ]),
+        EskBolumu(g: g),
         const SizedBox(height: 12),
         Panel(
           baslik: 'İşletme Bazlı Canlı Hayvan',

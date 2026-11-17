@@ -60,6 +60,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
             style: const TextStyle(fontSize: 12.5, color: Renk.soluk),
           ),
         ),
+        const BolumBasligi('Çiftliklerimiz', ikon: Icons.home_work_outlined),
         GostergeIzgarasi(kartlar: [
           GostergeKarti(
             baslik: 'Toplam Hayvan',
@@ -92,7 +93,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
           ),
           GostergeKarti(
             baslik: 'Personel / Taşeron',
-            deger: '${sayi(g.personel)} / ${sayi(g.taseron)}',
+            deger: '${sayi(g.ciftlikPersonel)} / ${sayi(g.ciftlikTaseron)}',
             ikon: Icons.groups_outlined,
             renk: Renk.amber,
           ),
@@ -110,9 +111,6 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
             deger: sayi(g.kesilenDana),
             ikon: Icons.content_cut,
             renk: Renk.turuncu,
-            alt: g.eskKesilen == null
-                ? null
-                : 'ESK-Taşağıl: ${sayi(g.eskKesilen)}',
           ),
           GostergeKarti(
             baslik: 'İnek/Düve Kesim-Satış',
@@ -121,6 +119,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
             renk: Renk.turuncu,
           ),
         ]),
+        EskBolumu(g: g, kesilenAlt: 'Hafta toplamı'),
         const SizedBox(height: 12),
         Panel(
           baslik: 'Günlük Süt Üretimi (kg)',

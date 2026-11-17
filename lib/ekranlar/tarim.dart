@@ -112,6 +112,7 @@ class _TarimEkranState extends State<TarimEkran> {
                     style:
                         const TextStyle(fontSize: 12.5, color: Renk.soluk)),
               ),
+            const BolumBasligi('Çiftliklerimiz', ikon: Icons.home_work_outlined),
             GostergeIzgarasi(kartlar: [
               GostergeKarti(
                 baslik: 'Toplam Hayvan',
@@ -147,9 +148,6 @@ class _TarimEkranState extends State<TarimEkran> {
                 deger: sayi(hg.kesilenDana),
                 ikon: Icons.content_cut,
                 renk: Renk.turuncu,
-                alt: hg.eskKesilen == null
-                    ? null
-                    : 'ESK-Taşağıl: ${sayi(hg.eskKesilen)}',
               ),
               GostergeKarti(
                 baslik: 'İnek/Düve Kesim-Satış',
@@ -158,6 +156,7 @@ class _TarimEkranState extends State<TarimEkran> {
                 renk: Renk.turuncu,
               ),
             ]),
+            EskBolumu(g: hg, kesilenAlt: 'Hafta toplamı'),
             const SizedBox(height: 12),
           ],
           Panel(
