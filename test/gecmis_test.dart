@@ -31,9 +31,17 @@ void main() {
     expect(kapsananYillar(''), isEmpty);
   });
 
-  testWidgets('geçmiş ekranı gösterir', (t) async {
+  testWidgets('geçmiş ekranı menü ve alt sayfalar', (t) async {
     final v = RaporVerisi.json(j);
+    t.view.physicalSize = const Size(1080, 4800);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
     await t.pumpWidget(MaterialApp(home: GecmisEkran(veri: v)));
+    await t.pumpAndSettle();
+    expect(find.text('Bilgi Bankası'), findsOneWidget);
+    expect(find.text('Hayvancılık'), findsOneWidget);
+
+    await t.tap(find.text('Tüm kayıtlarda ara'));
     await t.pumpAndSettle();
     expect(find.text('Ortalama süt verimi'), findsOneWidget);
     expect(find.text('Yıllık dönem kâr/zarar'), findsOneWidget);
@@ -41,6 +49,16 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Ortalama süt verimi'), findsOneWidget);
     expect(find.text('Yıllık dönem kâr/zarar'), findsNothing);
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+
+    await t.tap(find.text('Şekersüt'));
+    await t.pumpAndSettle();
+    expect(find.text('Ortalama süt verimi'), findsOneWidget);
+    expect(find.text('5 yıllık kesim'), findsNothing);
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+
     await t.tap(find.text('Dersler'));
     await t.pumpAndSettle();
     expect(find.text('Buğday zarar etti.'), findsOneWidget);
