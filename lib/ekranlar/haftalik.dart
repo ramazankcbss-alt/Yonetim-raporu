@@ -152,6 +152,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
           ),
         ),
         IsletmeDetayPaneli(veri: v, bas: hafta, son: haftaSonu),
+        DriveBulgulariPaneli(veri: v, bas: hafta, son: haftaSonu),
         Panel(
           baslik: 'İşletme Bazlı Canlı Hayvan',
           child: oz.ozetGunu == null

@@ -82,6 +82,46 @@ double _s(List r, int i) => i < r.length ? (sayiOku(r[i]) ?? 0) : 0;
 // Ham satırlar
 // ---------------------------------------------------------------------------
 
+/// Drive_Bulgular: günlük Drive incelemesinde bulunan rapor kapsamındaki bilgi.
+class DriveBulgu {
+  const DriveBulgu({
+    required this.tarih,
+    required this.dosya,
+    required this.konu,
+    required this.ciftlik,
+    required this.bulgu,
+    this.veriGunu,
+    required this.durum,
+    required this.baglanti,
+  });
+
+  final DateTime tarih;
+  final String dosya, konu, ciftlik, bulgu, durum, baglanti;
+  final DateTime? veriGunu;
+
+  bool get eklendi => durum.toLowerCase().contains('eklendi');
+  bool get onayBekliyor => durum.toLowerCase().contains('onay');
+
+  /// Bulgunun ait olduğu gün (veri günü yoksa inceleme günü).
+  DateTime get gun => veriGunu ?? tarih;
+
+  static DriveBulgu? oku(Object? v) {
+    final r = _liste(v);
+    final t = r.isEmpty ? null : tarihOku(r[0]);
+    if (t == null || r.length < 5 || _metin(r[4]).isEmpty) return null;
+    return DriveBulgu(
+      tarih: t,
+      dosya: _metin(r[1]),
+      konu: _metin(r[2]),
+      ciftlik: _metin(r[3]),
+      bulgu: _metin(r[4]),
+      veriGunu: r.length > 5 ? tarihOku(r[5]) : null,
+      durum: r.length > 6 ? _metin(r[6]) : '',
+      baglanti: r.length > 7 ? _metin(r[7]) : '',
+    );
+  }
+}
+
 /// Hayvan_Detay: işletme günlük raporundaki bir gösterge (sıfırdan farklı).
 class DetaySatir {
   const DetaySatir(this.tarih, this.isletme, this.bolum, this.gosterge, this.deger);
@@ -851,6 +891,7 @@ class RaporVerisi {
     this.arac = const AracVerisi(),
     List<BakimOnarimKaydi> bakimOnarim = const [],
     this.detay = const [],
+    this.bulgular = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
         ozet = List.unmodifiable(
@@ -884,6 +925,15 @@ class RaporVerisi {
 
   /// İşletme günlük raporlarının tüm göstergeleri (Hayvan_Detay).
   final List<DetaySatir> detay;
+
+  /// Günlük Drive incelemesinin bulguları.
+  final List<DriveBulgu> bulgular;
+
+  /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
+  List<DriveBulgu> bulgularDonem(DateTime bas, DateTime son) => [
+        for (final b in bulgular)
+          if (!gunu(b.gun).isBefore(gunu(bas)) && !gunu(b.gun).isAfter(gunu(son))) b
+      ]..sort((a, b) => b.gun.compareTo(a.gun));
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -893,6 +943,7 @@ class RaporVerisi {
       ozet: oku('hayvanOzet', OzetSatir.oku),
       gunluk: oku('hayvanGunluk', GunlukSatir.oku),
       detay: oku('hayvanDetay', DetaySatir.oku),
+      bulgular: oku('driveBulgular', DriveBulgu.oku),
       tarim: oku('tarim', TarimKaydi.oku),
       ekim: oku('ekim', EkimSatir.oku),
       hasat: oku('hasat', HasatSatir.oku),

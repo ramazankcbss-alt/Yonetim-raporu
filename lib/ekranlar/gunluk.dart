@@ -124,6 +124,7 @@ class _GunlukEkranState extends State<GunlukEkran> {
         EskBolumu(g: g, olenDana: eskKo?.toplam),
         const SizedBox(height: 12),
         IsletmeDetayPaneli(veri: v, bas: gun, son: gun),
+        DriveBulgulariPaneli(veri: v, bas: gun, son: gun),
         Panel(
           baslik: 'İşletme Bazlı Canlı Hayvan',
           child: oz.ozetGunu == null

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../bicim.dart';
 import '../tema.dart';
@@ -92,6 +93,68 @@ class _IsletmeDetayPaneliState extends State<IsletmeDetayPaneli> {
               ),
             ],
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Günlük Drive incelemesinin bulguları: diğer Drive dosyalarında bulunan,
+/// rapor kapsamındaki bilgiler. "Onay bekliyor" olanlar kullanıcı onayıyla
+/// rapora alınır; "Rapora eklendi" olanlar PDF'te de yer alır.
+class DriveBulgulariPaneli extends StatelessWidget {
+  const DriveBulgulariPaneli({super.key, required this.veri, required this.bas, required this.son});
+
+  final RaporVerisi veri;
+  final DateTime bas, son;
+
+  @override
+  Widget build(BuildContext context) {
+    final liste = veri.bulgularDonem(bas, son);
+    if (liste.isEmpty) return const SizedBox.shrink();
+    (Color, Color) renk(DriveBulgu b) => b.eklendi
+        ? (Renk.yesil, Renk.yesilAcik)
+        : b.onayBekliyor
+            ? (Renk.amber, Renk.amberAcik)
+            : (Renk.soluk, Renk.zemin);
+    return Panel(
+      baslik: 'Diğer Drive Dosyalarından Bilgiler',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final b in liste)
+            InkWell(
+              onTap: b.baglanti.startsWith('http')
+                  ? () => launchUrl(Uri.parse(b.baglanti), mode: LaunchMode.externalApplication)
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                        child: Text(
+                          [b.konu, if (b.ciftlik.isNotEmpty) b.ciftlik].join(' · '),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: renk(b).$2, borderRadius: BorderRadius.circular(10)),
+                        child: Text(b.durum.isEmpty ? 'Bilgi' : b.durum,
+                            style: TextStyle(fontSize: 11, color: renk(b).$1)),
+                      ),
+                    ]),
+                    const SizedBox(height: 2),
+                    Text(b.bulgu, style: const TextStyle(fontSize: 13)),
+                    Text('${b.dosya} · ${tarihKisa(b.gun)}',
+                        style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -425,7 +425,19 @@ List<pw.Widget> _hareketler(RaporVerisi v, DateTime bas, DateTime son) {
 
   final tekGun = gunu(bas) == gunu(son);
   final ek = tekGun ? '' : ' (hafta toplamı)';
+  final ekli = [for (final b in v.bulgularDonem(bas, son)) if (b.eklendi) b];
   return [
+    if (ekli.isNotEmpty) ...[
+      _bolum('Diğer Kaynaklardan Bilgiler$ek'),
+      _tablo(const ['Konu', 'Çiftlik', 'Bilgi', 'Tarih'], [
+        for (final b in ekli) [b.konu, b.ciftlik, b.bulgu, tarihKisa(b.gun)]
+      ], genislik: const {
+        0: pw.FlexColumnWidth(1.6),
+        1: pw.FlexColumnWidth(1.2),
+        2: pw.FlexColumnWidth(4),
+        3: pw.FlexColumnWidth(1.1),
+      }, metin: const {0, 1, 2}, kucuk: true),
+    ],
     ...tablo('Sürüden Çıkanlar ve Kayıplar$ek',
         hareketTablosu(v, bas, son, cikis: true)),
     ...tablo('Doğumlar ve Hayvan Girişleri$ek',

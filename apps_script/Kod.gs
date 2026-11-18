@@ -141,6 +141,13 @@ function veriTopla_(gun) {
     hayvanGunluk: tarihli(satirlar(SAYFALAR.gunluk, 13), 0),
     // Tarih, İşletme, Bölüm, Gösterge, Değer — işletme günlük raporlarının
     // tüm satırları (personel listesi hariç), son 70 gün
+    // Tarih, Dosya, Konu, Çiftlik, Bulgu, Veri günü, Durum, Bağlantı —
+    // günlük Drive incelemesinin bulguları (kişisel veri içermez), son 45 gün
+    driveBulgular: satirlar('Drive_Bulgular', 8)
+      .filter(function (r) {
+        return r[0] instanceof Date && r[0] >= new Date(Date.now() - 45 * 86400000);
+      })
+      .map(function (r) { return r.map(hucre); }),
     hayvanDetay: satirlar(DETAY_SAYFA_, 5)
       .filter(function (r) {
         return r[0] instanceof Date && r[0] >= new Date(Date.now() - 70 * 86400000);
