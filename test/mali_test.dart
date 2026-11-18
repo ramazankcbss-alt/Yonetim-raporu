@@ -48,7 +48,7 @@ void main() {
   });
 
   testWidgets('mali raporlar ekranı', (t) async {
-    t.view.physicalSize = const Size(1200, 5000);
+    t.view.physicalSize = const Size(2400, 5000);
     t.view.devicePixelRatio = 1.5;
     addTearDown(t.view.reset);
     await t.pumpWidget(MaterialApp(
