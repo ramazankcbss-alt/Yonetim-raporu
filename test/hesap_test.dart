@@ -112,7 +112,7 @@ void main() {
     expect(s.length, 8);
     expect(s.last, [
       'ÇİFTLİKLER TOPLAM', '91', '10', '2.079', '537', '53.187', '24,8', '3',
-      '1', '2'
+      '1', '—', '—', '2'
     ]);
 
     final suru = suruSatirlari(v.gunlukBul(pzt), v.gunlukBul(DateTime(2026, 11, 5)));
