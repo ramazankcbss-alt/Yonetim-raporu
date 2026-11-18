@@ -1186,7 +1186,7 @@ function detayGecmisiAl() {
 // Panel sayfası ve hastalık arşivi Drive'da tutulur (kişisel veri içermez):
 // "Veteriner Paneli – sayfa (…).html" ve "Veteriner Paneli – hastalık arşivi (…).json".
 // Kaynakları depoda: apps_script/Veteriner.html ve assets/veri/hastalik.json.
-var VET_HTML_ID = '1H8EmEPGRn7FADY9_xQ9m563hnl1TcjsX';
+var VET_HTML_ID = '14izW3rxYQvhXV668iD_McdEcds4VvTs8';
 var VET_ARSIV_ID = '1t_4NvUHrQDjyX-TmLPEidP51hi8Zun8e';
 
 var VET_KOD_SAYFA_ = 'Veteriner_Kodları';      // Kod, Etiket, Oluşturma, Durum, Son giriş
