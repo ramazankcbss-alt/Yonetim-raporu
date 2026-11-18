@@ -33,11 +33,8 @@ class _HastalikEkranState extends State<HastalikEkran> {
     super.initState();
     hastalikYukle(widget.veri.gecmis).then((l) {
       if (!mounted) return;
-      final y = l.map((k) => k.yil).toSet();
-      setState(() {
-        _hepsi = l;
-        _yil = y.isEmpty ? null : y.reduce((a, b) => a > b ? a : b);
-      });
+      // Varsayılan: tüm yıllar; liste yıl → ay olarak gruplanır.
+      setState(() => _hepsi = l);
     });
   }
 
@@ -57,7 +54,7 @@ class _HastalikEkranState extends State<HastalikEkran> {
                 _filtreler(h),
                 Expanded(
                   child: TabBarView(children: [
-                    _Aylik(k: _suz(h), yil: _yil),
+                    _Aylik(k: _suz(h)),
                     _Hastaliklar(k: _suz(h)),
                     _Tedbirler(k: _suz(h)),
                   ]),
@@ -167,10 +164,13 @@ class _YiginCubuk extends StatelessWidget {
   }
 }
 
-class _Aylik extends StatelessWidget {
-  const _Aylik({required this.k, required this.yil});
+/// Kayıtları yıl → ay olarak gruplar: her yılın başlığı (toplam vaka),
+/// altında yeniden eskiye aylar. [ay] her ayın kartını üretir.
+class _YilAy extends StatelessWidget {
+  const _YilAy({required this.k, required this.ay, this.ust = const []});
   final List<HastalikKaydi> k;
-  final int? yil;
+  final Widget Function(int yil, int ay, List<HastalikKaydi> l, int enCok) ay;
+  final List<Widget> ust;
 
   @override
   Widget build(BuildContext context) {
@@ -182,24 +182,54 @@ class _Aylik extends StatelessWidget {
     final anahtar = donem.keys.toList()..sort((a, b) => b.compareTo(a));
     final toplam = {for (final a in anahtar) a: donem[a]!.fold(0, (s, x) => s + x.adet)};
     final enCok = toplam.values.reduce((a, b) => a > b ? a : b);
-    return ListView(padding: const EdgeInsets.all(12), children: [
-      const _Lejant(),
-      const SizedBox(height: 8),
-      for (final a in anahtar)
-        Card(
+    final satirlar = <Widget>[...ust];
+    int? oncekiYil;
+    for (final a in anahtar) {
+      final y = a ~/ 100;
+      if (y != oncekiYil) {
+        final yk = k.where((x) => x.yil == y);
+        final yt = yk.fold(0, (s, x) => s + x.adet);
+        final ol = yk.where((x) => x.sonuc == 'Ölüm').fold(0, (s, x) => s + x.adet);
+        satirlar.add(Padding(
+          padding: EdgeInsets.fromLTRB(4, oncekiYil == null ? 4 : 18, 4, 8),
+          child: Row(children: [
+            Text('$y', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text('$yt vaka · $ol ölüm',
+                  style: const TextStyle(color: Renk.soluk, fontSize: 13)),
+            ),
+          ]),
+        ));
+        oncekiYil = y;
+      }
+      satirlar.add(ay(y, a % 100, donem[a]!, enCok));
+    }
+    return ListView(padding: const EdgeInsets.all(12), children: satirlar);
+  }
+}
+
+class _Aylik extends StatelessWidget {
+  const _Aylik({required this.k});
+  final List<HastalikKaydi> k;
+
+  @override
+  Widget build(BuildContext context) => _YilAy(
+        k: k,
+        ust: const [_Lejant(), SizedBox(height: 8)],
+        ay: (y, ay, l, enCok) => Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ExpansionTile(
             title: Row(children: [
-              SizedBox(width: 92, child: Text('${aylar[a % 100 - 1]} ${a ~/ 100}', style: const TextStyle(fontWeight: FontWeight.w600))),
-              Expanded(child: _YiginCubuk(dagilim: _topla(donem[a]!, (x) => x.sonuc), enCok: enCok)),
-              SizedBox(width: 48, child: Text('${toplam[a]}', textAlign: TextAlign.right)),
+              SizedBox(width: 78, child: Text(aylar[ay - 1], style: const TextStyle(fontWeight: FontWeight.w600))),
+              Expanded(child: _YiginCubuk(dagilim: _topla(l, (x) => x.sonuc), enCok: enCok)),
+              SizedBox(width: 48, child: Text('${l.fold(0, (s, x) => s + x.adet)}', textAlign: TextAlign.right)),
             ]),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            children: [_HastalikListesi(k: donem[a]!, sinir: 8)],
+            children: [_HastalikListesi(k: l, sinir: 8)],
           ),
         ),
-    ]);
-  }
+      );
 }
 
 class _Lejant extends StatelessWidget {
@@ -305,51 +335,79 @@ class _Hastaliklar extends StatelessWidget {
   const _Hastaliklar({required this.k});
   final List<HastalikKaydi> k;
   @override
-  Widget build(BuildContext context) => k.isEmpty
-      ? const Center(child: Text('Bu seçimde kayıt yok'))
-      : ListView(padding: const EdgeInsets.all(12), children: [
-          const Text('Satıra dokun: etken ve önleme tedbirleri', style: TextStyle(color: Renk.soluk, fontSize: 12)),
-          _HastalikListesi(k: k),
-        ]);
+  Widget build(BuildContext context) => _YilAy(
+        k: k,
+        ust: const [
+          Text('Aya dokun: o ayın hastalıkları. Hastalığa dokun: etken ve önleme tedbirleri.',
+              style: TextStyle(color: Renk.soluk, fontSize: 12)),
+          SizedBox(height: 6),
+        ],
+        ay: (y, ay, l, _) {
+          final top = _topla(l, (x) => x.hastalik);
+          final ilk = (top.keys.toList()..sort((a, b) => top[b]!.compareTo(top[a]!))).take(3);
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ExpansionTile(
+              title: Text('${aylar[ay - 1]} $y · ${l.fold(0, (s, x) => s + x.adet)} vaka',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(ilk.map((h) => '$h ${top[h]}').join(' · '),
+                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              children: [_HastalikListesi(k: l)],
+            ),
+          );
+        },
+      );
 }
 
 class _Tedbirler extends StatelessWidget {
   const _Tedbirler({required this.k});
   final List<HastalikKaydi> k;
   @override
-  Widget build(BuildContext context) {
-    final top = _topla(k, (x) => x.hastalik)..remove('Belirtilmemiş')..remove('Diğer');
-    final l = top.keys.toList()..sort((a, b) => top[b]!.compareTo(top[a]!));
-    return ListView(padding: const EdgeInsets.all(12), children: [
-      Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: Renk.amberAcik, borderRadius: BorderRadius.circular(8)),
-        child: const Text(
-            'Seçili döneme göre en sık görülen hastalıklar ve önleme tedbirleri. Tedbirler genel '
-            'bilgidir; aşı programı ve ilaçlar çiftlik veterineri ile teyit edilir.',
-            style: TextStyle(fontSize: 12)),
-      ),
-      const SizedBox(height: 8),
-      for (final h in l.take(10))
-        Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('$h — ${top[h]} vaka', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 6),
-              _TedbirKutusu(h: h, t: tedbirBul(h)),
-            ]),
+  Widget build(BuildContext context) => _YilAy(
+        k: k,
+        ust: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Renk.amberAcik, borderRadius: BorderRadius.circular(8)),
+            child: const Text(
+                'Her ayda görülen hastalıklar ve önleme tedbirleri. Aya dokununca hastalıklar, '
+                'hastalığa dokununca etken ve tedbirler açılır. Tedbirler genel bilgidir; aşı '
+                'programı ve ilaçlar çiftlik veterineri ile teyit edilir.',
+                style: TextStyle(fontSize: 12)),
           ),
-        ),
-      const Card(
-        child: Padding(
-          padding: EdgeInsets.all(12),
-          child: Text(
-              'Kayıt kalitesi: teşhisi yazılmamış ("Belirtilmemiş/Diğer") vakalarda etken izlenemiyor. '
-              'Her ölümde otopsi ve her tedavide sonuç (iyileşti/kuru/kesim/ölüm) yazılması önerilir.'),
-        ),
-      ),
-    ]);
-  }
+          const SizedBox(height: 8),
+        ],
+        ay: (y, ay, l, _) {
+          final top = _topla(l, (x) => x.hastalik);
+          final hl = top.keys.toList()..sort((a, b) => top[b]!.compareTo(top[a]!));
+          final teshissiz = (top['Belirtilmemiş'] ?? 0) + (top['Diğer'] ?? 0);
+          final teshisli = hl.where((h) => h != 'Belirtilmemiş' && h != 'Diğer').toList();
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ExpansionTile(
+              title: Text('${aylar[ay - 1]} $y · ${l.fold(0, (s, x) => s + x.adet)} vaka',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(teshisli.take(3).map((h) => '$h ${top[h]}').join(' · '),
+                  maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+              childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              children: [
+                for (final h in teshisli)
+                  ExpansionTile(
+                    dense: true,
+                    title: Text('$h — ${top[h]} vaka', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    children: [_TedbirKutusu(h: h, t: tedbirBul(h))],
+                  ),
+                if (teshissiz > 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                    child: Text('Teşhisi yazılmamış: $teshissiz vaka (etken izlenemiyor; otopsi ve teşhis kaydı önerilir)',
+                        style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+                  ),
+              ],
+            ),
+          );
+        },
+      );
 }
