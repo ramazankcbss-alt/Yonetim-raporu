@@ -153,6 +153,13 @@ class EskBolumu extends StatelessWidget {
             renk: Renk.turuncu,
             alt: kesilenAlt,
           ),
+          if ((g.eskOlenDana ?? 0) > 0)
+            GostergeKarti(
+              baslik: 'Ölen Dana',
+              deger: sayi(g.eskOlenDana),
+              ikon: Icons.heart_broken_outlined,
+              renk: Renk.turuncu,
+            ),
           if (pers > 0 || tas > 0)
             GostergeKarti(
               baslik: 'Personel / Taşeron',

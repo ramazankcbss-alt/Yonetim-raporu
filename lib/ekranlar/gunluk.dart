@@ -104,6 +104,13 @@ class _GunlukEkranState extends State<GunlukEkran> {
                 : 'Ölen buzağı: ${sayi(g.olenBuzagi)}',
           ),
           GostergeKarti(
+            baslik: 'Hayvan Kayıpları',
+            deger: sayi(g.kayip),
+            ikon: Icons.heart_broken_outlined,
+            renk: Renk.turuncu,
+            alt: g.kayipAyrinti,
+          ),
+          GostergeKarti(
             baslik: 'Kesilen Dana',
             deger: sayi(g.kesilenDana),
             ikon: Icons.content_cut,

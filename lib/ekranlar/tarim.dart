@@ -144,6 +144,13 @@ class _TarimEkranState extends State<TarimEkran> {
                     : 'Ölen buzağı: ${sayi(hg.olenBuzagi)}',
               ),
               GostergeKarti(
+                baslik: 'Hayvan Kayıpları',
+                deger: sayi(hg.kayip),
+                ikon: Icons.heart_broken_outlined,
+                renk: Renk.turuncu,
+                alt: hg.kayipAyrinti,
+              ),
+              GostergeKarti(
                 baslik: 'Kesilen Dana',
                 deger: sayi(hg.kesilenDana),
                 ikon: Icons.content_cut,

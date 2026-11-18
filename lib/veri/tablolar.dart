@@ -13,6 +13,8 @@ const isletmeBasliklari = [
   'Ort. Verim',
   'İnek/Düve Kesim-Satış',
   'Buzağı Ölümü',
+  'Yavru Atma/Ölü Doğum',
+  'İnek/Genç Ölüm',
   'Kesilen Dana',
 ];
 
@@ -26,6 +28,8 @@ List<String> _isletme(IsletmeSatiri s) => [
       s.ortVerim > 0 ? sayi(s.ortVerim, ondalik: 1) : '—',
       sayiTire(s.kesimSatis),
       sayiTire(s.buzagiOlum),
+      sayiTire(s.yavruAtma),
+      sayiTire(s.inekOlum + s.gencOlum),
       sayiTire(s.kesilenDana),
     ];
 

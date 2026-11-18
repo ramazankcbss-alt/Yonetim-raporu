@@ -210,6 +210,7 @@ const _isletmeGenislik = {
   0: pw.FlexColumnWidth(3.2),
   6: pw.FlexColumnWidth(1.1),
   7: pw.FlexColumnWidth(1.5),
+  9: pw.FlexColumnWidth(1.4),
 };
 
 const _suruGenislik = {0: pw.FlexColumnWidth(2.2)};
@@ -307,6 +308,7 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
       sayi(g.dogan),
       g.olenBuzagi == null ? null : 'Ölen buzağı: ${sayi(g.olenBuzagi)}'
     ),
+    ('Hayvan Kayıpları', sayi(g.kayip), g.kayipAyrinti),
     ('Kesilen Dana', sayi(g.kesilenDana), null),
     if (haftalik) ('İnek/Düve Kesim-Satış', sayi(g.kesimSatis), null),
   ];
@@ -315,6 +317,7 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
   final eskKutular = <(String, String, String?)>[
     ('Besi Hayvanı', sayi(g.eskBesiHayvan), null),
     ('Kesilen Dana', sayi(g.eskKesilen), haftalik ? 'Hafta toplamı' : null),
+    if ((g.eskOlenDana ?? 0) > 0) ('Ölen Dana', sayi(g.eskOlenDana), null),
     if (eskPers > 0 || eskTas > 0)
       ('Personel / Taşeron', '${sayi(eskPers)} / ${sayi(eskTas)}', null),
   ];

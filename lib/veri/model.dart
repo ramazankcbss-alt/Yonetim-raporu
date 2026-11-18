@@ -96,12 +96,24 @@ class OzetSatir {
     this.kesimSatis = 0,
     this.buzagiOlum = 0,
     this.kesilenDana = 0,
+    this.inekOlum = 0,
+    this.gencKesim = 0,
+    this.gencOlum = 0,
+    this.yavruAtma = 0,
+    this.olenDana = 0,
+    this.alinan = 0,
+    this.satilanDana = 0,
   });
 
   final DateTime tarih;
   final String isletme;
   final double personel, taseron, hayvan, sagilan, sut;
   final double dogan, kesimSatis, buzagiOlum, kesilenDana;
+
+  /// Hayvan_Özet L–R: İnek Ölüm, Genç Kesim/Satış, Genç Ölüm,
+  /// Yavru Atma/Ölü Doğum, Ölen Dana, Dışarıdan Alınan, Satılan/Transfer Dana.
+  final double inekOlum, gencKesim, gencOlum, yavruAtma, olenDana, alinan,
+      satilanDana;
 
   static OzetSatir? oku(Object? v) {
     final r = _liste(v);
@@ -119,6 +131,13 @@ class OzetSatir {
       kesimSatis: _s(r, 8),
       buzagiOlum: _s(r, 9),
       kesilenDana: _s(r, 10),
+      inekOlum: _s(r, 11),
+      gencKesim: _s(r, 12),
+      gencOlum: _s(r, 13),
+      yavruAtma: _s(r, 14),
+      olenDana: _s(r, 15),
+      alinan: _s(r, 16),
+      satilanDana: _s(r, 17),
     );
   }
 }
@@ -971,6 +990,10 @@ class IsletmeSatiri {
     this.kesimSatis = 0,
     this.buzagiOlum = 0,
     this.kesilenDana = 0,
+    this.inekOlum = 0,
+    this.gencOlum = 0,
+    this.yavruAtma = 0,
+    this.olenDana = 0,
   });
 
   final String ad;
@@ -980,6 +1003,10 @@ class IsletmeSatiri {
 
   /// Dönem toplamları.
   final double sut, sagilanGun, dogan, kesimSatis, buzagiOlum, kesilenDana;
+  final double inekOlum, gencOlum, yavruAtma, olenDana;
+
+  /// Buzağı ölümü + yavru atma/ölü doğum + inek ölüm + genç ölüm + ölen dana.
+  double get kayip => buzagiOlum + yavruAtma + inekOlum + gencOlum + olenDana;
 
   /// Süt / (dönemdeki günlerin sağılan hayvan toplamı).
   double get ortVerim => sagilanGun > 0 ? sut / sagilanGun : 0;
@@ -1019,6 +1046,7 @@ CanliHayvanOzeti canliHayvanOzeti(RaporVerisi v, DateTime bas, DateTime son) {
   IsletmeSatiri hesapla(String ad, bool Function(String) uyar) {
     double p = 0, t = 0, h = 0, s = 0;
     double sut = 0, sg = 0, d = 0, ks = 0, bo = 0, kd = 0;
+    double io = 0, go = 0, ya = 0, od = 0;
     for (final o in donem) {
       if (!uyar(o.isletme)) continue;
       if (gun != null && ayniGun(o.tarih, gun)) {
@@ -1033,6 +1061,10 @@ CanliHayvanOzeti canliHayvanOzeti(RaporVerisi v, DateTime bas, DateTime son) {
       ks += o.kesimSatis;
       bo += o.buzagiOlum;
       kd += o.kesilenDana;
+      io += o.inekOlum;
+      go += o.gencOlum;
+      ya += o.yavruAtma;
+      od += o.olenDana;
     }
     return IsletmeSatiri(
       ad: ad,
@@ -1046,6 +1078,10 @@ CanliHayvanOzeti canliHayvanOzeti(RaporVerisi v, DateTime bas, DateTime son) {
       kesimSatis: ks,
       buzagiOlum: bo,
       kesilenDana: kd,
+      inekOlum: io,
+      gencOlum: go,
+      yavruAtma: ya,
+      olenDana: od,
     );
   }
 
@@ -1074,6 +1110,10 @@ CanliHayvanOzeti canliHayvanOzeti(RaporVerisi v, DateTime bas, DateTime son) {
     kesimSatis: top((s) => s.kesimSatis),
     buzagiOlum: top((s) => s.buzagiOlum),
     kesilenDana: top((s) => s.kesilenDana, eskHaric: true),
+    inekOlum: top((s) => s.inekOlum),
+    gencOlum: top((s) => s.gencOlum),
+    yavruAtma: top((s) => s.yavruAtma),
+    olenDana: top((s) => s.olenDana, eskHaric: true),
   );
 
   return CanliHayvanOzeti(ozetGunu: gun, satirlar: satirlar, toplam: toplam);
@@ -1100,11 +1140,39 @@ class Gostergeler {
     this.eskKesilen,
     this.eskPersonel,
     this.eskTaseron,
+    this.yavruAtma,
+    this.inekOlum,
+    this.gencOlum,
+    this.olenDana,
+    this.eskOlenDana,
   });
 
   final double? toplamHayvan, sagilan, sut, ortVerim, satilan;
   final double? personel, taseron, dogan, kesilenDana, olenBuzagi, kesimSatis;
   final double? eskBesiHayvan, eskKesilen, eskPersonel, eskTaseron;
+  final double? yavruAtma, inekOlum, gencOlum, olenDana, eskOlenDana;
+
+  /// Çiftliklerimizdeki toplam hayvan kaybı (ESK-Taşağıl hariç).
+  double? get kayip => olenBuzagi == null
+      ? null
+      : olenBuzagi! +
+          (yavruAtma ?? 0) +
+          (inekOlum ?? 0) +
+          (gencOlum ?? 0) +
+          (olenDana ?? 0);
+
+  /// Kayıp kartının alt yazısı: sıfır olmayan kalemler.
+  String? get kayipAyrinti {
+    if (olenBuzagi == null) return null;
+    final p = <String>[
+      if ((yavruAtma ?? 0) > 0) 'Yavru atma/ölü doğum ${yavruAtma!.round()}',
+      if (olenBuzagi! > 0) 'Buzağı ${olenBuzagi!.round()}',
+      if ((inekOlum ?? 0) > 0) 'İnek ${inekOlum!.round()}',
+      if ((gencOlum ?? 0) > 0) 'Genç ${gencOlum!.round()}',
+      if ((olenDana ?? 0) > 0) 'Dana ${olenDana!.round()}',
+    ];
+    return p.isEmpty ? 'Kayıp yok' : p.join(' · ');
+  }
 
   /// Personel ve taşeron: ESK-Taşağıl hariç, yalnızca çiftliklerimiz.
   double? get ciftlikPersonel =>
@@ -1140,6 +1208,11 @@ Gostergeler gunlukGostergeler(RaporVerisi v, DateTime d) {
     eskKesilen: ozVar ? esk?.kesilenDana : null,
     eskPersonel: ozVar ? esk?.personel : null,
     eskTaseron: ozVar ? esk?.taseron : null,
+    yavruAtma: ozVar ? oz.toplam.yavruAtma : null,
+    inekOlum: ozVar ? oz.toplam.inekOlum : null,
+    gencOlum: ozVar ? oz.toplam.gencOlum : null,
+    olenDana: ozVar ? oz.toplam.olenDana : null,
+    eskOlenDana: ozVar ? esk?.olenDana : null,
   );
 }
 
@@ -1171,6 +1244,11 @@ Gostergeler haftalikGostergeler(RaporVerisi v, DateTime bas) {
     eskKesilen: ozVar ? esk?.kesilenDana : null,
     eskPersonel: ozVar ? esk?.personel : null,
     eskTaseron: ozVar ? esk?.taseron : null,
+    yavruAtma: ozVar ? oz.toplam.yavruAtma : null,
+    inekOlum: ozVar ? oz.toplam.inekOlum : null,
+    gencOlum: ozVar ? oz.toplam.gencOlum : null,
+    olenDana: ozVar ? oz.toplam.olenDana : null,
+    eskOlenDana: ozVar ? esk?.olenDana : null,
   );
 }
 

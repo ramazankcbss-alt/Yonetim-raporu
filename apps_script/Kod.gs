@@ -132,8 +132,10 @@ function veriTopla_(gun) {
     surum: 1,
     olusturma: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ss"),
     // Tarih, İşletme, Personel, Taşeron, Hayvan, Sağılan, Süt, Doğan Buzağı,
-    // İnek/Düve Kesim-Satış, Buzağı Ölümü, Kesilen Dana
-    hayvanOzet: tarihli(satirlar(SAYFALAR.ozet, 11), 0),
+    // İnek/Düve Kesim-Satış, Buzağı Ölümü, Kesilen Dana, İnek Ölüm,
+    // Genç Kesim/Satış, Genç Ölüm, Yavru Atma/Ölü Doğum, Ölen Dana,
+    // Dışarıdan Alınan, Satılan/Transfer Dana
+    hayvanOzet: tarihli(satirlar(SAYFALAR.ozet, 18), 0),
     // Tarih, Fethiye (Toplam, Sağmal, Kuru Gebe, Erkek, Süt, Satılan),
     // Erentepe (Toplam, Sağmal, Kuru Gebe, Erkek, Süt, Satılan)
     hayvanGunluk: tarihli(satirlar(SAYFALAR.gunluk, 13), 0),
@@ -539,7 +541,6 @@ function ozetEsitle_(ss, ch, tz, notlar) {
   var tarih = tarihCoz_(v[1][1]);
   if (!tarih || tarih > bugun_()) return 0;
   var hedef = ss.getSheetByName(SAYFALAR.ozet);
-  if (mevcutGunler_(hedef)[tarih]) return 0;
   var kaynak = {};
   for (var i = 3; i < 16; i++) {
     var ad = String(v[i][0]).trim();
@@ -551,18 +552,47 @@ function ozetEsitle_(ss, ch, tz, notlar) {
   Object.keys(kaynak).forEach(function (a) {
     if (adlar.indexOf(a) < 0) { adlar.push(a); notlar.push('Yeni işletme: ' + a); }
   });
+  // Kaynak sütunları: H Doğan, J İnek-Düve Kesim/Satış, N Buzağı Ölümü,
+  // P Kesilen Dana, K İnek Ölüm, L Genç Kesim/Satış, M Genç Ölüm,
+  // O Yavru Atma/Ölü Doğum, Q Ölen Dana, I Dışarıdan Alınan, R Satılan/Transfer.
+  var OLAY = [7, 9, 13, 15, 10, 11, 12, 14, 16, 8, 17];
   var satirlar = [];
   adlar.forEach(function (ad) {
     var r = kaynak[ad];
     if (!r) return;
-    var hareket = [7, 9, 13, 15].some(function (k) { var n = sayi_(r[k]); return n !== '' && n !== 0; });
+    var hareket = OLAY.some(function (k) { var n = sayi_(r[k]); return n !== '' && n !== 0; });
     var tam = sayi_(r[4]) !== '' || hareket;
     satirlar.push([yazTarih_(tarih), ad, sayi_(r[1]), sayi_(r[2]), sayi_(r[3]),
-      tam ? sayi_(r[4]) : '', tam ? sayi_(r[5]) : '', tam ? sayi_(r[7]) : '',
-      tam ? sayi_(r[9]) : '', tam ? sayi_(r[13]) : '', tam ? sayi_(r[15]) : '']);
+      tam ? sayi_(r[4]) : '', tam ? sayi_(r[5]) : ''].concat(
+      OLAY.map(function (k) { return tam ? sayi_(r[k]) : ''; })));
   });
   if (!satirlar.length) return 0;
-  yaz_(hedef, sonSatirA_(hedef) + 1, satirlar, 11);
+
+  // Gün zaten varsa: kaynakta sonradan düzeltilen/eklenen değerleri güncelle.
+  var son = sonSatirA_(hedef);
+  if (mevcutGunler_(hedef)[tarih]) {
+    var mevcut = hedef.getRange(2, 1, son - 1, 18).getValues();
+    var degisti = 0;
+    satirlar.forEach(function (yeni) {
+      for (var j = 0; j < mevcut.length; j++) {
+        if (tarihCoz_(mevcut[j][0]) !== tarih || String(mevcut[j][1]).trim() !== yeni[1]) continue;
+        var fark = false;
+        for (var c = 2; c < 18; c++) {
+          var a = mevcut[j][c] === '' ? '' : Number(mevcut[j][c]);
+          var b = yeni[c] === '' ? '' : Number(yeni[c]);
+          if (a !== b) { fark = true; break; }
+        }
+        if (fark) {
+          hedef.getRange(j + 2, 3, 1, 16).setValues([yeni.slice(2)]);
+          degisti++;
+        }
+        break;
+      }
+    });
+    if (degisti) notlar.push(yazTarih_(tarih) + ' canlı hayvan özeti güncellendi (' + degisti + ' işletme)');
+    return degisti ? 1 : 0;
+  }
+  yaz_(hedef, son + 1, satirlar, 18);
   return 1;
 }
 
