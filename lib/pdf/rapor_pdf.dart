@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../bicim.dart';
 import '../servis/veri_servisi.dart';
+import '../veri/detay.dart';
 import '../veri/faaliyet_ozet.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
@@ -64,13 +65,17 @@ Future<Uint8List> gunlukRaporPdf(
       _bant(a, 'Günlük Rapor', tarihUzun(gun)),
       ..._hitap(a, '${tarihKisa(gun)} tarihli çiftlik verileri aşağıda bilgilerinize sunulmuştur.'),
       _bolum('Özet Göstergeler'),
-      _gostergeler(g, haftalik: false),
+      _gostergeler(g,
+          haftalik: false,
+          ko: kayipOzeti(v, gun, gun),
+          eskOlen: kayipOzeti(v, gun, gun, eskDahil: true)?.toplam),
       _bolum('Canlı Hayvan — İşletme Bazlı'),
       if (oz.ozetGunu == null)
         _not('Bu gün için işletme özeti bulunmuyor.')
       else
         _tablo(isletmeBasliklari, isletmeSatirlari(oz),
             genislik: _isletmeGenislik, vurguSon: true, kucuk: true),
+      ..._hareketler(v, gun, gun),
       _bolum('Süt Sığırı — Fethiye / Erentepe'),
       if (bugun == null)
         _not('Bu gün için Fethiye / Erentepe günlük verisi bulunmuyor.')
@@ -142,7 +147,10 @@ Future<Uint8List> haftalikRaporPdf(
       ..._hitap(a,
           '${isoHafta(pazartesi)}. hafta (${tarihKisa(pazartesi)} – ${tarihKisa(son)}) çiftlik verileri aşağıda bilgilerinize sunulmuştur.'),
       _bolum('Özet Göstergeler'),
-      _gostergeler(g, haftalik: true),
+      _gostergeler(g,
+          haftalik: true,
+          ko: kayipOzeti(v, pazartesi, son),
+          eskOlen: kayipOzeti(v, pazartesi, son, eskDahil: true)?.toplam),
       if (gunler.isNotEmpty)
         _not('Süt verisi: ${tarihKisa(gunler.first.tarih)} – ${tarihKisa(gunler.last.tarih)} (${gunler.length} gün). '
             'Toplam hayvan ve sağılan: haftanın son veri günü.'),
@@ -160,6 +168,7 @@ Future<Uint8List> haftalikRaporPdf(
             genislik: _isletmeGenislik, vurguSon: true, kucuk: true),
         _not('Personel, hayvan, sağılan: ${tarihKisa(oz.ozetGunu!)}; süt ve olaylar: hafta toplamı.'),
       ],
+      ..._hareketler(v, pazartesi, son),
       _bolum('Sürü Değişimi — Fethiye / Erentepe'),
       if (gunler.isEmpty)
         _not('Bu hafta için günlük veri bulunmuyor.')
@@ -286,7 +295,10 @@ pw.Widget _not(String s) => pw.Padding(
       child: pw.Text(s, style: const pw.TextStyle(fontSize: 7.5, color: _soluk)),
     );
 
-pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
+pw.Widget _gostergeler(Gostergeler g,
+    {required bool haftalik,
+    ({double toplam, String aciklama})? ko,
+    double? eskOlen}) {
   final kutular = <(String, String, String?)>[
     ('Toplam Hayvan', sayi(g.toplamHayvan), null),
     ('Sağılan Hayvan', sayi(g.sagilan), null),
@@ -308,7 +320,7 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
       sayi(g.dogan),
       g.olenBuzagi == null ? null : 'Ölen buzağı: ${sayi(g.olenBuzagi)}'
     ),
-    ('Hayvan Kayıpları', sayi(g.kayip), g.kayipAyrinti),
+    ('Hayvan Kayıpları', sayi(ko?.toplam ?? g.kayip), ko?.aciklama ?? g.kayipAyrinti),
     ('Kesilen Dana', sayi(g.kesilenDana), null),
     if (haftalik) ('İnek/Düve Kesim-Satış', sayi(g.kesimSatis), null),
   ];
@@ -317,7 +329,8 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
   final eskKutular = <(String, String, String?)>[
     ('Besi Hayvanı', sayi(g.eskBesiHayvan), null),
     ('Kesilen Dana', sayi(g.eskKesilen), haftalik ? 'Hafta toplamı' : null),
-    if ((g.eskOlenDana ?? 0) > 0) ('Ölen Dana', sayi(g.eskOlenDana), null),
+    if ((eskOlen ?? g.eskOlenDana ?? 0) > 0)
+      ('Ölen Dana', sayi(eskOlen ?? g.eskOlenDana), null),
     if (eskPers > 0 || eskTas > 0)
       ('Personel / Taşeron', '${sayi(eskPers)} / ${sayi(eskTas)}', null),
   ];
@@ -378,6 +391,46 @@ pw.Widget _gostergeler(Gostergeler g, {required bool haftalik}) {
       ],
     ],
   );
+}
+
+/// İşletme raporlarından: sürüden çıkanlar/kayıplar ve doğum/girişler.
+List<pw.Widget> _hareketler(RaporVerisi v, DateTime bas, DateTime son) {
+  const kisa = ['Fethiye', 'Erentepe', 'Aslım', 'ESK-Taşağıl'];
+  List<pw.Widget> tablo(String baslik, Map<String, Map<String, double>> t) {
+    if (t.isEmpty) return const [];
+    final satirlar = <List<String>>[];
+    final top = List<double>.filled(detayIsletmeleri.length, 0);
+    for (final e in t.entries) {
+      final degerler = [for (final i in detayIsletmeleri) e.value[i] ?? 0];
+      for (var k = 0; k < degerler.length; k++) {
+        top[k] += degerler[k];
+      }
+      satirlar.add([
+        e.key,
+        for (final d in degerler) sayiTire(d),
+        sayi(degerler.fold<double>(0, (a, b) => a + b)),
+      ]);
+    }
+    satirlar.add([
+      'TOPLAM',
+      for (final d in top) sayiTire(d),
+      sayi(top.fold<double>(0, (a, b) => a + b)),
+    ]);
+    return [
+      _bolum(baslik),
+      _tablo(['Gösterge', ...kisa, 'Toplam'], satirlar,
+          genislik: const {0: pw.FlexColumnWidth(2.6)}, vurguSon: true, kucuk: true),
+    ];
+  }
+
+  final tekGun = gunu(bas) == gunu(son);
+  final ek = tekGun ? '' : ' (hafta toplamı)';
+  return [
+    ...tablo('Sürüden Çıkanlar ve Kayıplar$ek',
+        hareketTablosu(v, bas, son, cikis: true)),
+    ...tablo('Doğumlar ve Hayvan Girişleri$ek',
+        hareketTablosu(v, bas, son, cikis: false)),
+  ];
 }
 
 String _maddeler(List<String> m) =>

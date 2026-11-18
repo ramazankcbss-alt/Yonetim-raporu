@@ -299,6 +299,22 @@ class VeriDeposu extends ChangeNotifier {
   /// yeniler. Kullanıcıya gösterilecek özet mesajı döndürür.
   bool esitleniyor = false;
 
+  /// Uygulama açılışında: son eşitlemeden 3 saat geçtiyse kaynak tabloları
+  /// (canlı hayvan, işletme raporları, tarım) arka planda rapora çeker.
+  Future<void> otomatikEsitle() async {
+    if (link == null || esitleniyor || sahteGonder != null) return;
+    final p = await SharedPreferences.getInstance();
+    final son = p.getInt('son_otomatik_esitle');
+    final simdi = DateTime.now().millisecondsSinceEpoch;
+    if (son != null && simdi - son < 3 * 3600 * 1000) return;
+    await p.setInt('son_otomatik_esitle', simdi);
+    try {
+      await esitle();
+    } catch (_) {
+      // Sessiz: kullanıcı isterse Eşitle düğmesiyle tekrar dener.
+    }
+  }
+
   Future<String> esitle() async {
     if (esitleniyor) return 'Eşitleme zaten sürüyor.';
     esitleniyor = true;

@@ -69,7 +69,7 @@ class _AnaEkranState extends State<AnaEkran> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      d.yenile();
+      d.yenile().then((_) => d.otomatikEsitle());
       if (widget.guncellemeKontrolu) Guncelleme.kontrolEt(context);
     });
   }

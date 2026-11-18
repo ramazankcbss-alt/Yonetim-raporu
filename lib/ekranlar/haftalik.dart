@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../bicim.dart';
 import '../tema.dart';
 import '../veri/faaliyet_ozet.dart';
+import '../veri/detay.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
+import 'isletme_detay.dart';
 
 /// Haftalık pano: E-Tablodaki haftalık rapor sayfasının telefondaki hali.
 class HaftalikEkran extends StatefulWidget {
@@ -34,6 +36,9 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
     final son = hafta.add(const Duration(days: 6));
 
     final g = haftalikGostergeler(v, hafta);
+    final haftaSonu = hafta.add(const Duration(days: 6));
+    final ko = kayipOzeti(v, hafta, haftaSonu);
+    final eskKo = kayipOzeti(v, hafta, haftaSonu, eskDahil: true);
     final oz = canliHayvanOzeti(v, hafta, son);
     final gunler = v.gunlukDonem(hafta, son);
     final tarim = v.tarimDonem(hafta, son).toList()
@@ -108,10 +113,10 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
           ),
           GostergeKarti(
             baslik: 'Hayvan Kayıpları',
-            deger: sayi(g.kayip),
+            deger: sayi(ko?.toplam ?? g.kayip),
             ikon: Icons.heart_broken_outlined,
             renk: Renk.turuncu,
-            alt: g.kayipAyrinti,
+            alt: ko?.aciklama ?? g.kayipAyrinti,
           ),
           GostergeKarti(
             baslik: 'Kesilen Dana',
@@ -126,7 +131,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
             renk: Renk.turuncu,
           ),
         ]),
-        EskBolumu(g: g, kesilenAlt: 'Hafta toplamı'),
+        EskBolumu(g: g, kesilenAlt: 'Hafta toplamı', olenDana: eskKo?.toplam),
         const SizedBox(height: 12),
         Panel(
           baslik: 'Günlük Süt Üretimi (kg)',
@@ -146,6 +151,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
             ],
           ),
         ),
+        IsletmeDetayPaneli(veri: v, bas: hafta, son: haftaSonu),
         Panel(
           baslik: 'İşletme Bazlı Canlı Hayvan',
           child: oz.ozetGunu == null

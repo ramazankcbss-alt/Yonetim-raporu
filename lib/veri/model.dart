@@ -82,6 +82,26 @@ double _s(List r, int i) => i < r.length ? (sayiOku(r[i]) ?? 0) : 0;
 // Ham satırlar
 // ---------------------------------------------------------------------------
 
+/// Hayvan_Detay: işletme günlük raporundaki bir gösterge (sıfırdan farklı).
+class DetaySatir {
+  const DetaySatir(this.tarih, this.isletme, this.bolum, this.gosterge, this.deger);
+
+  final DateTime tarih;
+  final String isletme, bolum, gosterge;
+  final double deger;
+
+  static DetaySatir? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 5) return null;
+    final t = tarihOku(r[0]);
+    final d = sayiOku(r[4]);
+    if (t == null || d == null || _metin(r[1]).isEmpty || _metin(r[3]).isEmpty) {
+      return null;
+    }
+    return DetaySatir(t, _metin(r[1]), _metin(r[2]), _metin(r[3]), d);
+  }
+}
+
 /// Hayvan_Özet: bir günün bir işletmesi.
 class OzetSatir {
   const OzetSatir({
@@ -830,6 +850,7 @@ class RaporVerisi {
     this.dersler = const [],
     this.arac = const AracVerisi(),
     List<BakimOnarimKaydi> bakimOnarim = const [],
+    this.detay = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
         ozet = List.unmodifiable(
@@ -860,6 +881,9 @@ class RaporVerisi {
   final List<Ders> dersler;
   final AracVerisi arac;
   final BakimOnarimOzeti bakimOnarim;
+
+  /// İşletme günlük raporlarının tüm göstergeleri (Hayvan_Detay).
+  final List<DetaySatir> detay;
   final DateTime? olusturma;
 
   factory RaporVerisi.json(Map<String, dynamic> j) {
@@ -868,6 +892,7 @@ class RaporVerisi {
     return RaporVerisi(
       ozet: oku('hayvanOzet', OzetSatir.oku),
       gunluk: oku('hayvanGunluk', GunlukSatir.oku),
+      detay: oku('hayvanDetay', DetaySatir.oku),
       tarim: oku('tarim', TarimKaydi.oku),
       ekim: oku('ekim', EkimSatir.oku),
       hasat: oku('hasat', HasatSatir.oku),

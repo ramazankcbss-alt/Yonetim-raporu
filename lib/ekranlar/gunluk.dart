@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../bicim.dart';
 import '../tema.dart';
+import '../veri/detay.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
+import 'isletme_detay.dart';
 
 /// Günlük pano: seçilen günün göstergeleri, işletme tablosu, Fethiye/Erentepe
 /// karşılaştırması ve tarım faaliyetleri.
@@ -33,6 +35,8 @@ class _GunlukEkranState extends State<GunlukEkran> {
         : (v.sonGun != null && gunler.contains(v.sonGun) ? v.sonGun! : gunler.first);
 
     final g = gunlukGostergeler(v, gun);
+    final ko = kayipOzeti(v, gun, gun);
+    final eskKo = kayipOzeti(v, gun, gun, eskDahil: true);
     final oz = canliHayvanOzeti(v, gun, gun);
     final bugun = v.gunlukBul(gun);
     final onceki = v.oncekiGunluk(gun);
@@ -105,10 +109,10 @@ class _GunlukEkranState extends State<GunlukEkran> {
           ),
           GostergeKarti(
             baslik: 'Hayvan Kayıpları',
-            deger: sayi(g.kayip),
+            deger: sayi(ko?.toplam ?? g.kayip),
             ikon: Icons.heart_broken_outlined,
             renk: Renk.turuncu,
-            alt: g.kayipAyrinti,
+            alt: ko?.aciklama ?? g.kayipAyrinti,
           ),
           GostergeKarti(
             baslik: 'Kesilen Dana',
@@ -117,8 +121,9 @@ class _GunlukEkranState extends State<GunlukEkran> {
             renk: Renk.turuncu,
           ),
         ]),
-        EskBolumu(g: g),
+        EskBolumu(g: g, olenDana: eskKo?.toplam),
         const SizedBox(height: 12),
+        IsletmeDetayPaneli(veri: v, bas: gun, son: gun),
         Panel(
           baslik: 'İşletme Bazlı Canlı Hayvan',
           child: oz.ozetGunu == null

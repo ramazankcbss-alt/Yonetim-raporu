@@ -123,10 +123,13 @@ class BolumBasligi extends StatelessWidget {
 
 /// ESK-Taşağıl Çiftliği (besi) göstergeleri: çiftliklerimizden ayrı bölüm.
 class EskBolumu extends StatelessWidget {
-  const EskBolumu({super.key, required this.g, this.kesilenAlt});
+  const EskBolumu({super.key, required this.g, this.kesilenAlt, this.olenDana});
 
   final Gostergeler g;
   final String? kesilenAlt;
+
+  /// İşletme raporundan ölen dana (varsa özet yerine kullanılır).
+  final double? olenDana;
 
   @override
   Widget build(BuildContext context) {
@@ -153,10 +156,10 @@ class EskBolumu extends StatelessWidget {
             renk: Renk.turuncu,
             alt: kesilenAlt,
           ),
-          if ((g.eskOlenDana ?? 0) > 0)
+          if ((olenDana ?? g.eskOlenDana ?? 0) > 0)
             GostergeKarti(
               baslik: 'Ölen Dana',
-              deger: sayi(g.eskOlenDana),
+              deger: sayi(olenDana ?? g.eskOlenDana),
               ikon: Icons.heart_broken_outlined,
               renk: Renk.turuncu,
             ),

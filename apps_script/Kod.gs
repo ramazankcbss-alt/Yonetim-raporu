@@ -139,6 +139,13 @@ function veriTopla_(gun) {
     // Tarih, Fethiye (Toplam, Sağmal, Kuru Gebe, Erkek, Süt, Satılan),
     // Erentepe (Toplam, Sağmal, Kuru Gebe, Erkek, Süt, Satılan)
     hayvanGunluk: tarihli(satirlar(SAYFALAR.gunluk, 13), 0),
+    // Tarih, İşletme, Bölüm, Gösterge, Değer — işletme günlük raporlarının
+    // tüm satırları (personel listesi hariç), son 70 gün
+    hayvanDetay: satirlar(DETAY_SAYFA_, 5)
+      .filter(function (r) {
+        return r[0] instanceof Date && r[0] >= new Date(Date.now() - 70 * 86400000);
+      })
+      .map(function (r) { return r.map(hucre); }),
     // Tarih, Çiftlik, Faaliyet[, Kaynak] — icmal + formen bildirim formu
     tarim: tarihli(satirlar(SAYFALAR.tarim, 3), 0)
       .concat(tarihli(formBildirimleri_(), 0)),
@@ -435,8 +442,15 @@ function esitle_() {
     } catch (err) {
       sonuc.notlar.push('Tarım okunamadı: ' + err);
     }
+    try {
+      sonuc.detay = detayEsitle_(ss, 2, sonuc.notlar);
+    } catch (err) {
+      sonuc.detay = 0;
+      sonuc.notlar.push('İşletme raporları okunamadı: ' + err);
+    }
     SpreadsheetApp.flush();
-    sonuc.mesaj = (sonuc.ozet + sonuc.gunluk + sonuc.tarim) === 0
+    if (sonuc.detay) sonuc.notlar.push('İşletme raporları: ' + sonuc.detay + ' işletme-gün güncellendi');
+    sonuc.mesaj = (sonuc.ozet + sonuc.gunluk + sonuc.tarim + (sonuc.detay || 0)) === 0
       ? 'Kaynaklarda yeni veri yok; rapor güncel.'
       : 'Eklendi: ' + sonuc.ozet + ' özet günü, ' + sonuc.gunluk +
         ' günlük süt/hayvan günü, ' + sonuc.tarim + ' tarım kaydı.';
@@ -969,4 +983,165 @@ function driveIzniVer() {
   ScriptApp.requireScopes(ScriptApp.AuthMode.FULL,
     ['https://www.googleapis.com/auth/drive']);
   Logger.log('Drive izni var. Klasör: ' + DriveApp.getFolderById(RAPOR_KLASOR_ID).getName());
+}
+
+
+// ---------------------------------------------------------------------------
+// İŞLETME GÜNLÜK RAPORLARI (Fethiye, Erentepe, Aslım, ESK-Taşağıl)
+// Her dosyada aylık sayfalar vardır; satırlar gösterge, sütunlar ayın
+// günleridir. Başlık satırlarının B hücresi tarihtir ("1-Kas"). Tüm
+// göstergeler "Hayvan_Detay" sayfasına uzun biçimde yazılır:
+// Tarih | İşletme | Bölüm | Gösterge | Değer (yalnızca sıfırdan farklı).
+// KVKK: "PERSONEL" başlığından sonraki satırlar (kişi listesi) OKUNMAZ;
+// yalnızca personel sayıları alınır.
+// ---------------------------------------------------------------------------
+
+var DETAY_SAYFA_ = 'Hayvan_Detay';
+var DETAY_DOSYALAR_ = [
+  { isletme: 'Fethiye Şube', ara: 'fethiye şube raporları' },
+  { isletme: 'Erentepe Şube', ara: 'erentepe şube raporları' },
+  { isletme: 'Aslım Çiftliği', ara: 'aslım raporları' },
+  { isletme: 'ESK-Taşağıl Çiftliği', ara: 'ESK raporlar' }
+];
+
+/** Başlığında aranan ifade geçen, en son güncellenen tabloyu bulur. */
+function detayDosyasi_(ara) {
+  var it = DriveApp.searchFiles('title contains "' + ara + '" and ' +
+    'mimeType = "application/vnd.google-apps.spreadsheet" and trashed = false');
+  var en = null, z = 0;
+  while (it.hasNext()) {
+    var f = it.next();
+    var t = f.getLastUpdated().getTime();
+    if (t > z) { en = f; z = t; }
+  }
+  return en ? SpreadsheetApp.openById(en.getId()) : null;
+}
+
+var AY_KISA_ = ['oca', 'şub', 'mar', 'nis', 'may', 'haz', 'tem', 'ağu', 'eyl', 'eki', 'kas', 'ara'];
+
+/** Başlık hücresi: tarih ya da "1-Kas" metni → Date (yıl bilinmiyorsa bu yıl). */
+function baslikTarihi_(h) {
+  if (h instanceof Date) return h;
+  var m = String(h || '').trim().toLocaleLowerCase('tr-TR')
+    .match(/^(\d{1,2})[-.\s]([a-zçğıöşü]{3})/);
+  if (!m) return null;
+  var ay = AY_KISA_.indexOf(m[2]);
+  if (ay < 0) return null;
+  var simdi = new Date();
+  var yil = simdi.getFullYear() - (ay > simdi.getMonth() ? 1 : 0);
+  return new Date(yil, ay, Number(m[1]));
+}
+
+/** Sayfadaki ilk başlık satırının tarihinden ayı bulur (yyyy-MM) ya da null. */
+function detayAyi_(sh) {
+  var v = sh.getRange(1, 1, Math.min(4, sh.getMaxRows()), 2).getValues();
+  for (var i = 0; i < v.length; i++) {
+    var t = baslikTarihi_(v[i][1]);
+    if (t) return Utilities.formatDate(t, TZ_, 'yyyy-MM');
+  }
+  return null;
+}
+
+/** Bir aylık sayfayı okur: { 'yyyy-MM-dd': [[bölüm, gösterge, değer], ...] } */
+function detaySayfaOku_(sh) {
+  var sonSatir = sh.getLastRow();
+  if (sonSatir < 2) return {};
+  // Önce yalnızca A sütunu: PERSONEL bloğunun başladığı satırı bul (KVKK).
+  var a = sh.getRange(1, 1, sonSatir, 1).getValues();
+  var bitis = sonSatir;
+  for (var i = 0; i < a.length; i++) {
+    if (String(a[i][0]).trim().toLocaleUpperCase('tr-TR') === 'PERSONEL') { bitis = i; break; }
+  }
+  if (bitis < 1) return {};
+  var v = sh.getRange(1, 1, bitis, Math.min(sh.getLastColumn(), 33)).getValues();
+  var yil = null, ay = null, bolum = '', sonuc = {};
+  var bugun = bugun_();
+  for (var r = 0; r < v.length; r++) {
+    var etiket = String(v[r][0]).replace(/\s+/g, ' ').trim();
+    var bt = baslikTarihi_(v[r][1]);
+    if (bt) {                                // başlık satırı
+      bolum = etiket;
+      yil = bt.getFullYear(); ay = bt.getMonth();
+      continue;
+    }
+    if (!etiket || yil === null) continue;
+    var gunSayisi = new Date(yil, ay + 1, 0).getDate();
+    for (var g = 1; g <= gunSayisi && g < v[r].length; g++) {
+      var ham = v[r][g];
+      if (typeof ham === 'string' && /[%#]/.test(ham)) continue;
+      var n = sayi_(ham);
+      if (n === '' || n === 0 || isNaN(n)) continue;
+      var k = yil + '-' + ('0' + (ay + 1)).slice(-2) + '-' + ('0' + g).slice(-2);
+      if (k > bugun) continue;
+      (sonuc[k] = sonuc[k] || []).push([bolum, etiket, n]);
+    }
+  }
+  return sonuc;
+}
+
+/**
+ * İşletme raporlarını Hayvan_Detay'a aktarır. aySayisi: bugünkü ay dahil
+ * geriye kaç ay (eşitlemede 2; geçmişi doldurmak için daha büyük).
+ * Okunan aylardaki kayıtlar her seferinde yeniden yazılır (sonradan yapılan
+ * düzeltmeler de gelir). Döner: güncellenen işletme-gün sayısı.
+ */
+function detayEsitle_(ss, aySayisi, notlar) {
+  var simdi = new Date();
+  var aylar = {};
+  for (var i = 0; i < aySayisi; i++) {
+    var d = new Date(simdi.getFullYear(), simdi.getMonth() - i, 1);
+    aylar[Utilities.formatDate(d, TZ_, 'yyyy-MM')] = true;
+  }
+  var hedef = ss.getSheetByName(DETAY_SAYFA_);
+  if (!hedef) {
+    hedef = ss.insertSheet(DETAY_SAYFA_);
+    hedef.getRange(1, 1, 1, 5).setValues([['Tarih', 'İşletme', 'Bölüm', 'Gösterge', 'Değer']]);
+    hedef.setFrozenRows(1);
+  }
+  var yeni = [], yenilenen = {}, gunSay = 0;
+  DETAY_DOSYALAR_.forEach(function (df) {
+    var dosya;
+    try { dosya = detayDosyasi_(df.ara); } catch (e) { dosya = null; }
+    if (!dosya) { notlar.push(df.isletme + ' raporu bulunamadı'); return; }
+    dosya.getSheets().forEach(function (sh) {
+      var ayK = detayAyi_(sh);
+      if (!ayK || !aylar[ayK]) return;
+      var anahtar = df.isletme + '|' + ayK;
+      if (yenilenen[anahtar]) return;   // aynı ay iki sayfada varsa ilki
+      yenilenen[anahtar] = true;
+      var gunler = detaySayfaOku_(sh);
+      Object.keys(gunler).sort().forEach(function (k) {
+        gunSay++;
+        gunler[k].forEach(function (x) {
+          yeni.push([yazTarih_(k), df.isletme, x[0], x[1], x[2]]);
+        });
+      });
+    });
+  });
+  if (!Object.keys(yenilenen).length) return 0;
+  // Mevcut kayıtlardan, yeniden okunan (işletme, ay) çiftlerini çıkar.
+  var son = hedef.getLastRow();
+  var eski = son >= 2 ? hedef.getRange(2, 1, son - 1, 5).getValues() : [];
+  var kalan = eski.filter(function (r) {
+    var k = tarihCoz_(r[0]);
+    return !(k && yenilenen[String(r[1]) + '|' + k.slice(0, 7)]);
+  });
+  var tum = kalan.concat(yeni);
+  tum.sort(function (x, y) {
+    var a = tarihCoz_(x[0]) || '', b = tarihCoz_(y[0]) || '';
+    return a < b ? -1 : a > b ? 1 : 0;
+  });
+  if (son >= 2) hedef.getRange(2, 1, son - 1, 5).clearContent();
+  if (tum.length) {
+    hedef.getRange(2, 1, tum.length, 5).setValues(tum);
+    hedef.getRange(2, 1, tum.length, 1).setNumberFormat('dd.mm.yyyy');
+  }
+  return gunSay;
+}
+
+/** Bir kez editörden çalıştırın: son 12 ayın işletme raporlarını aktarır. */
+function detayGecmisiAl() {
+  var notlar = [];
+  var n = detayEsitle_(SpreadsheetApp.getActiveSpreadsheet(), 12, notlar);
+  Logger.log(n + ' işletme-gün aktarıldı. ' + notlar.join(' / '));
 }

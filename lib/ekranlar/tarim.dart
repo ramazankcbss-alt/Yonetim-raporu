@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../bicim.dart';
 import '../tema.dart';
+import '../veri/detay.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
@@ -51,6 +52,9 @@ class _TarimEkranState extends State<TarimEkran> {
     final haftalar = v.haftalar;
     final sonHafta = haftalar.isEmpty ? null : haftalar.first;
     final hg = sonHafta == null ? null : haftalikGostergeler(v, sonHafta);
+    final ko = sonHafta == null
+        ? null
+        : kayipOzeti(v, sonHafta, sonHafta.add(const Duration(days: 6)));
     final hayvanOzeti = sonHafta == null
         ? null
         : canliHayvanOzeti(v, sonHafta, sonHafta.add(const Duration(days: 6)));
@@ -145,10 +149,10 @@ class _TarimEkranState extends State<TarimEkran> {
               ),
               GostergeKarti(
                 baslik: 'Hayvan Kayıpları',
-                deger: sayi(hg.kayip),
+                deger: sayi(ko?.toplam ?? hg.kayip),
                 ikon: Icons.heart_broken_outlined,
                 renk: Renk.turuncu,
-                alt: hg.kayipAyrinti,
+                alt: ko?.aciklama ?? hg.kayipAyrinti,
               ),
               GostergeKarti(
                 baslik: 'Kesilen Dana',
