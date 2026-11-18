@@ -35,7 +35,7 @@ void main() {
   test('mali veri okunur ve döneme ayrılır', () {
     final m = RaporVerisi.json(_j).mali;
     expect(m.faturalar, hasLength(3));
-    expect(m.faturalar.last.gelenYer, 'FETHİYE (ŞEKERSÜT) 2026 › satır 5');
+    expect(m.faturalar.firstWhere((f) => f.tutar == 100000).gelenYer, 'FETHİYE (ŞEKERSÜT) 2026 › satır 5');
     expect(m.kontrol.first.detay.single.tutarB, 0);
     expect(m.kontrol.first.linkA, 'https://drive.google.com/x');
     expect(m.faturalar.first.tarih, DateTime(2026, 10, 5));
