@@ -1,0 +1,373 @@
+import 'package:flutter/material.dart';
+
+import '../bicim.dart';
+import '../servis/veri_servisi.dart';
+import '../tema.dart';
+import '../veri/model.dart';
+import 'bilesenler.dart';
+import 'esk.dart' show tl;
+
+/// Mali Raporlar: çiftliklerin gelen faturaları günlük, haftalık, aylık ve
+/// yıllık; açık bakiyeler; dosyalar arası karşılaştırma ve tutarsızlıklar.
+class MaliEkran extends StatelessWidget {
+  const MaliEkran({super.key, required this.veri});
+
+  final RaporVerisi veri;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: VeriDeposu.ben,
+      builder: (context, _) {
+        final m = (VeriDeposu.ben.veri ?? veri).mali;
+        return DefaultTabController(
+          length: 6,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Mali Raporlar'),
+              actions: const [TabloGuncelleButonu()],
+              bottom: const TabBar(
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: Colors.white,
+                unselectedLabelColor: Color(0xCCFFFFFF),
+                indicatorColor: Colors.white,
+                tabs: [
+                  Tab(text: 'Günlük'),
+                  Tab(text: 'Haftalık'),
+                  Tab(text: 'Aylık'),
+                  Tab(text: 'Yıllık'),
+                  Tab(text: 'Açık bakiyeler'),
+                  Tab(text: 'Karşılaştırma'),
+                ],
+              ),
+            ),
+            body: m.bos
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: BilgiKutusu(
+                        yazi: "Mali veri henüz gelmedi. Drive'daki 'Mali Raporlar' klasöründe "
+                            'mali_veri.json olmalı ve Apps Script güncel olmalı.'),
+                  )
+                : TabBarView(children: [
+                    _Donem(veri: m, donem: MaliDonem.gun),
+                    _Donem(veri: m, donem: MaliDonem.hafta),
+                    _Donem(veri: m, donem: MaliDonem.ay),
+                    _Donem(veri: m, donem: MaliDonem.yil),
+                    _Acik(veri: m),
+                    _Karsilastirma(veri: m),
+                  ]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+String _donemAdi(DateTime b, MaliDonem d) => switch (d) {
+      MaliDonem.gun => tarihUzun(b),
+      MaliDonem.hafta => haftaEtiketi(b),
+      MaliDonem.ay => '${const ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'][b.month - 1]} ${b.year}',
+      MaliDonem.yil => '${b.year}',
+    };
+
+String _kisaAd(DateTime b, MaliDonem d) => switch (d) {
+      MaliDonem.gun => gunAy(b),
+      MaliDonem.hafta => '${isoHafta(b)}. hf',
+      MaliDonem.ay => '${const ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][b.month - 1]} ${b.year % 100}',
+      MaliDonem.yil => '${b.year}',
+    };
+
+class _Donem extends StatefulWidget {
+  const _Donem({required this.veri, required this.donem});
+  final MaliVeri veri;
+  final MaliDonem donem;
+
+  @override
+  State<_Donem> createState() => _DonemState();
+}
+
+class _DonemState extends State<_Donem> {
+  DateTime? _secili;
+
+  @override
+  Widget build(BuildContext context) {
+    final donemler = maliDonemler(widget.veri.faturalar, widget.donem);
+    if (donemler.isEmpty) return const Center(child: Text('Fatura yok'));
+    final sec = donemler.firstWhere((e) => e.key == _secili, orElse: () => donemler.first);
+    final o = MaliOzet(sec.value);
+    final enCok = donemler.map((e) => MaliOzet(e.value).toplam).reduce((a, b) => a > b ? a : b);
+    final d = widget.donem;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+      children: [
+        SizedBox(
+          height: 44,
+          child: ListView(scrollDirection: Axis.horizontal, children: [
+            for (final e in donemler.take(d == MaliDonem.gun ? 60 : 53))
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: ChoiceChip(
+                  label: Text(_kisaAd(e.key, d)),
+                  selected: e.key == sec.key,
+                  onSelected: (_) => setState(() => _secili = e.key),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 6),
+        Text(_donemAdi(sec.key, d), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Row(children: [
+          _Kutu('Toplam fatura', tl(o.toplam), '${o.faturalar.length} fatura', Renk.ana),
+          const SizedBox(width: 8),
+          _Kutu('Ödenen', tl(o.odenen), '', Renk.yesil),
+          const SizedBox(width: 8),
+          _Kutu('Ödenmemiş', tl(o.acik), '', o.acik > 0 ? Renk.amber : Renk.soluk),
+        ]),
+        if (d != MaliDonem.gun) ...[
+          const BolumBasligi('Dönemler'),
+          _Cubuklar(
+            satirlar: [
+              for (final e in donemler.take(d == MaliDonem.yil ? 10 : 12))
+                MapEntry(_kisaAd(e.key, d), MaliOzet(e.value).toplam)
+            ],
+            enCok: enCok,
+            vurgu: _kisaAd(sec.key, d),
+          ),
+        ],
+        if (d == MaliDonem.yil) ...[
+          const BolumBasligi('Aylara göre'),
+          Builder(builder: (_) {
+            final aylar = maliDonemler(sec.value, MaliDonem.ay);
+            final m = aylar.isEmpty ? 0.0 : aylar.map((e) => MaliOzet(e.value).toplam).reduce((a, b) => a > b ? a : b);
+            return _Cubuklar(
+                satirlar: [for (final e in aylar.reversed) MapEntry(_kisaAd(e.key, MaliDonem.ay), MaliOzet(e.value).toplam)],
+                enCok: m);
+          }),
+        ],
+        const BolumBasligi('Birime göre'),
+        _Cubuklar(satirlar: o.grupla((f) => f.birim), enCok: o.toplam),
+        const BolumBasligi('Kategoriye göre'),
+        _Cubuklar(satirlar: o.grupla((f) => f.kategori), enCok: o.toplam),
+        const BolumBasligi('Tedarikçi grubu'),
+        _Cubuklar(satirlar: o.grupla((f) => f.hesap), enCok: o.toplam),
+        const BolumBasligi('En büyük tedarikçiler'),
+        _Cubuklar(satirlar: o.grupla((f) => f.tedarikci).take(8).toList(), enCok: o.toplam),
+        const BolumBasligi('Dosyalar arası kontrol'),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Wrap(spacing: 12, runSpacing: 6, children: [
+              for (final e in o.kontrolSayilari().entries)
+                Text('${e.key}: ${e.value}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: e.key == 'Raporla uyumlu' ? Renk.yesil : Renk.amber)),
+            ]),
+          ),
+        ),
+        if (d == MaliDonem.gun || o.faturalar.length <= 40) ...[
+          const BolumBasligi('Faturalar'),
+          for (final f in ([...o.faturalar]..sort((a, b) => b.tutar.compareTo(a.tutar))))
+            Card(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: ListTile(
+                dense: true,
+                title: Text('${f.kategori} · ${f.birim}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text('${f.tedarikci}\n${tarihKisa(f.tarih)} · ${f.durum}'
+                    '${f.vade != null ? ' · vade ${tarihKisa(f.vade!)}' : ''}'
+                    '${f.kontrol == 'Raporla uyumlu' ? '' : ' · ${f.kontrol}'}'),
+                isThreeLine: true,
+                trailing: Text(tl(f.tutar),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: f.acik ? Renk.amber : Renk.yazi)),
+              ),
+            ),
+        ],
+        const SizedBox(height: 8),
+        const Text('Tutarlar KDV dahil TL (muhasebe satıcı listesi). Şahıs işletmesi tedarikçilerin adları KVKK gereği gösterilmez.',
+            style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+      ],
+    );
+  }
+}
+
+class _Kutu extends StatelessWidget {
+  const _Kutu(this.ad, this.deger, this.alt, this.renk);
+  final String ad, deger, alt;
+  final Color renk;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: renk.withValues(alpha: .10), borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(ad, style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+            Text(deger, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: renk)),
+            if (alt.isNotEmpty) Text(alt, style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
+          ]),
+        ),
+      );
+}
+
+class _Cubuklar extends StatelessWidget {
+  const _Cubuklar({required this.satirlar, required this.enCok, this.vurgu});
+  final List<MapEntry<String, double>> satirlar;
+  final double enCok;
+  final String? vurgu;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(children: [
+            for (final e in satirlar)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(
+                        child: Text(e.key,
+                            style: TextStyle(fontSize: 13, fontWeight: e.key == vurgu ? FontWeight.w800 : FontWeight.w500))),
+                    Text(tl(e.value), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  ]),
+                  const SizedBox(height: 3),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: enCok <= 0 ? 0 : (e.value / enCok).clamp(0.0, 1.0),
+                      minHeight: 5,
+                      backgroundColor: Renk.cizgi,
+                      color: e.key == vurgu ? Renk.anaKoyu : Renk.ana,
+                    ),
+                  ),
+                ]),
+              ),
+          ]),
+        ),
+      );
+}
+
+class _Acik extends StatefulWidget {
+  const _Acik({required this.veri});
+  final MaliVeri veri;
+
+  @override
+  State<_Acik> createState() => _AcikState();
+}
+
+class _AcikState extends State<_Acik> {
+  bool _yalnizGecmis = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final bugun = DateTime.now();
+    final tum = widget.veri.acik;
+    final gecmis = tum.where((a) => a.gecmis(bugun)).toList();
+    double top(Iterable<MaliAcik> l) => l.fold(0.0, (t, a) => t + a.tutar);
+    final l = [...(_yalnizGecmis ? gecmis : tum)]..sort((a, b) => (a.odeme ?? a.tarih).compareTo(b.odeme ?? b.tarih));
+    Map<String, double> grup(String Function(MaliAcik) k) {
+      final m = <String, double>{};
+      for (final a in tum) {
+        m.update(k(a), (v) => v + a.tutar, ifAbsent: () => a.tutar);
+      }
+      return m;
+    }
+
+    final vadeAy = grup((a) => a.odeme == null ? 'Vade yok' : '${a.odeme!.year}-${a.odeme!.month.toString().padLeft(2, '0')}');
+    final ayAnahtar = vadeAy.keys.toList()..sort();
+    final birim = grup((a) => a.birim).entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final toplam = top(tum);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      children: [
+        Row(children: [
+          _Kutu('Ödenmemiş toplam', tl(toplam), '${tum.length} fatura', Renk.amber),
+          const SizedBox(width: 8),
+          _Kutu('Vadesi geçmiş', tl(top(gecmis)), '${gecmis.length} fatura', gecmis.isEmpty ? Renk.soluk : Renk.kirmizi),
+        ]),
+        const BolumBasligi('Vade ayına göre'),
+        _Cubuklar(satirlar: [
+          for (final k in ayAnahtar)
+            MapEntry(k == 'Vade yok' ? k : '${const ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][int.parse(k.substring(5)) - 1]} ${k.substring(0, 4)}', vadeAy[k]!)
+        ], enCok: vadeAy.values.fold(0.0, (a, b) => a > b ? a : b)),
+        const BolumBasligi('Birime göre'),
+        _Cubuklar(satirlar: birim, enCok: toplam),
+        const BolumBasligi('Faturalar'),
+        FilterChip(
+          label: const Text('Yalnızca vadesi geçmiş'),
+          selected: _yalnizGecmis,
+          onSelected: (s) => setState(() => _yalnizGecmis = s),
+        ),
+        for (final a in l)
+          Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              dense: true,
+              title: Text('${a.kategori} · ${a.birim}', style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text('${a.tedarikci}\nFatura ${tarihKisa(a.tarih)}'
+                  '${a.odeme != null ? ' · ödeme ${tarihKisa(a.odeme!)}' : ''}'
+                  '${a.gecmis(bugun) ? ' · ${bugun.difference(a.odeme!).inDays} gün gecikti' : ''}'),
+              isThreeLine: true,
+              trailing: Text(tl(a.tutar),
+                  style: TextStyle(fontWeight: FontWeight.w700, color: a.gecmis(bugun) ? Renk.kirmizi : Renk.yazi)),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _Karsilastirma extends StatelessWidget {
+  const _Karsilastirma({required this.veri});
+  final MaliVeri veri;
+
+  static const _sira = ['Tutarsızlık', 'Uyarı', 'Karşılaştırma', 'Bilgi'];
+  static Color _renk(String b) => switch (b) {
+        'Tutarsızlık' => Renk.kirmizi,
+        'Uyarı' => Renk.amber,
+        'Karşılaştırma' => Renk.mavi,
+        _ => Renk.soluk,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final bolumler = {for (final k in veri.kontrol) k.bolum}.toList()
+      ..sort((a, b) {
+        final x = _sira.indexOf(a), y = _sira.indexOf(b);
+        return (x < 0 ? 99 : x).compareTo(y < 0 ? 99 : y);
+      });
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+      children: [
+        const BilgiKutusu(
+            yazi: 'Mali Raporlar klasöründeki dosyaların birbiriyle ve uygulamadaki diğer verilerle '
+                '(ESK, hayvancılık, bakım onarım) karşılaştırması: benzerlikler, eşleşmeler ve tutarsızlıklar.'),
+        for (final b in bolumler) ...[
+          BolumBasligi(b),
+          for (final k in veri.kontrol.where((k) => k.bolum == b))
+            Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                decoration: BoxDecoration(border: Border(left: BorderSide(color: _renk(b), width: 4))),
+                padding: const EdgeInsets.all(12),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(k.baslik, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  if (k.deger.isNotEmpty && k.deger != '—')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(k.deger, style: TextStyle(fontWeight: FontWeight.w800, color: _renk(b))),
+                    ),
+                  if (k.aciklama.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(k.aciklama, style: const TextStyle(fontSize: 13)),
+                  ],
+                ]),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}

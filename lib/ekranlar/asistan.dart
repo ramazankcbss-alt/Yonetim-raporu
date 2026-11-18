@@ -11,6 +11,7 @@ import 'gecmis.dart';
 import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
+import 'mali.dart';
 import 'toplanti.dart';
 import 'veteriner.dart';
 
@@ -42,6 +43,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.kirmizi,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => EskEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.account_balance_outlined,
+          baslik: 'Mali Raporlar',
+          aciklama: _maliOzet(veri),
+          renk: Renk.amber,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => MaliEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.history_edu_outlined,
@@ -200,6 +209,15 @@ class _AnlikGuncelleState extends State<_AnlikGuncelle> {
       },
     );
   }
+}
+
+String _maliOzet(RaporVerisi veri) {
+  final m = veri.mali;
+  if (m.bos) return 'Gelen faturalar, açık bakiyeler ve dosyalar arası kontrol';
+  final top = m.faturalar.fold(0.0, (t, f) => t + f.tutar);
+  final acik = m.acik.fold(0.0, (t, a) => t + a.tutar);
+  final sorun = m.kontrol.where((k) => k.bolum == 'Tutarsızlık' || k.bolum == 'Uyarı').length;
+  return '2026 faturalar ${tl(top)} · ödenmemiş ${tl(acik)}${sorun > 0 ? ' · $sorun uyarı' : ''}';
 }
 
 String _vetOzet(RaporVerisi veri) {

@@ -9,11 +9,13 @@
 //  - Haftalık süt, sağmal ve satılan süt Fethiye + Erentepe günlük
 //    kayıtlarından (Hayvan_Günlük) hesaplanır.
 
+import 'mali.dart';
 import 'arac.dart';
 import 'bakim_onarim.dart';
 
 export 'arac.dart';
 export 'bakim_onarim.dart';
+export 'mali.dart';
 
 /// Türkçe yazılmış ya da sayı olarak gelen değeri okur ("12.648" → 12648,
 /// "22,4" → 22.4). Boş veya okunamayan değer için null döner.
@@ -953,6 +955,7 @@ class RaporVerisi {
     this.detay = const [],
     this.bulgular = const [],
     this.vetKodlari = const [],
+    this.mali = const MaliVeri(),
     this.vetBildirimleri = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
@@ -993,6 +996,9 @@ class RaporVerisi {
 
   /// Veteriner Kontrol Paneli: erişim kodları ve gelen değerlendirmeler.
   final List<VetKod> vetKodlari;
+
+  /// Mali Raporlar: gelen faturalar, açık bakiyeler, kontrol bulguları.
+  final MaliVeri mali;
   final List<VetBildirim> vetBildirimleri;
 
   /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
@@ -1010,6 +1016,7 @@ class RaporVerisi {
       gunluk: oku('hayvanGunluk', GunlukSatir.oku),
       detay: oku('hayvanDetay', DetaySatir.oku),
       bulgular: oku('driveBulgular', DriveBulgu.oku),
+      mali: MaliVeri.json(j['mali']),
       vetKodlari: _liste(j['veteriner'] is Map ? (j['veteriner'] as Map)['kodlar'] : null)
           .map(VetKod.oku)
           .whereType<VetKod>()

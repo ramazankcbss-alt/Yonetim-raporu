@@ -200,6 +200,9 @@ function veriTopla_(gun) {
     // Makine/ekipman, İşlem türü, Çalışma saati/km, Yapılan iş, Malzeme/parça,
     // Tedarik durumu, Servis, Durum, Onay (Evet/boş), Onay zamanı
     bakimOnarim: sonSatirlar_(bakimOnarimOku_(tz), 600),
+    // Mali Raporlar: "Mali Raporlar" klasöründeki en yeni mali_veri.json
+    // (fatura özetleri; şahıs tedarikçi adı, fatura no ve plaka içermez)
+    mali: maliVeri_(),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
     // ve veterinerlerin bildirimleri (Veteriner.gs)
     veteriner: (function () {
@@ -1446,4 +1449,26 @@ function vetUygulamaVerisi_() {
       .map(function (r) { return [String(r[0]), String(r[1]), t(r[2]), String(r[3]), t(r[4])]; })
     : [];
   return { kodlar: kodlar, bildirimler: vetBildirimleri_(null) };
+}
+
+
+// ---------------------------------------------------------------------------
+// MALİ RAPORLAR: "Mali Raporlar" klasöründeki fatura dosyalarından hazırlanan
+// özet (mali_veri.json). Fatura, açık bakiye ve kontrol satırları; şahıs
+// tedarikçi adları, fatura numaraları, plaka ve personel ücret ayrıntısı yoktur.
+var MALI_KLASOR_ID = '1mJBz8lhL7AETl_8SpSv8rjtsZm8cWIs5';
+
+function maliVeri_() {
+  try {
+    var it = DriveApp.getFolderById(MALI_KLASOR_ID).getFiles();
+    var en = null;
+    while (it.hasNext()) {
+      var f = it.next();
+      if (f.getName().indexOf('mali_veri.json') !== 0) continue;
+      if (!en || f.getLastUpdated() > en.getLastUpdated()) en = f;
+    }
+    return en ? JSON.parse(en.getBlob().getDataAsString('UTF-8')) : null;
+  } catch (err) {
+    return null;
+  }
 }
