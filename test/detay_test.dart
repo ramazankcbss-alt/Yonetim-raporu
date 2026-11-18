@@ -12,6 +12,7 @@ void main() {
     DetaySatir(DateTime(2026, 11, 17), 'Erentepe Şube', 'suruden cikanlar', 'olu dogum', 1),
     DetaySatir(DateTime(2026, 11, 17), 'Erentepe Şube', 'sut (kg)', 'sagilan', 3400),
     DetaySatir(DateTime(2026, 11, 17), 'Erentepe Şube', 'disiler', 'bugun dogan buzagi', 2),
+    DetaySatir(DateTime(2026, 11, 17), 'Erentepe Şube', 'performans gostert', 'calisan pers.says.', 6),
     DetaySatir(DateTime(2026, 11, 17), 'ESK-Taşağıl Çiftliği', 'SÜRÜDEN ÇIKANLAR', 'Ölen ithal Besi Danası', 3),
   ]);
   final bas = DateTime(2026, 11, 16), son = DateTime(2026, 11, 22);
