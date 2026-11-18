@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<style>
+  :root { --ana:#1F7A4D; --anaKoyu:#14593A; --anaAcik:#E3F2EA; --zemin:#F3F6F7; --cizgi:#E2E8EC;
+    --yazi:#1E293B; --soluk:#64748B; --kirmizi:#DC2626; --kirmiziAcik:#FEE2E2; --amber:#B45309;
+    --amberAcik:#FEF3C7; --mavi:#1D4ED8; --maviAcik:#DBEAFE; --yesil:#15803D; --turuncu:#C2410C; --mor:#7C3AED; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Roboto, "Segoe UI", Arial, sans-serif; background:var(--zemin); color:var(--yazi); font-size:15px; }
+  header { background:var(--ana); color:#fff; padding:14px 16px 0; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:19px; margin:0 0 2px; }
+  header .alt { font-size:12.5px; opacity:.85; }
+  nav { display:flex; gap:4px; margin-top:10px; overflow-x:auto; }
+  nav button { background:none; border:0; color:#ffffffbb; font-size:14.5px; padding:10px 12px; border-bottom:3px solid transparent; cursor:pointer; white-space:nowrap; }
+  nav button.secili { color:#fff; border-bottom-color:#fff; font-weight:600; }
+  main { max-width:860px; margin:0 auto; padding:14px; }
+  .kart { background:#fff; border:1px solid var(--cizgi); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .bilgi { background:var(--maviAcik); border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:10px; }
+  .uyari { background:var(--amberAcik); border-radius:10px; padding:10px 12px; font-size:13px; margin-bottom:10px; }
+  .baslik { font-weight:700; font-size:16px; margin:16px 4px 8px; color:var(--anaKoyu); }
+  .izgara { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+  .gosterge { background:var(--zemin); border-radius:10px; padding:10px; }
+  .gosterge .ad { font-size:12.5px; color:var(--soluk); }
+  .gosterge .deger { font-size:20px; font-weight:800; }
+  .gosterge .not { font-size:11.5px; color:var(--soluk); }
+  .satir { display:flex; align-items:center; gap:8px; }
+  .bosluk { flex:1; }
+  .cip { display:inline-block; border:1px solid var(--cizgi); background:#fff; border-radius:18px; padding:6px 12px; margin:0 6px 6px 0; font-size:13.5px; cursor:pointer; }
+  .cip.secili { background:var(--anaAcik); border-color:var(--ana); color:var(--anaKoyu); font-weight:600; }
+  .dugme { background:var(--ana); color:#fff; border:0; border-radius:8px; padding:9px 14px; font-size:14px; cursor:pointer; }
+  .dugme.ince { background:#fff; color:var(--ana); border:1px solid var(--ana); padding:5px 10px; font-size:12.5px; }
+  .dugme:disabled { opacity:.5; }
+  details { background:#fff; border:1px solid var(--cizgi); border-radius:10px; margin-bottom:8px; }
+  details > summary { padding:12px 14px; cursor:pointer; list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+  details .ic { padding:0 14px 12px; }
+  details details { border-color:var(--zemin); }
+  .etiket { display:inline-block; border-radius:6px; padding:1px 6px; font-size:11.5px; font-weight:600; margin-left:4px; }
+  .s-Ölüm { color:var(--kirmizi); background:#DC26261f; } .s-Kalım { color:var(--yesil); background:#15803D1f; }
+  .s-Kuru { color:var(--mavi); background:#1D4ED81f; } .s-Kesim { color:var(--turuncu); background:#C2410C1f; } .s-İmha { color:var(--mor); background:#7C3AED1f; }
+  .yil { font-size:20px; font-weight:800; margin:14px 4px 8px; }
+  .yil span { font-size:13px; font-weight:400; color:var(--soluk); margin-left:8px; }
+  .etken { color:var(--amber); font-weight:600; font-size:13.5px; margin:4px 0 6px; }
+  ul { margin:4px 0 8px; padding-left:20px; } li { margin:3px 0; }
+  input, select, textarea { width:100%; font:inherit; padding:10px; border:1px solid var(--cizgi); border-radius:8px; background:#fff; }
+  textarea { min-height:110px; }
+  .giris { max-width:380px; margin:60px auto; }
+  .hata { color:var(--kirmizi); font-size:13.5px; margin-top:8px; }
+  .perde { position:fixed; inset:0; background:#0006; display:none; align-items:flex-end; justify-content:center; z-index:20; }
+  .perde.acik { display:flex; }
+  .pencere { background:#fff; width:100%; max-width:560px; border-radius:16px 16px 0 0; padding:16px; max-height:90vh; overflow:auto; }
+  .degerler { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .soluk { color:var(--soluk); font-size:12.5px; }
+  .durum { font-size:12px; font-weight:600; border-radius:6px; padding:2px 8px; }
+  .d-Yeni { background:var(--amberAcik); color:var(--amber); } .d-Görüldü { background:var(--maviAcik); color:var(--mavi); }
+  .d-Düzeltildi { background:#DCFCE7; color:var(--yesil); } .d-Katılmıyorum { background:var(--kirmiziAcik); color:var(--kirmizi); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Veteriner Kontrol Paneli</h1>
+  <div class="alt" id="ust">Panagro A.Ş. Tarım ve Hayvancılık · Hayvancılık ve hastalık analizlerinin kontrolü</div>
+  <nav id="sekmeler" style="display:none">
+    <button data-s="hayvan" class="secili">Hayvancılık</button>
+    <button data-s="hastalik">Hastalık Dağılımı</button>
+    <button data-s="bildirim">Bildirimlerim</button>
+  </nav>
+</header>
+<main id="icerik">
+  <div class="giris kart">
+    <h3 style="margin-top:0">Giriş</h3>
+    <p class="soluk">Size verilen erişim kodunu yazın.</p>
+    <input id="kod" autocomplete="off" autocapitalize="characters" placeholder="Erişim kodu" maxlength="12">
+    <div style="margin-top:10px"><button class="dugme" id="girisDugme">Giriş yap</button></div>
+    <div class="hata" id="girisHata"></div>
+    <p class="soluk" style="margin-top:14px">Bu panelde yalnızca hayvan sayıları ve hastalık istatistikleri bulunur;
+      kişisel veri yer almaz. Kodunuzu başkasıyla paylaşmayın.</p>
+  </div>
+</main>
+
+<div class="perde" id="perde">
+  <div class="pencere">
+    <div class="satir"><b>Değerlendirme</b><span class="bosluk"></span><button class="dugme ince" id="kapat">Kapat</button></div>
+    <p class="soluk" id="fKonu" style="margin:8px 0"></p>
+    <div class="degerler" id="fDeg"></div>
+    <textarea id="fAciklama" placeholder="Neyi yanlış, eksik ya da yetersiz buldunuz? Doğrusu ne olmalı? (Kaynak, ölçüm, öneri)"></textarea>
+    <div class="uyari" style="margin-top:8px">KVKK: Açıklamaya kişi adı, telefon, T.C. kimlik no ya da hayvan sahibi bilgisi yazmayın.
+      Telefon, e-posta ve kimlik no biçimindeki ifadeler kaydedilmeden silinir.</div>
+    <button class="dugme" id="fGonder">Gönder</button>
+    <div class="hata" id="fHata"></div>
+  </div>
+</div>
+
+<script>
+var TEDBIR = {"harita": {"Mastit": {"etken": "Staph. aureus, Strep. agalactiae/uberis, E. coli, Klebsiella, mikoplazma; hijyen ve sağım kusurları", "tedbirler": ["Sağım öncesi ön daldırma + kağıt havlu ile tek tek kurulama; sağım sonrası son daldırma.", "Sağım makinesi vakum/pulsatör kontrolü 6 ayda bir; meme lastikleri zamanında değişsin.", "Yataklık kuru ve temiz; serbest durak ve gezinti alanı günde en az 2 kez kazınsın.", "Kuruya çıkarmada kuru dönem tedavisi + meme başı tıkacı; klinik vakalara kültür-antibiyogram.", "Kronik (3+ atak) ve kör memeli inekler için ayıklama planı; SHS (somatik hücre) aylık takip."]}, "Topallık/ayak": {"etken": "Digital dermatit (Treponema), tırnak taban ülseri, beyaz çizgi hastalığı, laminitis, ökçe çürüğü", "tedbirler": ["Yılda 2 kez rutin tırnak kesimi; topal inek 48 saat içinde bakılsın.", "Ayak banyosu (formalin/bakır sülfat) haftada 2–3 kez, çözelti 150–200 geçişte yenilensin.", "Zeminde kayma, çukur ve gübre birikimi giderilsin; bekleme alanında süre kısaltılsın.", "Asidozu önleyen rasyon (yeterli kaba yem/efektif lif), biotin-çinko takviyesi.", "Aylık topallık skorlaması yapılıp kayda geçsin."]}, "Solunum/pnömoni": {"etken": "BRSV, PI-3, IBR, BVD virüsleri; Mannheimia, Pasteurella, Histophilus, Mycoplasma bovis", "tedbirler": ["Buzağı ve dana barınaklarında hava akımı var, cereyan yok; amonyak kokusu olmasın.", "Solunum karma aşıları (IBR-BVD-BRSV-PI3, Pasteurella) programa göre, satın alınan hayvana karantina + aşı.", "Kolostrum: ilk 2 saatte 4 litre, 12 saatte toplam 6 litre; pasif bağışıklık kontrolü.", "Grup karışımı, nakil ve sütten kesim aynı zamana gelmesin; aşırı kalabalık önlensin.", "İlk ateşte (39,5°C üstü) erken tedavi; ölümlerde akciğer otopsisi."]}, "İshal": {"etken": "E. coli (K99), Rota/Corona virüs, Cryptosporidium, Salmonella, Coccidia; kolostrum yetersizliği", "tedbirler": ["Kolostrum kalitesi refraktometre ile ölçülsün (≥%22 Brix); ilk 2 saatte içirilsin.", "Gebe ineklere doğumdan 3–6 hafta önce Rota-Corona-E. coli aşısı.", "Biberon/kova her kullanımdan sonra yıkanıp dezenfekte edilsin; süt sıcaklığı sabit.", "Doğumhane ve kulübeler her doğum/buzağı arası temizlik + kireçleme.", "İshalli buzağıya erken ağızdan elektrolit; sütü kesmeden ayrı besleme."]}, "Metrit": {"etken": "Trueperella pyogenes, E. coli, Fusobacterium; son atılmaması, güç doğum, hijyensiz müdahale", "tedbirler": ["Doğumhane temiz ve tek tip; doğum müdahalesi eldiven + dezenfeksiyon ile.", "Geçiş dönemi rasyonu (DCAD, enerji) ile süt humması ve son atılmaması önlensin.", "Doğum sonrası 10 gün ateş takibi; kokulu akıntıya erken tedavi.", "Vücut kondisyonu kuruya çıkışta 3,0–3,5 aralığında tutulsun."]}, "Son atılmaması (retensiyo)": {"etken": "Selenyum/E vitamini eksikliği, hipokalsemi, ikiz/güç doğum, abort", "tedbirler": ["Kuru dönemde Se-E vitamini ve mineral takviyesi.", "Geçiş dönemi kalsiyum dengesi (anyonik tuz) uygulansın.", "Doğum sonrası 12 saatte atılmayan son kayda geçsin, elle zorla çıkarılmasın."]}, "Süt humması/hipokalsemi": {"etken": "Doğum çevresi kan kalsiyumu düşüşü; yaşlı ve yüksek verimli inek", "tedbirler": ["Kuru dönemin son 3 haftasında anyonik rasyon ve idrar pH takibi.", "Riskli ineklere doğumda ağızdan kalsiyum bolusu.", "Kuru dönemde aşırı kalsiyum ve potasyumdan kaçınılsın."]}, "Ketoz": {"etken": "Negatif enerji dengesi; doğum sonrası yağ mobilizasyonu", "tedbirler": ["Doğum sonrası ilk 2 hafta kan BHB taraması.", "Kuruda aşırı yağlanma önlensin; geçiş döneminde yem tüketimi izlensin.", "Riskli ineklere propilen glikol desteği."]}, "Abomasum deplasmanı": {"etken": "Doğum sonrası düşük kaba yem tüketimi, hipokalsemi, ketoz", "tedbirler": ["Doğum sonrası rasyonda yeterli uzun lifli kaba yem; ani rasyon değişikliği yok.", "Hipokalsemi ve ketoz kontrolü ile birlikte ele alınsın."]}, "Blat (şişkinlik)": {"etken": "Yonca/taze yeşil ot ile köpüklü gaz, tahıl fazlası, yemek borusu tıkanıklığı", "tedbirler": ["Rasyon geçişleri 2–3 haftaya yayılsın; aç hayvan taze yoncaya salınmasın.", "Yem karışımında partikül boyutu ve kesif oranı kontrol edilsin."]}, "Enterit/enterotoksemi": {"etken": "Clostridium perfringens tip A-D, ani rasyon değişikliği", "tedbirler": ["Clostridium (enterotoksemi) aşısı programa göre tekrarlansın.", "Kesif yem artışı kademeli; besi başlangıcında adaptasyon dönemi."]}, "Septisemi": {"etken": "Kolostrum yetersizliği, göbek enfeksiyonu üzerinden E. coli/Salmonella", "tedbirler": ["Göbek doğumda %7 iyot ile batırılsın, 12 saat sonra tekrar.", "Kolostrum ve doğumhane hijyeni ishal tedbirleriyle aynı."]}, "Göbek iltihabı": {"etken": "Kirli doğum ortamı, göbek dezenfeksiyonu eksikliği", "tedbirler": ["Doğumda göbeğe iyot daldırma, kulübe yataklığı kuru.", "Göbek ilk hafta günlük kontrol edilsin."]}, "Günsüz/zayıf doğum": {"etken": "Annenin beslenme/hastalığı, ikiz, BVD gibi enfeksiyonlar", "tedbirler": ["Gebe düve/inek kondisyon ve mineral programı; BVD aşısı ve PI hayvan taraması.", "Zayıf doğana ilk saatte kolostrum (gerekirse sonda) ve ısıtma."]}, "Güç doğum": {"etken": "İri buzağı, erken tohumlanmış/küçük düve, yanlış duruş", "tedbirler": ["Düveler hedef canlı ağırlıkta tohumlansın; kolay doğum boğası seçilsin.", "Doğum ekibine müdahale zamanlaması eğitimi."]}, "Ölü doğum": {"etken": "Güç doğum, enfeksiyon (BVD, Neospora, Leptospira), beslenme", "tedbirler": ["Doğumların gözetimi; uzayan doğuma zamanında müdahale.", "Abort/ölü doğumlardan laboratuvar örneği."]}, "Abort": {"etken": "Brusella, BVD, IBR, Neospora, Leptospira; küflü yem, stres", "tedbirler": ["Brusella ve şap aşıları resmi programla; abortlar İl Müdürlüğüne bildirilsin.", "Fetüs ve plasenta laboratuvara; küflü silaj yedirilmesin.", "Köpek-kedi girişinin yem ve doğumhaneye engellenmesi (Neospora)."]}, "İnfertilite": {"etken": "Metrit, negatif enerji, kızgınlığın kaçırılması, mineral eksikliği", "tedbirler": ["Doğum sonrası 30. gün rahim muayenesi, senkronizasyon programı.", "Kızgınlık takibi (aktivite ölçer) ve tohumlama kayıtları düzenli."]}, "TB şüphesi": {"etken": "Mycobacterium bovis; enfekte hayvanla temas", "tedbirler": ["Resmi tüberkülin testleri aksatılmasın; pozitifler mevzuata göre ayrılsın.", "Satın alınan hayvana karantina ve test; kesimde lezyon bulgusu kayda geçsin."]}, "Kan paraziti": {"etken": "Theileria, Babesia, Anaplasma; kene", "tedbirler": ["Kene sezonunda (bahar-yaz) dış parazit uygulaması ve ahır çevresi ilaçlama.", "Theileria aşısı veteriner önerisine göre."]}, "Yara/pişik": {"etken": "Kaba zemin, sıkışma, kirli/ıslak yataklık, sinek", "tedbirler": ["Demir aksam, kapı ve yemlikte keskin kenarlar giderilsin.", "Yataklık kuru tutulsun; sinek mücadelesi."]}, "Kırık/travma": {"etken": "Kaygan zemin, sıkışma, kavga, kızgınlıkta atlama, nakil", "tedbirler": ["Kaygan zemine oluk/kauçuk; kapı ve geçitlerde sıkışma noktaları düzeltilsin.", "Aşırı kalabalık önlensin; nakil ve yüklemede rampa kontrolü."]}, "Felç": {"etken": "Süt humması, doğum felci, travma, sinir hasarı", "tedbirler": ["Hipokalsemi önlemleri; yatan ineğe ilk saatlerde kaldırma desteği ve yumuşak zemin."]}, "Göz": {"etken": "Moraxella bovis (pembe göz), sinek, toz, güneş", "tedbirler": ["Sinek mücadelesi; tozlu yemlerin nemlendirilmesi; hasta hayvan ayrılsın."]}, "Apse": {"etken": "Hijyensiz enjeksiyon, yaralanma, Trueperella", "tedbirler": ["Her hayvana temiz iğne; enjeksiyon boyuna kas içi kurala uygun."]}, "Eklem/artrit": {"etken": "Göbek enfeksiyonu yayılması, Mycoplasma, travma", "tedbirler": ["Göbek bakımı ve kolostrum; mikoplazmalı sütün buzağıya verilmemesi."]}, "Doğum travması/yırtık": {"etken": "Kaba/yanlış doğum müdahalesi, iri buzağı", "tedbirler": ["Doğum müdahale eğitimi; zincir ile çekmede doğru yön ve ritim."]}, "Prolapsus (sarkma)": {"etken": "Güç doğum, hipokalsemi, aşırı ıkınma", "tedbirler": ["Hipokalsemi önlemleri; prolapsus görülen hayvan derhal veterinere."]}, "Anafilaktik şok (aşı sonrası)": {"etken": "Aşı/ilaç reaksiyonu", "tedbirler": ["Aşılama sonrası 30 dk gözlem; adrenalin el altında; seri numarası kayda."]}, "Karaciğer yetmezliği/dejenerasyon": {"etken": "Yağlı karaciğer, kelebek (Fasciola), mikotoksin", "tedbirler": ["Kuruda aşırı yağlanma önlensin; yılda 2 iç parazit programı; yem mikotoksin analizi."]}, "Sindirim bozukluğu": {"etken": "Rasyon hatası, bozuk yem, asidoz", "tedbirler": ["Silaj ve yem kalitesi kontrolü; rasyon değişikliği kademeli."]}, "İndigesyon": {"etken": "Rasyon hatası, bozuk yem, asidoz", "tedbirler": ["Silaj ve yem kalitesi kontrolü; rasyon değişikliği kademeli."]}, "Mide/bağırsak": {"etken": "Yabancı cisim, asidoz, bağırsak düğümlenmesi", "tedbirler": ["Yem karma vagonunda mıknatıs; rasyonda efektif lif yeterli."]}, "İdrar yolu/taş": {"etken": "Besi danasında yüksek fosfor/düşük kalsiyum, az su", "tedbirler": ["Rasyonda Ca:P en az 2:1, amonyum klorür desteği; temiz ve bol su."]}, "Durgunluk/iştahsızlık": {"etken": "Başlangıç belirtisi; çok sayıda hastalık", "tedbirler": ["Günlük ateş/yem tüketimi kontrolü ile erken teşhis."]}, "Peritonit": {"etken": "Yabancı cisim (çivi, tel), abomasum ülseri", "tedbirler": ["Yem hazırlığında mıknatıs ve tel/çivi kontrolü."]}, "Verim düşüklüğü": {"etken": "Kronik mastit, topallık, yaş, beslenme", "tedbirler": ["Verim ve sağlık kayıtları birlikte değerlendirilip ayıklama kararı verilsin."]}, "Ani ölüm": {"etken": "Enterotoksemi, şarbon, zehirlenme, kalp", "tedbirler": ["Mutlaka otopsi; şarbon şüphesinde leşe dokunmadan resmi bildirim."]}}, "genel": {"etken": "Kayıtta teşhis yazılmamış / sınıflandırılamadı", "tedbirler": ["Her vakada teşhis, tedavi ve sonuç (iyileşti/kuru/kesim/ölüm) eksiksiz yazılsın.", "Ölümlerde otopsi istenip sonucu kayda geçsin; tekrar eden nedenler ancak böyle görülür."]}};
+var SONUCLAR = ['Ölüm', 'Tedavi (kalım)', 'Kuru', 'Kesim', 'İmha'];
+var AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+var ESK = 'ESK-Taşağıl Çiftliği Besi Danası';
+var KOD = '', V = null, sekme = 'hayvan';
+var hf = { hafta: null }, sf = { yil: null, ciftlik: null, cins: null };
+var form = { bolum: '', konu: '', deg: '' };
+
+function $(id) { return document.getElementById(id); }
+function e(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function sayi(n, o) { return Number(n || 0).toLocaleString('tr-TR', { maximumFractionDigits: o || 0, minimumFractionDigits: o || 0 }); }
+function kisa(s) { return s === 'Tedavi (kalım)' ? 'Kalım' : s; }
+function tedbir(h) { return TEDBIR.harita[h] || TEDBIR.genel; }
+
+try { var k0 = sessionStorage.getItem('vetKod'); if (k0) $('kod').value = k0; } catch (x) {}
+$('girisDugme').onclick = giris;
+$('kod').onkeydown = function (ev) { if (ev.key === 'Enter') giris(); };
+
+function giris() {
+  var k = $('kod').value.trim().toUpperCase();
+  if (!k) return;
+  $('girisDugme').disabled = true; $('girisHata').textContent = '';
+  google.script.run.withSuccessHandler(function (v) {
+    KOD = k; V = v; try { sessionStorage.setItem('vetKod', k); } catch (x) {}
+    $('ust').textContent = v.etiket + ' · Veri: ' + v.olusturma;
+    $('sekmeler').style.display = 'flex';
+    hazirla(); ciz();
+  }).withFailureHandler(function (err) {
+    $('girisDugme').disabled = false; $('girisHata').textContent = err.message || String(err);
+  }).vetVeri(k);
+}
+
+document.querySelectorAll('#sekmeler button').forEach(function (b) {
+  b.onclick = function () {
+    sekme = b.dataset.s;
+    document.querySelectorAll('#sekmeler button').forEach(function (x) { x.classList.toggle('secili', x === b); });
+    ciz(); window.scrollTo(0, 0);
+  };
+});
+
+// ---------- Veri hazırlığı ----------
+var HK = [];   // hastalık kayıtları: {yil, ay, ciftlik, cins, hastalik, sonuc, adet}
+function hazirla() {
+  var a = V.hastalik; HK = [];
+  a.kayit.forEach(function (r) {
+    HK.push({ yil: r[0], ay: r[1], ciftlik: a.ciftlik[r[2]], cins: a.cins[r[3]], hastalik: a.hastalik[r[4]], sonuc: a.sonuc[r[5]], adet: r[6] });
+  });
+  var var_ = {}; HK.forEach(function (k) { var_[k.yil + '|' + k.ay + '|' + k.ciftlik] = 1; });
+  (V.hastalikEk || []).forEach(function (r) {
+    var yil = parseInt(String(r[0]).match(/20\d\d/g) ? String(r[0]).match(/20\d\d/g).pop() : 0, 10);
+    var ay = AYLAR.indexOf(String(r[1])) + 1, p = String(r[3]).split(' · ');
+    if (!yil || !ay || p.length !== 3 || var_[yil + '|' + ay + '|' + r[2]]) return;
+    HK.push({ yil: yil, ay: ay, ciftlik: r[2], cins: p[0], hastalik: p[1], sonuc: p[2], adet: Math.round(r[4] || 1) });
+  });
+}
+
+function haftaBasi(t) { var d = new Date(t + 'T00:00:00'); var g = (d.getDay() + 6) % 7; d.setDate(d.getDate() - g); return d; }
+function isoHafta(d) { var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); var g = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - g); var y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y) / 86400000 + 1) / 7); }
+function gunAy(d) { return ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2); }
+function anahtar(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function haftaAdi(k) { var d = new Date(k + 'T00:00:00'), s = new Date(d); s.setDate(s.getDate() + 6); return isoHafta(d) + '. Hafta · ' + gunAy(d) + ' – ' + gunAy(s) + '.' + s.getFullYear(); }
+
+// ---------- Çizim ----------
+function ciz() {
+  if (sekme === 'hayvan') hayvanCiz();
+  else if (sekme === 'hastalik') hastalikCiz();
+  else bildirimCiz();
+}
+
+// Hayvan_Özet satırı: [tarih, işletme, hayvan, sağılan, süt, doğan, kesimSatış, buzağıÖlüm,
+//   kesilenDana, inekÖlüm, gençKesim, gençÖlüm, yavruAtma, ölenDana, alınan, satılan]
+function hayvanCiz() {
+  var haftalar = {};
+  V.ozet.forEach(function (r) { haftalar[anahtar(haftaBasi(r[0]))] = 1; });
+  var l = Object.keys(haftalar).sort().reverse();
+  if (!l.length) { $('icerik').innerHTML = '<div class="kart">Son haftalarda veri yok.</div>'; return; }
+  if (!hf.hafta || l.indexOf(hf.hafta) < 0) hf.hafta = l[0];
+  var bas = hf.hafta, sonD = new Date(bas + 'T00:00:00'); sonD.setDate(sonD.getDate() + 6);
+  var son = anahtar(sonD);
+  var satir = V.ozet.filter(function (r) { return r[0] >= bas && r[0] <= son; });
+  var sonGun = satir.reduce(function (m, r) { return r[0] > m ? r[0] : m; }, '');
+  var isl = {};
+  satir.forEach(function (r) {
+    var x = isl[r[1]] = isl[r[1]] || { hayvan: 0, sagilan: 0, sut: 0, sagGun: 0, dogan: 0, kesimSatis: 0, buzagiOlum: 0, kesilen: 0, inekOlum: 0, gencKesim: 0, gencOlum: 0, yavru: 0, olenDana: 0, alinan: 0, satilan: 0 };
+    if (r[0] === sonGun) { x.hayvan = r[2]; x.sagilan = r[3]; }
+    x.sut += r[4]; x.sagGun += r[3]; x.dogan += r[5]; x.kesimSatis += r[6]; x.buzagiOlum += r[7]; x.kesilen += r[8];
+    x.inekOlum += r[9]; x.gencKesim += r[10]; x.gencOlum += r[11]; x.yavru += r[12]; x.olenDana += r[13]; x.alinan += r[14]; x.satilan += r[15];
+  });
+  var kayipDetay = {};
+  V.kayip.filter(function (r) { return r[0] >= bas && r[0] <= son && r[3]; }).forEach(function (r) {
+    var k = kayipDetay[r[1]] = kayipDetay[r[1]] || {};
+    k[r[2]] = (k[r[2]] || 0) + r[3];
+  });
+  var h = '<div class="bilgi">Uygulamadaki Hayvancılık ekranının haftalık göstergeleri. Her kartı kontrol edip yanlış, eksik ya da yetersiz bulduğunuz değeri <b>Değerlendir</b> ile bildirin.</div>';
+  h += '<div>' + l.map(function (k) { return '<span class="cip' + (k === bas ? ' secili' : '') + '" data-h="' + k + '">' + e(haftaAdi(k)) + '</span>'; }).join('') + '</div>';
+  var adlar = Object.keys(isl).filter(function (a) { return a !== ESK; }).sort();
+  var top = { hayvan: 0, sagilan: 0, sut: 0, sagGun: 0, dogan: 0, buzagiOlum: 0, kesilen: 0, kesimSatis: 0, kayip: 0 };
+  adlar.forEach(function (a) { var x = isl[a]; top.hayvan += x.hayvan; top.sagilan += x.sagilan; top.sut += x.sut; top.sagGun += x.sagGun; top.dogan += x.dogan; top.buzagiOlum += x.buzagiOlum; top.kesilen += x.kesilen; top.kesimSatis += x.kesimSatis; top.kayip += kayip(x); });
+  var hafta = haftaAdi(bas);
+  h += '<div class="baslik">Çiftliklerimiz – toplam</div><div class="kart"><div class="izgara">' +
+    g('Toplam hayvan', sayi(top.hayvan), 'son gün ' + sonGun.split('-').reverse().join('.'), hafta + ' · Çiftliklerimiz · Toplam hayvan') +
+    g('Sağılan hayvan', sayi(top.sagilan), '', hafta + ' · Çiftliklerimiz · Sağılan hayvan') +
+    g('Haftalık süt', sayi(top.sut) + ' kg', 'Ort. ' + sayi(top.sagGun ? top.sut / top.sagGun : 0, 1) + ' kg/baş/gün', hafta + ' · Çiftliklerimiz · Süt ve verim') +
+    g('Doğan buzağı', sayi(top.dogan), 'Ölen buzağı: ' + sayi(top.buzagiOlum), hafta + ' · Çiftliklerimiz · Doğum') +
+    g('Hayvan kayıpları', sayi(top.kayip), 'ölüm, ölü doğum, atık', hafta + ' · Çiftliklerimiz · Hayvan kayıpları') +
+    g('Kesilen dana', sayi(top.kesilen), '', hafta + ' · Çiftliklerimiz · Kesilen dana') +
+    g('İnek/düve kesim-satış', sayi(top.kesimSatis), '', hafta + ' · Çiftliklerimiz · İnek/düve kesim-satış') +
+    '</div></div>';
+  h += '<div class="baslik">İşletme bazlı</div>';
+  adlar.concat(isl[ESK] ? [ESK] : []).forEach(function (a) {
+    var x = isl[a], kd = kayipDetay[a.replace(' Besi Danası', '')] || kayipDetay[a] || null;
+    var kdYazi = kd ? Object.keys(kd).map(function (n) { return n + ' ' + sayi(kd[n]); }).join(' · ') : '';
+    h += '<div class="kart"><div class="satir"><b>' + e(a) + '</b>' + (a === ESK ? '<span class="soluk">&nbsp;(ESK, çiftliklerimiz toplamına dahil değil)</span>' : '') + '</div><div class="izgara" style="margin-top:8px">' +
+      g('Hayvan', sayi(x.hayvan), '', hafta + ' · ' + a + ' · Hayvan') +
+      (x.sagilan ? g('Sağılan', sayi(x.sagilan), '', hafta + ' · ' + a + ' · Sağılan') : '') +
+      (x.sut ? g('Süt', sayi(x.sut) + ' kg', 'Ort. ' + sayi(x.sagGun ? x.sut / x.sagGun : 0, 1) + ' kg/baş/gün', hafta + ' · ' + a + ' · Süt ve verim') : '') +
+      (x.dogan || x.buzagiOlum ? g('Doğan buzağı', sayi(x.dogan), 'Ölen buzağı: ' + sayi(x.buzagiOlum), hafta + ' · ' + a + ' · Doğum') : '') +
+      g('Kayıplar', sayi(kayip(x)), kdYazi || 'inek ' + sayi(x.inekOlum) + ' · genç ' + sayi(x.gencOlum) + ' · ölü doğum/atık ' + sayi(x.yavru) + ' · dana ' + sayi(x.olenDana), hafta + ' · ' + a + ' · Kayıplar') +
+      (x.kesilen ? g('Kesilen dana', sayi(x.kesilen), '', hafta + ' · ' + a + ' · Kesilen dana') : '') +
+      (x.alinan ? g('Dışarıdan alınan', sayi(x.alinan), '', hafta + ' · ' + a + ' · Dışarıdan alınan') : '') +
+      '</div></div>';
+  });
+  h += genelDugme('Hayvancılık');
+  $('icerik').innerHTML = h;
+  document.querySelectorAll('[data-h]').forEach(function (c) { c.onclick = function () { hf.hafta = c.dataset.h; hayvanCiz(); }; });
+  baglaDegerlendir();
+}
+function kayip(x) { return x.buzagiOlum + x.inekOlum + x.gencOlum + x.yavru + x.olenDana; }
+function g(ad, deger, not, konu) {
+  return '<div class="gosterge"><div class="ad">' + e(ad) + '</div><div class="deger">' + e(deger) + '</div>' +
+    (not ? '<div class="not">' + e(not) + '</div>' : '') +
+    '<div style="margin-top:6px"><button class="dugme ince" data-b="Hayvancılık" data-k="' + e(konu + ' = ' + deger) + '">Değerlendir</button></div></div>';
+}
+function genelDugme(bolum) {
+  return '<div class="kart"><b>Genel değerlendirme</b><p class="soluk">Kartlarda olmayan bir eksik ya da öneri için.</p>' +
+    '<button class="dugme ince" data-b="' + bolum + '" data-k="' + bolum + ' · Genel">Genel bildirim yaz</button></div>';
+}
+
+function topla(l, f) { var m = {}; l.forEach(function (x) { var k = f(x); m[k] = (m[k] || 0) + x.adet; }); return m; }
+function sirala(m) { return Object.keys(m).sort(function (a, b) { return m[b] - m[a]; }); }
+
+function hastalikCiz() {
+  var yillar = Object.keys(topla(HK, function (x) { return x.yil; })).sort().reverse();
+  var cf = Object.keys(topla(HK, function (x) { return x.ciftlik; })).sort();
+  var cins = Object.keys(topla(HK, function (x) { return x.cins; })).sort();
+  var k = HK.filter(function (x) { return (!sf.yil || String(x.yil) === sf.yil) && (!sf.ciftlik || x.ciftlik === sf.ciftlik) && (!sf.cins || x.cins === sf.cins); });
+  function cipler(l, alan, tumu) {
+    return '<div>' + [null].concat(l).map(function (v) {
+      return '<span class="cip' + ((sf[alan] || null) === v ? ' secili' : '') + '" data-f="' + alan + '" data-v="' + e(v || '') + '">' + e(v || tumu) + '</span>';
+    }).join('') + '</div>';
+  }
+  var h = '<div class="uyari">Uygulamadaki Hastalık Dağılımı: ay ay vakalar, her hastalığın etkeni ve önleme tedbirleri. Etken ve tedbirler genel bilgi olarak hazırlandı; ' +
+    'yanlış, eksik ya da işletmeye uygun olmayan maddeleri <b>Değerlendir</b> ile bildirin.</div>';
+  h += cipler(yillar, 'yil', 'Tüm yıllar') + cipler(cf, 'ciftlik', 'Tüm çiftlikler') + cipler(cins, 'cins', 'Tüm cinsler');
+  var son = topla(k, function (x) { return x.sonuc; });
+  h += '<div style="margin:6px 0 4px">' + SONUCLAR.map(function (s) { return '<span class="etiket s-' + kisa(s) + '">' + kisa(s) + ' ' + sayi(son[s]) + '</span>'; }).join(' ') + '</div>';
+  var donem = {};
+  k.forEach(function (x) { (donem[x.yil * 100 + x.ay] = donem[x.yil * 100 + x.ay] || []).push(x); });
+  var an = Object.keys(donem).map(Number).sort(function (a, b) { return b - a; });
+  var oncekiYil = null;
+  an.forEach(function (a) {
+    var y = Math.floor(a / 100), ay = a % 100, l = donem[a];
+    if (y !== oncekiYil) {
+      var yk = k.filter(function (x) { return x.yil === y; });
+      var yt = yk.reduce(function (s, x) { return s + x.adet; }, 0);
+      var ol = yk.filter(function (x) { return x.sonuc === 'Ölüm'; }).reduce(function (s, x) { return s + x.adet; }, 0);
+      h += '<div class="yil">' + y + '<span>' + sayi(yt) + ' vaka · ' + sayi(ol) + ' ölüm</span></div>';
+      oncekiYil = y;
+    }
+    var top = topla(l, function (x) { return x.hastalik; }), hl = sirala(top);
+    var t = l.reduce(function (s, x) { return s + x.adet; }, 0);
+    var yer = (sf.ciftlik || 'Tüm çiftlikler') + (sf.cins ? ' · ' + sf.cins : '');
+    h += '<details><summary><b>' + AYLAR[ay - 1] + ' ' + y + '</b> · ' + sayi(t) + ' vaka<div class="soluk">' +
+      e(hl.filter(function (x) { return x !== 'Belirtilmemiş' && x !== 'Diğer'; }).slice(0, 3).map(function (x) { return x + ' ' + top[x]; }).join(' · ')) + '</div></summary><div class="ic">';
+    hl.forEach(function (hs) {
+      var hk = l.filter(function (x) { return x.hastalik === hs; });
+      var sn = topla(hk, function (x) { return x.sonuc; }), cfl = topla(hk, function (x) { return x.ciftlik; }), cn = topla(hk, function (x) { return x.cins; });
+      var td = tedbir(hs);
+      var konu = AYLAR[ay - 1] + ' ' + y + ' · ' + yer + ' · ' + hs + ' (' + top[hs] + ' vaka)';
+      h += '<details><summary><b>' + e(hs) + '</b> — ' + sayi(top[hs]) + ' vaka ' +
+        SONUCLAR.filter(function (s) { return sn[s]; }).map(function (s) { return '<span class="etiket s-' + kisa(s) + '">' + kisa(s) + ' ' + sn[s] + '</span>'; }).join('') +
+        '</summary><div class="ic"><div class="soluk">Çiftlik: ' + e(sirala(cfl).map(function (x) { return x + ' ' + cfl[x]; }).join(' · ')) +
+        '<br>Cins: ' + e(sirala(cn).map(function (x) { return x + ' ' + cn[x]; }).join(' · ')) + '</div>' +
+        '<div class="etken">Etken / neden: ' + e(td.etken) + '</div><b>Önleme tedbirleri</b><ul>' +
+        td.tedbirler.map(function (x) { return '<li>' + e(x) + '</li>'; }).join('') + '</ul>' +
+        '<button class="dugme ince" data-b="Hastalık Dağılımı" data-k="' + e(konu + ' · vaka sayısı ve sonuçlar') + '">Sayıları değerlendir</button> ' +
+        '<button class="dugme ince" data-b="Hastalık Dağılımı" data-k="' + e(hs + ' · etken ve önleme tedbirleri') + '">Etken/tedbirleri değerlendir</button>' +
+        '</div></details>';
+    });
+    h += '</div></details>';
+  });
+  if (!an.length) h += '<div class="kart">Bu seçimde kayıt yok.</div>';
+  h += genelDugme('Hastalık Dağılımı');
+  $('icerik').innerHTML = h;
+  document.querySelectorAll('[data-f]').forEach(function (c) {
+    c.onclick = function () { var v = c.dataset.v || null; sf[c.dataset.f] = sf[c.dataset.f] === v ? null : v; hastalikCiz(); };
+  });
+  baglaDegerlendir();
+}
+
+function bildirimCiz() {
+  var l = V.bildirimler || [];
+  var h = '<div class="bilgi">Gönderdiğiniz değerlendirmeler ve durumları. Durum, uygulama sahibi inceledikçe güncellenir.</div>';
+  if (!l.length) h += '<div class="kart">Henüz bildirim yok.</div>';
+  l.forEach(function (b) {
+    h += '<div class="kart"><div class="satir"><b>' + e(b.degerlendirme) + '</b><span class="soluk">&nbsp;' + e(b.bolum) + '</span><span class="bosluk"></span><span class="durum d-' + e(b.durum) + '">' + e(b.durum) + '</span></div>' +
+      '<div class="soluk" style="margin:4px 0">' + e(b.tarih) + ' · ' + e(b.konu) + '</div><div>' + e(b.aciklama) + '</div>' +
+      (b.yanit ? '<div class="bilgi" style="margin:8px 0 0">Yanıt: ' + e(b.yanit) + '</div>' : '') + '</div>';
+  });
+  $('icerik').innerHTML = h;
+}
+
+// ---------- Değerlendirme formu ----------
+function baglaDegerlendir() {
+  document.querySelectorAll('[data-k]').forEach(function (b) {
+    b.onclick = function (ev) { ev.preventDefault(); ev.stopPropagation(); formAc(b.dataset.b, b.dataset.k); };
+  });
+}
+function formAc(bolum, konu) {
+  form = { bolum: bolum, konu: konu, deg: '' };
+  $('fKonu').textContent = konu; $('fAciklama').value = ''; $('fHata').textContent = '';
+  $('fDeg').innerHTML = ['Doğru', 'Yanlış', 'Eksik', 'Yetersiz', 'Öneri'].map(function (d) { return '<span class="cip" data-d="' + d + '">' + d + '</span>'; }).join('');
+  document.querySelectorAll('[data-d]').forEach(function (c) {
+    c.onclick = function () { form.deg = c.dataset.d; document.querySelectorAll('[data-d]').forEach(function (x) { x.classList.toggle('secili', x === c); }); };
+  });
+  $('perde').classList.add('acik');
+}
+$('kapat').onclick = function () { $('perde').classList.remove('acik'); };
+$('fGonder').onclick = function () {
+  if (!form.deg) { $('fHata').textContent = 'Değerlendirme seçin.'; return; }
+  $('fGonder').disabled = true; $('fHata').textContent = '';
+  google.script.run.withSuccessHandler(function (l) {
+    V.bildirimler = l; $('fGonder').disabled = false; $('perde').classList.remove('acik');
+    alertKisa('Bildiriminiz kaydedildi. Teşekkürler.');
+  }).withFailureHandler(function (err) {
+    $('fGonder').disabled = false; $('fHata').textContent = err.message || String(err);
+  }).vetBildir(KOD, { bolum: form.bolum, konu: form.konu, degerlendirme: form.deg, aciklama: $('fAciklama').value });
+};
+function alertKisa(m) {
+  var d = document.createElement('div');
+  d.textContent = m;
+  d.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1E293B;color:#fff;padding:10px 16px;border-radius:8px;z-index:30;font-size:14px';
+  document.body.appendChild(d); setTimeout(function () { d.remove(); }, 2600);
+}
+</script>
+</body>
+</html>

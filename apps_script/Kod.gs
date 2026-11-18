@@ -77,6 +77,8 @@ var OZEL_SAYFALAR = {
 /** Uygulamanın çağırdığı adres. */
 function doGet(e) {
   var p = (e && e.parameter) || {};
+  // Veteriner Kontrol Paneli: sayfa veri içermez, veri kodla gelir (Veteriner.gs).
+  if (p.panel === 'veteriner') return vetPanel_();
   var anahtar = PropertiesService.getScriptProperties().getProperty('ANAHTAR');
   if (!anahtar) {
     return json_({ ok: false, hata: 'Kurulum yapılmamış: Apps Script\'te "kurulum" fonksiyonunu çalıştırın.' });
@@ -197,7 +199,12 @@ function veriTopla_(gun) {
     // Bakım Onarım Kayıtları: No, Bildirim zamanı, Çiftlik, Bildiren (görev),
     // Makine/ekipman, İşlem türü, Çalışma saati/km, Yapılan iş, Malzeme/parça,
     // Tedarik durumu, Servis, Durum, Onay (Evet/boş), Onay zamanı
-    bakimOnarim: sonSatirlar_(bakimOnarimOku_(tz), 600)
+    bakimOnarim: sonSatirlar_(bakimOnarimOku_(tz), 600),
+    // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
+    // ve veterinerlerin bildirimleri (Veteriner.gs)
+    veteriner: (function () {
+      try { return vetUygulamaVerisi_(); } catch (err) { return { kodlar: [], bildirimler: [] }; }
+    })()
   };
 }
 
@@ -327,6 +334,7 @@ function doPost(e) {
       return json_({ ok: false, hata: 'Bu bölüm KVKK kapsamında kaldırıldı.' });
     }
     if (govde.tur === 'raporKaydet') return json_(raporKaydet_(govde));
+    if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
     var bugun = Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy');

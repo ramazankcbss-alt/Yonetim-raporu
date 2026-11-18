@@ -333,6 +333,39 @@ class VeriDeposu extends ChangeNotifier {
     }
   }
 
+  /// Veteriner Kontrol Paneli: yeni erişim kodu üretir (etiket: görev/rol).
+  Future<String> vetKodEkle(String etiket) async {
+    final j = await _islem('vetKodEkle', {'etiket': etiket});
+    await yenile();
+    return (j['kod'] ?? '').toString();
+  }
+
+  /// Kodu kapatır (panel o kodla açılmaz) ya da yeniden açar.
+  Future<void> vetKodDurum(String kod, {required bool acik}) async {
+    await _islem(acik ? 'vetKodAc' : 'vetKodKapat', {'kod': kod});
+    await yenile();
+  }
+
+  /// Veteriner bildiriminin durumunu (Görüldü, Düzeltildi, Katılmıyorum) ve
+  /// isteğe bağlı yanıtı kaydeder.
+  Future<void> vetBildirimDurum(VetBildirim b, String durum, {String? yanit}) async {
+    await _islem('vetBildirimDurum', {
+      'satir': '${b.satir}',
+      'kod': b.kod,
+      'durum': durum,
+      if (yanit != null) 'yanit': yanit,
+    });
+    await yenile();
+  }
+
+  /// Panel adresi: bağlantı linkinin anahtarsız hâli + ?panel=veteriner.
+  String? get vetPanelAdresi {
+    final l = link;
+    if (l == null) return null;
+    final u = Uri.parse(l);
+    return u.replace(queryParameters: {'panel': 'veteriner'}).toString();
+  }
+
   /// Haftalık rapor PDF'ini Drive'daki "Haftalık Faaliyet Raporları"
   /// klasörüne kaydeder; sunucunun bilgi mesajını döner.
   Future<String> raporuDriveKaydet(String ad, List<int> pdf) async {

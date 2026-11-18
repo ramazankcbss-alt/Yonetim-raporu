@@ -12,6 +12,7 @@ import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
 import 'toplanti.dart';
+import 'veteriner.dart';
 
 /// Asistan sekmesi: sekreterlik, danışmanlık, toplantı notları, özel notlar
 /// ve günlük bölümlerine açılan hub. Hazır olmayan bölümler "Yakında".
@@ -82,6 +83,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.kirmizi,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => HastalikEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.medical_services_outlined,
+          baslik: 'Veteriner Kontrol Paneli',
+          aciklama: _vetOzet(veri),
+          renk: Renk.mavi,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => VeterinerEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.groups_outlined,
@@ -191,6 +200,15 @@ class _AnlikGuncelleState extends State<_AnlikGuncelle> {
       },
     );
   }
+}
+
+String _vetOzet(RaporVerisi veri) {
+  final yeni = veri.vetBildirimleri.where((b) => b.yeni).length;
+  final aktif = veri.vetKodlari.where((k) => k.aktif).length;
+  if (veri.vetKodlari.isEmpty) {
+    return 'Veteriner hekimler kodla girip hayvancılık ve hastalık analizini kontrol eder';
+  }
+  return '${yeni > 0 ? '$yeni yeni bildirim · ' : ''}${veri.vetBildirimleri.length} bildirim · $aktif aktif kod';
 }
 
 String _eskOzet(RaporVerisi veri) {

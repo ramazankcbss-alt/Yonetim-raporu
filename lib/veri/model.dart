@@ -82,6 +82,62 @@ double _s(List r, int i) => i < r.length ? (sayiOku(r[i]) ?? 0) : 0;
 // Ham satırlar
 // ---------------------------------------------------------------------------
 
+/// Veteriner Kontrol Paneli erişim kodu (Veteriner_Kodları sayfası).
+class VetKod {
+  const VetKod({required this.kod, required this.etiket, this.olusturma = '', this.durum = '', this.sonGiris = ''});
+  final String kod, etiket, olusturma, durum, sonGiris;
+  bool get aktif => durum == 'Aktif';
+
+  static VetKod? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 4 || _metin(r[0]).isEmpty) return null;
+    return VetKod(
+        kod: _metin(r[0]),
+        etiket: _metin(r[1]),
+        olusturma: _metin(r[2]),
+        durum: _metin(r[3]),
+        sonGiris: r.length > 4 ? _metin(r[4]) : '');
+  }
+}
+
+/// Veterinerin panelden gönderdiği değerlendirme (Veteriner_Bildirimleri).
+class VetBildirim {
+  const VetBildirim({
+    required this.satir,
+    required this.tarih,
+    required this.etiket,
+    required this.bolum,
+    required this.konu,
+    required this.degerlendirme,
+    required this.aciklama,
+    required this.durum,
+    required this.kod,
+    this.yanit = '',
+  });
+  final int satir;
+  final String tarih, etiket, bolum, konu, degerlendirme, aciklama, durum, kod, yanit;
+  bool get yeni => durum == 'Yeni';
+
+  static VetBildirim? oku(Object? v) {
+    if (v is! Map) return null;
+    String m(String k) => _metin(v[k]);
+    final satir = int.tryParse(m('satir'));
+    if (satir == null) return null;
+    return VetBildirim(
+      satir: satir,
+      tarih: m('tarih'),
+      etiket: m('etiket'),
+      bolum: m('bolum'),
+      konu: m('konu'),
+      degerlendirme: m('degerlendirme'),
+      aciklama: m('aciklama'),
+      durum: m('durum'),
+      kod: m('kod'),
+      yanit: m('yanit'),
+    );
+  }
+}
+
 /// Drive_Bulgular: günlük Drive incelemesinde bulunan rapor kapsamındaki bilgi.
 class DriveBulgu {
   const DriveBulgu({
@@ -896,6 +952,8 @@ class RaporVerisi {
     List<BakimOnarimKaydi> bakimOnarim = const [],
     this.detay = const [],
     this.bulgular = const [],
+    this.vetKodlari = const [],
+    this.vetBildirimleri = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
         ozet = List.unmodifiable(
@@ -933,6 +991,10 @@ class RaporVerisi {
   /// Günlük Drive incelemesinin bulguları.
   final List<DriveBulgu> bulgular;
 
+  /// Veteriner Kontrol Paneli: erişim kodları ve gelen değerlendirmeler.
+  final List<VetKod> vetKodlari;
+  final List<VetBildirim> vetBildirimleri;
+
   /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
   List<DriveBulgu> bulgularDonem(DateTime bas, DateTime son) => [
         for (final b in bulgular)
@@ -948,6 +1010,14 @@ class RaporVerisi {
       gunluk: oku('hayvanGunluk', GunlukSatir.oku),
       detay: oku('hayvanDetay', DetaySatir.oku),
       bulgular: oku('driveBulgular', DriveBulgu.oku),
+      vetKodlari: _liste(j['veteriner'] is Map ? (j['veteriner'] as Map)['kodlar'] : null)
+          .map(VetKod.oku)
+          .whereType<VetKod>()
+          .toList(),
+      vetBildirimleri: _liste(j['veteriner'] is Map ? (j['veteriner'] as Map)['bildirimler'] : null)
+          .map(VetBildirim.oku)
+          .whereType<VetBildirim>()
+          .toList(),
       tarim: oku('tarim', TarimKaydi.oku),
       ekim: oku('ekim', EkimSatir.oku),
       hasat: oku('hasat', HasatSatir.oku),
