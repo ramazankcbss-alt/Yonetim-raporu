@@ -302,7 +302,7 @@ class _Haftalik extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
       children: [
         BilgiKutusu(
-            yazi: 'Günlük canlı hayvan özetinden hesaplanır. Bakım geliri = '
+            yazi: 'ESK günlük raporundan hesaplanır. Bakım geliri = '
                 'hayvan-gün × ${sayi(b.bakimUcreti)} TL; kira ve işletme gideri '
                 'aylık tutarın günlere bölünmesiyle bulunur. Kâr/zarar tahminidir.'),
         const SizedBox(height: 8),

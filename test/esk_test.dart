@@ -81,7 +81,7 @@ void main() {
 
     await t.tap(find.text('Haftalık rapor'));
     await t.pumpAndSettle();
-    expect(find.textContaining('Günlük canlı hayvan özetinden'), findsOneWidget);
+    expect(find.textContaining('ESK günlük raporundan'), findsOneWidget);
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 

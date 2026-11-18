@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yonetim_raporu/veri/detay.dart';
 import 'package:yonetim_raporu/veri/esk_rapor.dart';
 import 'package:yonetim_raporu/veri/model.dart';
 
@@ -40,6 +41,35 @@ void main() {
     expect(w.gider, closeTo(400000, 0.01));
     expect(w.karZarar, closeTo(55000, 0.01));
     expect(w.eksik, isTrue);
+  });
+
+  test('haftalık rapor ESK günlük raporunu tercih eder', () {
+    DetaySatir d(int g, String b, String ad, double x) =>
+        DetaySatir(DateTime(2026, 11, g), eskDetay, b, ad, x);
+    final v = RaporVerisi(
+      ozet: [OzetSatir(tarih: DateTime(2026, 11, 13), isletme: eskBesi, hayvan: 1)],
+      gunluk: const [],
+      tarim: const [],
+      detay: [
+        d(13, 'HAYVAN SAYISI', 'İthal Besi Danası', 3981),
+        d(13, 'HAYVAN SAYISI', 'Dışardan Alınan İTHAL  Besi Danası', 302),
+        d(13, 'SÜRÜDEN ÇIKANLAR', 'Kesilen İthal Besi Danası', 4),
+        d(13, 'SÜRÜDEN ÇIKANLAR', 'Toplam', 4283),
+        d(14, 'SÜRÜDEN ÇIKANLAR', 'Toplam', 4283),
+        d(12, 'SÜRÜDEN ÇIKANLAR', 'Ölen ithal Besi Danası', 1),
+        d(12, 'HAYVAN SAYISI', 'İthal Besi Danası', 3985),
+        d(18, 'SÜRÜDEN ÇIKANLAR', 'Toplam', 0),
+      ],
+    );
+    final h = eskHaftalari(v);
+    expect(h.map((w) => w.bas), [DateTime(2026, 11, 9)]);
+    final w = h.first;
+    expect(w.gun, 3);
+    expect(w.hayvanGun, 3985 + 4283 + 4283);
+    expect(w.giren, 302);
+    expect(w.kesilen, 4);
+    expect(w.olen, 1);
+    expect(w.sonMevcut, 4283);
   });
 
   test('yıllık ESK toplamları', () {

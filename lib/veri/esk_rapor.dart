@@ -1,11 +1,13 @@
 // ESK – Taşağıl bakım besleme: haftalık, aylık ve yıllık rapor hesapları.
 //
-// Haftalık rapor günlük Hayvan_Özet satırlarından (ESK-Taşağıl Çiftliği Besi
-// Danası) hesaplanır: ahırdaki hayvan sayıları toplanarak hayvan-gün bulunur,
+// Haftalık rapor ESK günlük raporundan (Hayvan_Detay, ESK-Taşağıl Çiftliği:
+// gün sonu toplam, dışarıdan alınan, kesilen, ölen) hesaplanır; bu veri yoksa
+// Hayvan_Özet satırları (ESK-Taşağıl Çiftliği Besi Danası) kullanılır: ahırdaki hayvan sayıları toplanarak hayvan-gün bulunur,
 // bakım geliri hayvan-gün × bakım ücreti, kira ve işletme gideri ise ayın gün
 // sayısına bölünerek günlere dağıtılır. Bu yüzden haftalık kâr/zarar tahminidir.
 // Aylık ve yıllık rapor 'ESK_Aylık' sayfasından gelir.
 
+import 'detay.dart';
 import 'model.dart';
 
 /// "50 TL/baş/gün", "900.000 TL/ay" → 50, 900000. Sayı yoksa null.
@@ -69,25 +71,69 @@ class EskHafta {
 
 int _ayGunu(DateTime d) => DateTime(d.year, d.month + 1, 0).day;
 
+class _EskGun {
+  double mevcut = 0, giren = 0, kesilen = 0, olen = 0;
+}
+
+/// ESK günlük raporundan gün bazında hareketler. Gün sonu hayvan sayısı
+/// "Toplam" satırından (yoksa "İthal Besi Danası"), henüz girilmemiş
+/// (sıfır) günler atlanır.
+Map<DateTime, _EskGun> _detayGunleri(RaporVerisi v) {
+  final g = <DateTime, _EskGun>{};
+  final yedek = <DateTime, double>{};
+  for (final d in v.detay) {
+    if (d.isletme != eskDetay) continue;
+    final n = kucuk(d.gosterge);
+    final x = g.putIfAbsent(gunu(d.tarih), () => _EskGun());
+    if (cikisMi(d.bolum) && n == 'toplam') {
+      x.mevcut = d.deger;
+    } else if (n == 'ithal besi danası' || n == 'yerli besi danası') {
+      yedek[gunu(d.tarih)] = (yedek[gunu(d.tarih)] ?? 0) + d.deger;
+    } else if (girisMi(d.gosterge)) {
+      x.giren += d.deger;
+    } else if (cikisMi(d.bolum) && kayipMi(d.gosterge)) {
+      x.olen += d.deger;
+    } else if (cikisMi(d.bolum) && n.contains('kesilen')) {
+      x.kesilen += d.deger;
+    }
+  }
+  for (final e in g.entries) {
+    if (e.value.mevcut == 0) e.value.mevcut = yedek[e.key] ?? 0;
+  }
+  g.removeWhere((_, x) => x.mevcut <= 0);
+  return g;
+}
+
 /// Günlük verisi olan haftalar, yeniden eskiye.
 List<EskHafta> eskHaftalari(RaporVerisi v) {
   final b = EskBirimler.oku(v.eskBilgi);
+  var gunler = _detayGunleri(v);
+  if (gunler.isEmpty) {
+    gunler = {
+      for (final o in v.ozet.where((o) => o.isletme == eskBesi && o.hayvan > 0))
+        gunu(o.tarih): _EskGun()
+          ..mevcut = o.hayvan
+          ..giren = o.alinan
+          ..kesilen = o.kesilenDana
+          ..olen = o.olenDana,
+    };
+  }
   final h = <DateTime, EskHafta>{};
-  final satirlar = v.ozet.where((o) => o.isletme == eskBesi).toList()
-    ..sort((a, b) => a.tarih.compareTo(b.tarih));
-  for (final o in satirlar) {
-    final w = h.putIfAbsent(haftaBasi(o.tarih), () => EskHafta(haftaBasi(o.tarih)));
+  final sirali = gunler.keys.toList()..sort();
+  for (final t in sirali) {
+    final o = gunler[t]!;
+    final w = h.putIfAbsent(haftaBasi(t), () => EskHafta(haftaBasi(t)));
     w.gun++;
-    w.hayvanGun += o.hayvan;
-    w.giren += o.alinan;
-    w.kesilen += o.kesilenDana;
-    w.olen += o.olenDana;
-    w.bakim += o.hayvan * (b.bakimUcreti ?? 0);
-    final ay = _ayGunu(o.tarih);
+    w.hayvanGun += o.mevcut;
+    w.giren += o.giren;
+    w.kesilen += o.kesilen;
+    w.olen += o.olen;
+    w.bakim += o.mevcut * (b.bakimUcreti ?? 0);
+    final ay = _ayGunu(t);
     w.kira += (b.aylikKira ?? 0) / ay;
     w.gider += (b.aylikGider ?? 0) / ay;
-    w.sonMevcut = o.hayvan;
-    w.sonGun = o.tarih;
+    w.sonMevcut = o.mevcut;
+    w.sonGun = t;
   }
   return h.values.toList()..sort((a, b) => b.bas.compareTo(a.bas));
 }
