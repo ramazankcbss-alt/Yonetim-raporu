@@ -1072,6 +1072,7 @@ function detaySayfaOku_(sh) {
       continue;
     }
     if (!etiket || yil === null) continue;
+    if (/\/\s*(topl|hay)/i.test(etiket)) continue;   // oran satırları
     var gunSayisi = new Date(yil, ay + 1, 0).getDate();
     for (var g = 1; g <= gunSayisi && g < v[r].length; g++) {
       var ham = v[r][g];

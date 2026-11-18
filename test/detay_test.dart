@@ -29,6 +29,12 @@ void main() {
     expect(b.last.ad, 'Personel Sayıları');
   });
 
+  test('Oran satırları alınmaz', () {
+    expect(DetaySatir.oku(['2026-11-06', 'Aslım Çiftliği', 'ASLIM ÇİFTLİĞİ', 'Ölüm/Hayvan Sayısı', '0,02']), isNull);
+    expect(DetaySatir.oku(['2026-11-06', 'Erentepe Şube', 'hayvan sayisi', 'sag.hay/ topl.hay.', 0.42]), isNull);
+    expect(DetaySatir.oku(['2026-11-06', 'Aslım Çiftliği', 'SÜRÜDEN ÇIKANLAR', 'Satılan Erkek /DİŞİ dana', 3]), isNotNull);
+  });
+
   test('Kayıplar: çiftliklerimiz ve ESK ayrı', () {
     final k = kayipOzeti(v, bas, son)!;
     expect(k.toplam, 2);

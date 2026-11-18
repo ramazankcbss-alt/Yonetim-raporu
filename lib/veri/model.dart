@@ -122,6 +122,8 @@ class DriveBulgu {
   }
 }
 
+final _oranSatiri = RegExp(r'/\s*(topl|hay)', caseSensitive: false);
+
 /// Hayvan_Detay: işletme günlük raporundaki bir gösterge (sıfırdan farklı).
 class DetaySatir {
   const DetaySatir(this.tarih, this.isletme, this.bolum, this.gosterge, this.deger);
@@ -138,6 +140,8 @@ class DetaySatir {
     if (t == null || d == null || _metin(r[1]).isEmpty || _metin(r[3]).isEmpty) {
       return null;
     }
+    // Oran satırları (ör. "sag.hay/ topl.hay.", "Ölüm/Hayvan Sayısı") gösterilmez.
+    if (_oranSatiri.hasMatch(_metin(r[3]))) return null;
     return DetaySatir(t, _metin(r[1]), _metin(r[2]), _metin(r[3]), d);
   }
 }
