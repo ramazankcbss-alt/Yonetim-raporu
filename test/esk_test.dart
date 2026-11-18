@@ -34,7 +34,7 @@ final _eskJson = <String, dynamic>{
     ['Fiyat', 'Bakım besleme ücreti', '50 TL/baş/gün', 'Ekim faturası'],
     ['Öneri', '1. Asgari hacim maddesi', '3.600 baş/gün', 'Al ya da öde'],
     ['Geçmiş', 'Taşağıl doluluk 2018 → 2023', '5.899 → 0 baş', ''],
-    ['Eksik', 'ESK sözleşmesi', 'Kemal Tan / Cem Uçar', 'Süre, fiyat'],
+    ['Eksik', 'ESK sözleşmesi', 'Satın alma birimi', 'Süre, fiyat'],
   ],
 };
 
@@ -56,25 +56,44 @@ void main() {
     expect(EskBilgi.oku(['Özet']), isNull);
   });
 
-  testWidgets('ESK ekranı: başabaş, aylık ve eksik belgeler', (t) async {
+  testWidgets('ESK ekranı: menü, raporlar ve eksik belgeler', (t) async {
     t.view.physicalSize = const Size(1080, 5400);
     t.view.devicePixelRatio = 3;
     addTearDown(t.view.reset);
     await t.pumpWidget(
         _uygulama(EskEkran(veri: RaporVerisi.json(_eskJson))));
     await t.pumpAndSettle();
-    expect(find.text('3.546 baş / gün ortalama'), findsOneWidget);
-    expect(find.textContaining('başabaşın 507 baş altında'), findsOneWidget);
-    expect(find.text('Taşağıl doluluk 2018 → 2023'), findsOneWidget);
+    expect(find.text('Ortalama 3.039 baş / gün'), findsOneWidget);
+    expect(find.textContaining('Başabaşın 507 baş altında'), findsOneWidget);
 
-    await t.tap(find.text('Aylık'));
+    await t.tap(find.text('Aylık rapor'));
     await t.pumpAndSettle();
     expect(find.text('Ekim 2026'), findsOneWidget);
     expect(find.text('Tahmini'), findsOneWidget);
+    await t.pageBack();
+    await t.pumpAndSettle();
 
-    await t.tap(find.text('Eksikler'));
+    await t.tap(find.text('Yıllık rapor'));
+    await t.pumpAndSettle();
+    expect(find.text('2026'), findsOneWidget);
+    await t.pageBack();
+    await t.pumpAndSettle();
+
+    await t.tap(find.text('Haftalık rapor'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Günlük canlı hayvan özetinden'), findsOneWidget);
+    await t.pageBack();
+    await t.pumpAndSettle();
+
+    await t.tap(find.text('Geçmiş yıllar'));
+    await t.pumpAndSettle();
+    expect(find.text('Taşağıl doluluk 2018 → 2023'), findsOneWidget);
+    await t.pageBack();
+    await t.pumpAndSettle();
+
+    await t.tap(find.text('Eksik belgeler ve kontroller'));
     await t.pumpAndSettle();
     expect(find.text('ESK sözleşmesi'), findsOneWidget);
-    expect(find.text('Kimden: Kemal Tan / Cem Uçar'), findsOneWidget);
+    expect(find.text('Kimden: Satın alma birimi'), findsOneWidget);
   });
 }
