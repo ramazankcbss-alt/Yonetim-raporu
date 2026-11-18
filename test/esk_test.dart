@@ -70,25 +70,25 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Ekim 2026'), findsOneWidget);
     expect(find.text('Tahmini'), findsOneWidget);
-    await t.pageBack();
+    await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 
     await t.tap(find.text('Yıllık rapor'));
     await t.pumpAndSettle();
     expect(find.text('2026'), findsOneWidget);
-    await t.pageBack();
+    await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 
     await t.tap(find.text('Haftalık rapor'));
     await t.pumpAndSettle();
     expect(find.textContaining('Günlük canlı hayvan özetinden'), findsOneWidget);
-    await t.pageBack();
+    await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 
     await t.tap(find.text('Geçmiş yıllar'));
     await t.pumpAndSettle();
     expect(find.text('Taşağıl doluluk 2018 → 2023'), findsOneWidget);
-    await t.pageBack();
+    await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 
     await t.tap(find.text('Eksik belgeler ve kontroller'));
