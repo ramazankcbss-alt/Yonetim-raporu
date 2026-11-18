@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../bicim.dart';
 import '../servis/veri_servisi.dart';
@@ -177,7 +178,9 @@ class _DonemState extends State<_Donem> {
                 title: Text('${f.kategori} · ${f.birim}', style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text('${f.tedarikci}\n${tarihKisa(f.tarih)} · ${f.durum}'
                     '${f.vade != null ? ' · vade ${tarihKisa(f.vade!)}' : ''}'
-                    '${f.kontrol == 'Raporla uyumlu' ? '' : ' · ${f.kontrol}'}'),
+                    '${f.kontrol == 'Raporla uyumlu' ? '' : ' · ${f.kontrol}'}'
+                    '${f.sapYer.isEmpty ? '' : '\nSAP listesi: ${f.sapYer}'}'
+                    '${f.gelenYer.isEmpty ? '' : '\nAyrıntılı rapor: ${f.gelenYer}'}'),
                 isThreeLine: true,
                 trailing: Text(tl(f.tutar),
                     style: TextStyle(fontWeight: FontWeight.w700, color: f.acik ? Renk.amber : Renk.yazi)),
@@ -308,7 +311,8 @@ class _AcikState extends State<_Acik> {
               title: Text('${a.kategori} · ${a.birim}', style: const TextStyle(fontWeight: FontWeight.w600)),
               subtitle: Text('${a.tedarikci}\nFatura ${tarihKisa(a.tarih)}'
                   '${a.odeme != null ? ' · ödeme ${tarihKisa(a.odeme!)}' : ''}'
-                  '${a.gecmis(bugun) ? ' · ${bugun.difference(a.odeme!).inDays} gün gecikti' : ''}'),
+                  '${a.gecmis(bugun) ? ' · ${bugun.difference(a.odeme!).inDays} gün gecikti' : ''}'
+                  '${a.yer.isEmpty ? '' : '\nAçık bakiye dosyası: ${a.yer}'}'),
               isThreeLine: true,
               trailing: Text(tl(a.tutar),
                   style: TextStyle(fontWeight: FontWeight.w700, color: a.gecmis(bugun) ? Renk.kirmizi : Renk.yazi)),
@@ -363,6 +367,23 @@ class _Karsilastirma extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(k.aciklama, style: const TextStyle(fontSize: 13)),
                   ],
+                  if (k.kaynakA.isNotEmpty) _KaynakSatiri('Kaynak 1', k.kaynakA, k.linkA),
+                  if (k.kaynakB.isNotEmpty) _KaynakSatiri('Kaynak 2', k.kaynakB, k.linkB),
+                  if (k.duzeltme.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text('Ne yapılmalı: ${k.duzeltme}',
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  ],
+                  if (k.detay.isNotEmpty)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => _DetaySayfasi(k: k, renk: _renk(b)))),
+                        icon: const Icon(Icons.list_alt),
+                        label: Text('Nerede? ${k.detay.length} kaydın yeri'),
+                      ),
+                    ),
                 ]),
               ),
             ),
@@ -370,4 +391,140 @@ class _Karsilastirma extends StatelessWidget {
       ],
     );
   }
+}
+
+Future<void> _ac(BuildContext context, String link) async {
+  final ok = await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+  if (!ok && context.mounted) bildir(context, 'Dosya açılamadı.');
+}
+
+class _KaynakSatiri extends StatelessWidget {
+  const _KaynakSatiri(this.etiket, this.dosya, this.link);
+  final String etiket, dosya, link;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Text.rich(TextSpan(children: [
+              TextSpan(text: '$etiket: ', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+              TextSpan(text: dosya, style: const TextStyle(fontSize: 12.5)),
+            ])),
+          ),
+          if (link.isNotEmpty)
+            InkWell(
+              onTap: () => _ac(context, link),
+              child: const Padding(
+                padding: EdgeInsets.only(left: 6),
+                child: Text('Dosyayı aç', style: TextStyle(fontSize: 12.5, color: Renk.mavi, fontWeight: FontWeight.w700)),
+              ),
+            ),
+        ]),
+      );
+}
+
+/// Bir bulgunun kayıtları: her kaydın iki kaynaktaki yeri ve yapılacak düzeltme.
+class _DetaySayfasi extends StatefulWidget {
+  const _DetaySayfasi({required this.k, required this.renk});
+  final MaliKontrol k;
+  final Color renk;
+
+  @override
+  State<_DetaySayfasi> createState() => _DetaySayfasiState();
+}
+
+class _DetaySayfasiState extends State<_DetaySayfasi> {
+  String _ara = '';
+  String? _birim;
+  int _sinir = 100;
+
+  @override
+  Widget build(BuildContext context) {
+    final k = widget.k;
+    final birimler = {for (final d in k.detay) d.birim}.where((b) => b.isNotEmpty).toList()..sort();
+    final q = trKucuk(_ara);
+    final l = k.detay
+        .where((d) => (_birim == null || d.birim == _birim) &&
+            (q.isEmpty || trKucuk('${d.yerA} ${d.yerB} ${d.yapilacak}').contains(q)))
+        .toList();
+    return Scaffold(
+      appBar: AppBar(title: Text(k.baslik, maxLines: 2, style: const TextStyle(fontSize: 16))),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        children: [
+          if (k.kaynakA.isNotEmpty) _KaynakSatiri('Kaynak 1', k.kaynakA, k.linkA),
+          if (k.kaynakB.isNotEmpty) _KaynakSatiri('Kaynak 2', k.kaynakB, k.linkB),
+          if (k.duzeltme.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('Ne yapılmalı: ${k.duzeltme}', style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          const SizedBox(height: 10),
+          TextField(
+            decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search), hintText: 'Ara: sayfa adı, satır, belge no…', isDense: true),
+            onChanged: (v) => setState(() => _ara = v),
+          ),
+          if (birimler.length > 1)
+            SizedBox(
+              height: 46,
+              child: ListView(scrollDirection: Axis.horizontal, children: [
+                for (final b in birimler)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6, top: 6),
+                    child: ChoiceChip(
+                      label: Text(b),
+                      selected: _birim == b,
+                      onSelected: (_) => setState(() => _birim = _birim == b ? null : b),
+                    ),
+                  ),
+              ]),
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Text('${l.length} kayıt · satır numaraları Excel satırlarıdır (başlık satırı 1)',
+                style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+          ),
+          for (final d in l.take(_sinir))
+            Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                decoration: BoxDecoration(border: Border(left: BorderSide(color: widget.renk, width: 3))),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text([if (d.tarih != null) tarihKisa(d.tarih!), if (d.birim.isNotEmpty) d.birim].join(' · '),
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 4),
+                  _Yer('Kaynak 1', d.yerA, d.tutarA),
+                  if (d.yerB.isNotEmpty || d.tutarB != null) _Yer('Kaynak 2', d.yerB, d.tutarB),
+                  if (d.yapilacak.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(d.yapilacak, style: const TextStyle(fontSize: 12.5)),
+                  ],
+                ]),
+              ),
+            ),
+          if (l.length > _sinir)
+            TextButton(onPressed: () => setState(() => _sinir += 200), child: Text('Daha fazla göster (${l.length - _sinir})')),
+        ],
+      ),
+    );
+  }
+}
+
+class _Yer extends StatelessWidget {
+  const _Yer(this.etiket, this.yer, this.tutar);
+  final String etiket, yer;
+  final double? tutar;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text.rich(TextSpan(style: const TextStyle(fontSize: 12.5), children: [
+          TextSpan(text: '$etiket: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+          TextSpan(text: yer.isEmpty ? '—' : yer),
+          if (tutar != null) TextSpan(text: '  ${tl(tutar)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+        ])),
+      );
 }

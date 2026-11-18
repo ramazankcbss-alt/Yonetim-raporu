@@ -13,7 +13,7 @@ final _j = <String, dynamic>{
   'mali': {
     'olusturma': '2026-11-18',
     'fatura': [
-      ['2026-11-16', 'Şekersüt (Fethiye)', 'Grup içi', 'Yem ve kaba yem', 'KONYA ŞEKER SANAYİ VE TİCARET A.Ş.', 100000.0, 'TRY', '2026-12-31', 'Açık', 'Raporla uyumlu'],
+      ['2026-11-16', 'Şekersüt (Fethiye)', 'Grup içi', 'Yem ve kaba yem', 'KONYA ŞEKER SANAYİ VE TİCARET A.Ş.', 100000.0, 'TRY', '2026-12-31', 'Açık', 'Raporla uyumlu', 'satır 2 · belge 7300000629', 'FETHİYE (ŞEKERSÜT) 2026 › satır 5'],
       ['2026-11-17', 'Aslım', 'Grup dışı', 'Akaryakıt', 'Şahıs / teyitsiz tedarikçi', 20000.0, 'TRY', '', 'Ödendi', 'Tutar farkı'],
       ['2026-10-05', 'Taşağıl', 'Grup dışı', 'Bakım, onarım, yedek parça', 'Şahıs / teyitsiz tedarikçi', 5000.0, 'TRY', '', 'Ödendi', 'Ayrıntılı raporda yok'],
     ],
@@ -22,7 +22,8 @@ final _j = <String, dynamic>{
       ['2026-11-16', 'Şekersüt (Fethiye)', 'Yem ve kaba yem', 'KONYA ŞEKER SANAYİ VE TİCARET A.Ş.', 100000.0, '2099-12-31', -100],
     ],
     'kontrol': [
-      ['Tutarsızlık', 'Tutarı farklı çıkan faturalar', '79 fatura', 'Açıklama'],
+      ['Tutarsızlık', 'Tutarı farklı çıkan faturalar', '79 fatura', 'Açıklama', 'SAP listesi', 'https://drive.google.com/x', 'Ayrıntılı rapor', '', 'Düzeltin.',
+        [['2026-07-02', 'Şekersüt (Fethiye)', 37815168, 0, 'satır 825 · belge 7300010738', 'FETHİYE (ŞEKERSÜT) 2026 › satır 916', 'Tutar boş; yazılmalı.']]],
       ['Karşılaştırma', 'ESK sap balyası', '6,77 milyon TL', 'Açıklama'],
     ],
   },
@@ -34,6 +35,9 @@ void main() {
   test('mali veri okunur ve döneme ayrılır', () {
     final m = RaporVerisi.json(_j).mali;
     expect(m.faturalar, hasLength(3));
+    expect(m.faturalar.last.gelenYer, 'FETHİYE (ŞEKERSÜT) 2026 › satır 5');
+    expect(m.kontrol.first.detay.single.tutarB, 0);
+    expect(m.kontrol.first.linkA, 'https://drive.google.com/x');
     expect(m.faturalar.first.tarih, DateTime(2026, 10, 5));
     expect(m.acik.first.gecmis(DateTime(2026, 11, 18)), isTrue);
     expect(m.acik.last.gecmis(DateTime(2026, 11, 18)), isFalse);
@@ -70,6 +74,12 @@ void main() {
     await t.tap(find.text('Karşılaştırma'));
     await t.pumpAndSettle();
     expect(find.text('Tutarı farklı çıkan faturalar'), findsOneWidget);
+    expect(find.text('Dosyayı aç'), findsOneWidget);
+    await t.tap(find.text('Nerede? 1 kaydın yeri'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('FETHİYE (ŞEKERSÜT) 2026 › satır 916'), findsOneWidget);
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
     await t.tap(find.text('Açık bakiyeler'));
     await t.pumpAndSettle();
     expect(find.text('Vadesi geçmiş'), findsOneWidget);

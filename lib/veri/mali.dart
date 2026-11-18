@@ -19,10 +19,16 @@ class MaliFatura {
     this.vade,
     required this.durum,
     required this.kontrol,
+    this.sapYer = '',
+    this.gelenYer = '',
   });
 
   final DateTime tarih;
   final String birim, hesap, kategori, tedarikci, paraBirimi, durum, kontrol;
+
+  /// Kaynak dosyalardaki yeri: SAP listesi (satır, belge no) ve ayrıntılı
+  /// fatura raporu (sayfa, satır).
+  final String sapYer, gelenYer;
 
   /// KDV dahil, TL.
   final double tutar;
@@ -47,6 +53,8 @@ class MaliFatura {
       vade: tarihOku(v[7]),
       durum: m(8),
       kontrol: m(9),
+      sapYer: v.length > 10 ? m(10) : '',
+      gelenYer: v.length > 11 ? m(11) : '',
     );
   }
 }
@@ -60,7 +68,11 @@ class MaliAcik {
     required this.tutar,
     this.odeme,
     this.gecikme,
+    this.yer = '',
   });
+
+  /// Açık bakiye dosyasındaki yeri (satır, belge no).
+  final String yer;
 
   final DateTime tarih;
   final String birim, kategori, tedarikci;
@@ -87,19 +99,73 @@ class MaliAcik {
       tutar: tutar,
       odeme: tarihOku(v[5]),
       gecikme: sayiOku(v[6])?.round(),
+      yer: v.length > 7 ? m(7) : '',
+    );
+  }
+}
+
+/// Bir bulgunun tek kaydı: iki kaynaktaki yeri, tutarı ve yapılacak düzeltme.
+class MaliDetay {
+  const MaliDetay({this.tarih, this.birim = '', this.tutarA, this.tutarB, this.yerA = '', this.yerB = '', this.yapilacak = ''});
+  final DateTime? tarih;
+  final String birim, yerA, yerB, yapilacak;
+  final double? tutarA, tutarB;
+
+  static MaliDetay? oku(Object? v) {
+    if (v is! List || v.length < 7) return null;
+    String m(int i) => (v[i] ?? '').toString().trim();
+    return MaliDetay(
+      tarih: tarihOku(v[0]),
+      birim: m(1),
+      tutarA: v[2] == null ? null : sayiOku(v[2]),
+      tutarB: v[3] == null ? null : sayiOku(v[3]),
+      yerA: m(4),
+      yerB: m(5),
+      yapilacak: m(6),
     );
   }
 }
 
 class MaliKontrol {
-  const MaliKontrol({required this.bolum, required this.baslik, this.deger = '', this.aciklama = ''});
+  const MaliKontrol({
+    required this.bolum,
+    required this.baslik,
+    this.deger = '',
+    this.aciklama = '',
+    this.kaynakA = '',
+    this.linkA = '',
+    this.kaynakB = '',
+    this.linkB = '',
+    this.duzeltme = '',
+    this.detay = const [],
+  });
   final String bolum, baslik, deger, aciklama;
+
+  /// Karşılaştırılan iki kaynak dosya ve Drive bağlantıları.
+  final String kaynakA, linkA, kaynakB, linkB;
+
+  /// Genel olarak ne yapılmalı.
+  final String duzeltme;
+  final List<MaliDetay> detay;
 
   static MaliKontrol? oku(Object? v) {
     if (v is! List || v.length < 2) return null;
     String m(int i) => i < v.length ? (v[i] ?? '').toString().trim() : '';
     if (m(1).isEmpty) return null;
-    return MaliKontrol(bolum: m(0), baslik: m(1), deger: m(2), aciklama: m(3));
+    return MaliKontrol(
+      bolum: m(0),
+      baslik: m(1),
+      deger: m(2),
+      aciklama: m(3),
+      kaynakA: m(4),
+      linkA: m(5),
+      kaynakB: m(6),
+      linkB: m(7),
+      duzeltme: m(8),
+      detay: v.length > 9 && v[9] is List
+          ? (v[9] as List).map(MaliDetay.oku).whereType<MaliDetay>().toList()
+          : const [],
+    );
   }
 }
 
