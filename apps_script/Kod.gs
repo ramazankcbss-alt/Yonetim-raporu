@@ -1269,6 +1269,29 @@ function vetVeri(kod) {
       });
   }
 
+  // Aylık geçmiş (son 13 ay): işletme × ay. Hayvan/Sağılan ayın son veri
+  // gününden, diğerleri ay toplamı. Personel ve taşeron gönderilmez.
+  var aylik = [];
+  if (osh && osh.getLastRow() >= 2) {
+    var aySinir = new Date(); aySinir.setDate(1); aySinir.setMonth(aySinir.getMonth() - 12);
+    aySinir.setHours(0, 0, 0, 0);
+    var ay = {};
+    osh.getRange(2, 1, osh.getLastRow() - 1, 18).getValues().forEach(function (r) {
+      if (!(r[0] instanceof Date) || r[0] < aySinir) return;
+      var t = tarih(r[0]), k = t.slice(0, 7) + '|' + String(r[1]);
+      var x = ay[k] = ay[k] || { ay: t.slice(0, 7), isletme: String(r[1]), sonGun: '', gun: 0,
+        hayvan: 0, sagilan: 0, sut: 0, sagGun: 0, dogan: 0, kesimSatis: 0, buzagiOlum: 0, kesilen: 0,
+        inekOlum: 0, gencKesim: 0, gencOlum: 0, yavru: 0, olenDana: 0, alinan: 0, satilan: 0 };
+      var n = function (c) { return Number(r[c]) || 0; };
+      x.gun++;
+      if (t >= x.sonGun) { x.sonGun = t; x.hayvan = n(4); x.sagilan = n(5); }
+      x.sut += n(6); x.sagGun += n(5); x.dogan += n(7); x.kesimSatis += n(8); x.buzagiOlum += n(9);
+      x.kesilen += n(10); x.inekOlum += n(11); x.gencKesim += n(12); x.gencOlum += n(13);
+      x.yavru += n(14); x.olenDana += n(15); x.alinan += n(16); x.satilan += n(17);
+    });
+    aylik = Object.keys(ay).sort().map(function (k) { return ay[k]; });
+  }
+
   // Hayvan_Detay: yalnızca sürüden çıkanlar ve kayıplar (personel bloğu zaten okunmaz).
   var kayip = [];
   var dsh = ss.getSheetByName(DETAY_SAYFA_);
@@ -1300,6 +1323,7 @@ function vetVeri(kod) {
     etiket: k.etiket,
     olusturma: Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy HH:mm'),
     ozet: ozet,
+    aylik: aylik,
     kayip: kayip,
     hastalik: vetArsiv_(),
     hastalikEk: ek,

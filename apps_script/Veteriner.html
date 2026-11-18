@@ -99,7 +99,7 @@ var SONUCLAR = ['Ölüm', 'Tedavi (kalım)', 'Kuru', 'Kesim', 'İmha'];
 var AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 var ESK = 'ESK-Taşağıl Çiftliği Besi Danası';
 var KOD = '', V = null, sekme = 'hayvan';
-var hf = { hafta: null }, sf = { yil: null, ciftlik: null, cins: null };
+var hf = { hafta: null, gorunum: 'hafta', isletme: '' }, sf = { yil: null, ciftlik: null, cins: null };
 var form = { bolum: '', konu: '', deg: '' };
 
 function $(id) { return document.getElementById(id); }
@@ -141,13 +141,18 @@ function hazirla() {
   a.kayit.forEach(function (r) {
     HK.push({ yil: r[0], ay: r[1], ciftlik: a.ciftlik[r[2]], cins: a.cins[r[3]], hastalik: a.hastalik[r[4]], sonuc: a.sonuc[r[5]], adet: r[6] });
   });
-  var var_ = {}; HK.forEach(function (k) { var_[k.yil + '|' + k.ay + '|' + k.ciftlik] = 1; });
+  // Bilgi Bankası'ndaki "Hastalık kaydı" satırları bir (yıl, ay, çiftlik) diliminin
+  // tamamını verir; o dilim için arşivdeki kayıtların yerine geçer.
+  var ek = [];
   (V.hastalikEk || []).forEach(function (r) {
     var yil = parseInt(String(r[0]).match(/20\d\d/g) ? String(r[0]).match(/20\d\d/g).pop() : 0, 10);
     var ay = AYLAR.indexOf(String(r[1])) + 1, p = String(r[3]).split(' · ');
-    if (!yil || !ay || p.length !== 3 || var_[yil + '|' + ay + '|' + r[2]]) return;
-    HK.push({ yil: yil, ay: ay, ciftlik: r[2], cins: p[0], hastalik: p[1], sonuc: p[2], adet: Math.round(r[4] || 1) });
+    if (!yil || !ay || p.length !== 3) return;
+    ek.push({ yil: yil, ay: ay, ciftlik: r[2], cins: p[0], hastalik: p[1], sonuc: p[2], adet: Math.round(r[4] || 0) });
   });
+  var dilim = {}; ek.forEach(function (k) { dilim[k.yil + '|' + k.ay + '|' + k.ciftlik] = 1; });
+  HK = HK.filter(function (k) { return !dilim[k.yil + '|' + k.ay + '|' + k.ciftlik]; })
+    .concat(ek.filter(function (k) { return k.adet > 0; }));
 }
 
 function haftaBasi(t) { var d = new Date(t + 'T00:00:00'); var g = (d.getDay() + 6) % 7; d.setDate(d.getDate() - g); return d; }
@@ -165,7 +170,17 @@ function ciz() {
 
 // Hayvan_Özet satırı: [tarih, işletme, hayvan, sağılan, süt, doğan, kesimSatış, buzağıÖlüm,
 //   kesilenDana, inekÖlüm, gençKesim, gençÖlüm, yavruAtma, ölenDana, alınan, satılan]
+function gorunumSec() {
+  return '<div style="margin-bottom:6px">' + [['hafta', 'Haftalık'], ['ay', 'Aylık geçmiş (13 ay)']].map(function (x) {
+    return '<span class="cip' + (hf.gorunum === x[0] ? ' secili' : '') + '" data-g="' + x[0] + '">' + x[1] + '</span>';
+  }).join('') + '</div>';
+}
+function gorunumBagla() {
+  document.querySelectorAll('[data-g]').forEach(function (c) { c.onclick = function () { hf.gorunum = c.dataset.g; hayvanCiz(); }; });
+}
+
 function hayvanCiz() {
+  if (hf.gorunum === 'ay') return aylikCiz();
   var haftalar = {};
   V.ozet.forEach(function (r) { haftalar[anahtar(haftaBasi(r[0]))] = 1; });
   var l = Object.keys(haftalar).sort().reverse();
@@ -187,7 +202,7 @@ function hayvanCiz() {
     var k = kayipDetay[r[1]] = kayipDetay[r[1]] || {};
     k[r[2]] = (k[r[2]] || 0) + r[3];
   });
-  var h = '<div class="bilgi">Uygulamadaki Hayvancılık ekranının haftalık göstergeleri. Her kartı kontrol edip yanlış, eksik ya da yetersiz bulduğunuz değeri <b>Değerlendir</b> ile bildirin.</div>';
+  var h = gorunumSec() + '<div class="bilgi">Uygulamadaki Hayvancılık ekranının haftalık göstergeleri. Her kartı kontrol edip yanlış, eksik ya da yetersiz bulduğunuz değeri <b>Değerlendir</b> ile bildirin.</div>';
   h += '<div>' + l.map(function (k) { return '<span class="cip' + (k === bas ? ' secili' : '') + '" data-h="' + k + '">' + e(haftaAdi(k)) + '</span>'; }).join('') + '</div>';
   var adlar = Object.keys(isl).filter(function (a) { return a !== ESK; }).sort();
   var top = { hayvan: 0, sagilan: 0, sut: 0, sagGun: 0, dogan: 0, buzagiOlum: 0, kesilen: 0, kesimSatis: 0, kayip: 0 };
@@ -219,7 +234,47 @@ function hayvanCiz() {
   h += genelDugme('Hayvancılık');
   $('icerik').innerHTML = h;
   document.querySelectorAll('[data-h]').forEach(function (c) { c.onclick = function () { hf.hafta = c.dataset.h; hayvanCiz(); }; });
-  baglaDegerlendir();
+  gorunumBagla(); baglaDegerlendir();
+}
+
+var TOPLAM_AD = 'Çiftliklerimiz toplamı';
+function aylikCiz() {
+  var l = V.aylik || [];
+  var adlar = {}; l.forEach(function (x) { adlar[x.isletme] = 1; });
+  var secenek = [TOPLAM_AD].concat(Object.keys(adlar).filter(function (a) { return a !== ESK; }).sort(), adlar[ESK] ? [ESK] : []);
+  if (secenek.indexOf(hf.isletme) < 0) hf.isletme = TOPLAM_AD;
+  var aylar = {};
+  l.forEach(function (x) {
+    var dahil = hf.isletme === TOPLAM_AD ? x.isletme !== ESK : x.isletme === hf.isletme;
+    if (!dahil) return;
+    var a = aylar[x.ay] = aylar[x.ay] || { hayvan: 0, sagilan: 0, sut: 0, sagGun: 0, dogan: 0, buzagiOlum: 0, kayip: 0, kesilen: 0, kesimSatis: 0, alinan: 0, gun: 0 };
+    a.hayvan += x.hayvan; a.sagilan += x.sagilan; a.sut += x.sut; a.sagGun += x.sagGun; a.dogan += x.dogan;
+    a.buzagiOlum += x.buzagiOlum; a.kayip += x.buzagiOlum + x.inekOlum + x.gencOlum + x.yavru + x.olenDana;
+    a.kesilen += x.kesilen; a.kesimSatis += x.kesimSatis; a.alinan += x.alinan; a.gun = Math.max(a.gun, x.gun);
+  });
+  var h = gorunumSec() + '<div class="bilgi">Son 13 ayın aylık özeti. Hayvan ve sağılan sayısı ayın son veri gününden, diğerleri ay toplamıdır. ' +
+    'Bir ayda yanlış, eksik ya da tutarsız gördüğünüz değeri <b>Değerlendir</b> ile bildirin.</div>';
+  h += '<div>' + secenek.map(function (a) { return '<span class="cip' + (a === hf.isletme ? ' secili' : '') + '" data-i="' + e(a) + '">' + e(a) + '</span>'; }).join('') + '</div>';
+  var an = Object.keys(aylar).sort().reverse();
+  if (!an.length) h += '<div class="kart">Bu seçimde aylık veri yok.</div>';
+  an.forEach(function (k) {
+    var a = aylar[k], y = k.slice(0, 4), m = parseInt(k.slice(5, 7), 10);
+    var ad = AYLAR[m - 1] + ' ' + y, onEk = ad + ' · ' + hf.isletme + ' · ';
+    h += '<div class="kart"><div class="satir"><b>' + ad + '</b><span class="soluk">&nbsp;' + a.gun + ' günlük veri</span></div><div class="izgara" style="margin-top:8px">' +
+      g('Hayvan', sayi(a.hayvan), '', onEk + 'Hayvan') +
+      (a.sagilan ? g('Sağılan', sayi(a.sagilan), '', onEk + 'Sağılan') : '') +
+      (a.sut ? g('Süt', sayi(a.sut / 1000, 1) + ' ton', 'Ort. ' + sayi(a.sagGun ? a.sut / a.sagGun : 0, 1) + ' kg/baş/gün', onEk + 'Süt ve verim') : '') +
+      (a.dogan || a.buzagiOlum ? g('Doğan buzağı', sayi(a.dogan), 'Ölen buzağı: ' + sayi(a.buzagiOlum), onEk + 'Doğum') : '') +
+      g('Kayıplar', sayi(a.kayip), 'ölüm, ölü doğum, atık', onEk + 'Kayıplar') +
+      (a.kesilen ? g('Kesilen dana', sayi(a.kesilen), '', onEk + 'Kesilen dana') : '') +
+      (a.kesimSatis ? g('İnek/düve kesim-satış', sayi(a.kesimSatis), '', onEk + 'İnek/düve kesim-satış') : '') +
+      (a.alinan ? g('Dışarıdan alınan', sayi(a.alinan), '', onEk + 'Dışarıdan alınan') : '') +
+      '</div></div>';
+  });
+  h += genelDugme('Hayvancılık');
+  $('icerik').innerHTML = h;
+  document.querySelectorAll('[data-i]').forEach(function (c) { c.onclick = function () { hf.isletme = c.dataset.i; aylikCiz(); }; });
+  gorunumBagla(); baglaDegerlendir();
 }
 function kayip(x) { return x.buzagiOlum + x.inekOlum + x.gencOlum + x.yavru + x.olenDana; }
 function g(ad, deger, not, konu) {

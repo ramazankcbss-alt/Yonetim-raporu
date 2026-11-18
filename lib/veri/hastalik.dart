@@ -33,7 +33,7 @@ HastalikKaydi? gecmistenHastalik(GecmisVeri x) {
   final p = x.gosterge.split(' · ');
   final ay = aylar.indexOf(x.ay) + 1;
   if (p.length != 3 || ay == 0 || x.yilNo == 0) return null;
-  return HastalikKaydi(x.yilNo, ay, x.alan, p[0], p[1], p[2], (x.sayi ?? 1).round());
+  return HastalikKaydi(x.yilNo, ay, x.alan, p[0], p[1], p[2], (x.sayi ?? 0).round());
 }
 
 Future<List<HastalikKaydi>> hastalikYukle(List<GecmisVeri> gecmis) async {
@@ -41,13 +41,21 @@ Future<List<HastalikKaydi>> hastalikYukle(List<GecmisVeri> gecmis) async {
   try {
     arsiv = hastalikJsonCoz(await rootBundle.loadString('assets/veri/hastalik.json'));
   } catch (_) {}
-  // Sonradan gelen satırlar arşivde olmayan (yıl, ay, çiftlik) dilimlerini tamamlar.
-  final var_ = {for (final k in arsiv) '${k.yil}|${k.ay}|${k.ciftlik}'};
-  final ek = [
-    for (final x in gecmis)
-      if (gecmistenHastalik(x) case final k? when !var_.contains('${k.yil}|${k.ay}|${k.ciftlik}')) k,
+  return hastalikBirlestir(arsiv, gecmis);
+}
+
+/// Bilgi Bankası'ndaki "Hastalık kaydı" satırları bir (yıl, ay, çiftlik)
+/// diliminin tamamını verir: o dilimde arşivdeki kayıtların yerine geçer.
+/// Adedi 0 olan satırlar (düzeltmede kaldırılan gösterge) gösterilmez.
+List<HastalikKaydi> hastalikBirlestir(List<HastalikKaydi> arsiv, List<GecmisVeri> gecmis) {
+  final ek = [for (final x in gecmis) if (gecmistenHastalik(x) case final k?) k];
+  final dilim = {for (final k in ek) '${k.yil}|${k.ay}|${k.ciftlik}'};
+  return [
+    for (final k in arsiv)
+      if (!dilim.contains('${k.yil}|${k.ay}|${k.ciftlik}')) k,
+    for (final k in ek)
+      if (k.adet > 0) k,
   ];
-  return [...arsiv, ...ek];
 }
 
 /// Hastalık → etken ve önleme tedbirleri (genel bilgi; çiftlik veterineri ile teyit edilir).

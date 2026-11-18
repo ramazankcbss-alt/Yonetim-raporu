@@ -18,4 +18,20 @@ void main() {
     expect(tedbirBul('Mastit').tedbirler, isNotEmpty);
     expect(tedbirBul('Bilinmeyen').etken, contains('teşhis'));
   });
+  test('Bilgi Bankası dilimi arşivdeki ayın yerine geçer', () {
+    const arsiv = [
+      HastalikKaydi(2026, 11, 'Şekersüt', 'İnek', 'Mastit', 'Kuru', 5),
+      HastalikKaydi(2026, 11, 'Aslım', 'Besi danası', 'Solunum/pnömoni', 'Ölüm', 1),
+      HastalikKaydi(2026, 10, 'Şekersüt', 'İnek', 'Mastit', 'Kuru', 4),
+    ];
+    const g = [
+      GecmisVeri(yil: '2026', ay: 'Kasım', alan: 'Şekersüt', konu: 'Hastalık kaydı', gosterge: 'İnek · Mastit · Kuru', sayi: 7),
+      GecmisVeri(yil: '2026', ay: 'Kasım', alan: 'Şekersüt', konu: 'Hastalık kaydı', gosterge: 'Buzağı · İshal · Ölüm', sayi: 0),
+    ];
+    final l = hastalikBirlestir(arsiv, g);
+    expect(l.length, 3);
+    expect(l.where((k) => k.ciftlik == 'Şekersüt' && k.ay == 11).single.adet, 7);
+    expect(l.any((k) => k.ciftlik == 'Aslım'), isTrue);
+    expect(l.any((k) => k.ay == 10), isTrue);
+  });
 }
