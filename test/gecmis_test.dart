@@ -33,7 +33,7 @@ void main() {
 
   testWidgets('geçmiş ekranı menü ve alt sayfalar', (t) async {
     final v = RaporVerisi.json(j);
-    t.view.physicalSize = const Size(1080, 4800);
+    t.view.physicalSize = const Size(2400, 4800);
     t.view.devicePixelRatio = 3;
     addTearDown(t.view.reset);
     await t.pumpWidget(MaterialApp(home: GecmisEkran(veri: v)));
