@@ -80,6 +80,14 @@ void main() {
     expect(find.textContaining('FETHİYE (ŞEKERSÜT) 2026 › satır 916'), findsOneWidget);
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
+    expect(find.text('Bu bulguyu gönder'), findsOneWidget);
+    await t.tap(find.text('Düzeltme talebi gönder'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('talepMetni')), findsOneWidget);
+    expect(find.textContaining('incelenerek düzeltilmesini', findRichText: true), findsWidgets);
+    expect(find.text('Paylaş'), findsOneWidget);
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
     await t.tap(find.text('Açık bakiyeler'));
     await t.pumpAndSettle();
     expect(find.text('Vadesi geçmiş'), findsOneWidget);
@@ -109,5 +117,20 @@ void main() {
     expect(find.text('Döviz faturaları'), findsOneWidget);
     expect(find.text('1.000 TL'), findsWidgets);
     expect(find.text('500,00 EUR'), findsWidgets);
+  });
+  test('düzeltme talebi metni', () {
+    final k = MaliKontrol(
+      bolum: 'Tutarsızlık',
+      baslik: 'Tutar hücresi boş bırakılmış satırlar',
+      deger: '1 satır',
+      duzeltme: 'Fatura aslından tutarı L sütununa yazın.',
+      linkA: 'https://drive.google.com/x',
+      detay: const [MaliDetay(yerA: 'FETHİYE (ŞEKERSÜT) 2026 › satır 916', yapilacak: 'Tutar hücresi boş.')],
+    );
+    final t = duzeltmeTalebi([k]);
+    expect(t, contains('incelenerek düzeltilmesini rica ederim'));
+    expect(t, contains('• FETHİYE (ŞEKERSÜT) 2026 › satır 916 – Tutar hücresi boş.'));
+    expect(t, contains('Dosya: https://drive.google.com/x'));
+    expect(t, contains('Tarım ve Hayvancılık Grup Müdürü'));
   });
 }

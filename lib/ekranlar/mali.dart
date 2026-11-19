@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../bicim.dart';
@@ -347,6 +348,10 @@ class _Karsilastirma extends StatelessWidget {
         final x = _sira.indexOf(a), y = _sira.indexOf(b);
         return (x < 0 ? 99 : x).compareTo(y < 0 ? 99 : y);
       });
+    final hatalar = veri.kontrol.where((k) => k.bolum == 'Tutarsızlık').toList();
+    final hataSay = hatalar.fold<int>(0, (t, k) => t + k.detay.length);
+    void gonder(List<MaliKontrol> l) =>
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => DuzeltmeTalebiEkran(bulgular: l)));
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
       children: [
@@ -354,6 +359,25 @@ class _Karsilastirma extends StatelessWidget {
             yazi: 'Gelen fatura raporundaki hatalı ya da tutarsız kayıtlar ve uygulamadaki diğer verilerle '
                 '(ESK, hayvancılık, bakım onarım) karşılaştırma. Her bulgunun altındaki "Nerede?" ile '
                 'sayfa ve satır numaraları açılır.'),
+        if (hatalar.isNotEmpty)
+          Card(
+            margin: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text('Düzeltilmesi gereken kayıtlar: $hataSay',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                Text(hatalar.map((k) => '${k.deger} – ${k.baslik.toLowerCase()}').join('\n'),
+                    style: const TextStyle(fontSize: 12.5, color: Renk.soluk)),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: () => gonder(hatalar),
+                  icon: const Icon(Icons.send),
+                  label: const Text('Düzeltme talebi gönder'),
+                ),
+              ]),
+            ),
+          ),
         for (final b in bolumler) ...[
           BolumBasligi(b),
           for (final k in veri.kontrol.where((k) => k.bolum == b))
@@ -380,16 +404,21 @@ class _Karsilastirma extends StatelessWidget {
                     Text('Ne yapılmalı: ${k.duzeltme}',
                         style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
                   ],
-                  if (k.detay.isNotEmpty)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
+                  Wrap(spacing: 4, children: [
+                    if (k.detay.isNotEmpty)
+                      TextButton.icon(
                         onPressed: () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => _DetaySayfasi(k: k, renk: _renk(b)))),
                         icon: const Icon(Icons.list_alt),
                         label: Text('Nerede? ${k.detay.length} kaydın yeri'),
                       ),
-                    ),
+                    if (b == 'Tutarsızlık')
+                      TextButton.icon(
+                        onPressed: () => gonder([k]),
+                        icon: const Icon(Icons.send),
+                        label: const Text('Bu bulguyu gönder'),
+                      ),
+                  ]),
                 ]),
               ),
             ),
@@ -537,3 +566,53 @@ class _Yer extends StatelessWidget {
 
 /// Tutarı para birimiyle yazar: TL için [tl], dövizde "12.345,67 EUR".
 String para(double v, String pb) => pb == 'TRY' ? tl(v) : '${sayi(v, ondalik: 2)} $pb';
+
+/// Düzeltme talebinin önizlemesi: metin düzenlenebilir, "Paylaş" telefonun
+/// paylaşım menüsünü açar. Uygulama kendiliğinden hiçbir şey göndermez.
+class DuzeltmeTalebiEkran extends StatefulWidget {
+  const DuzeltmeTalebiEkran({super.key, required this.bulgular});
+  final List<MaliKontrol> bulgular;
+
+  @override
+  State<DuzeltmeTalebiEkran> createState() => _DuzeltmeTalebiEkranState();
+}
+
+class _DuzeltmeTalebiEkranState extends State<DuzeltmeTalebiEkran> {
+  late final TextEditingController _metin = TextEditingController(text: duzeltmeTalebi(widget.bulgular));
+
+  @override
+  void dispose() {
+    _metin.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Düzeltme talebi')),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+          children: [
+            const BilgiKutusu(
+                yazi: 'Metni gerektiği gibi düzenleyebilirsiniz. "Paylaş" telefonun paylaşım menüsünü açar; '
+                    'e-posta ya da mesaj uygulamasını ve alıcıyı siz seçersiniz. Talebi yalnızca dosyaya '
+                    'erişimi olan kurum içi kişilere gönderin (KVKK).'),
+            const SizedBox(height: 8),
+            TextField(
+              key: const Key('talepMetni'),
+              controller: _metin,
+              maxLines: null,
+              minLines: 12,
+              style: const TextStyle(fontSize: 13.5, height: 1.4),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: () => Share.share(_metin.text,
+                  subject: '2026 Gelen Fatura Raporları – kayıt düzeltme talebi'),
+              icon: const Icon(Icons.share),
+              label: const Text('Paylaş'),
+            ),
+          ],
+        ),
+      );
+}

@@ -258,3 +258,38 @@ List<MapEntry<DateTime, List<MaliFatura>>> maliDonemler(List<MaliFatura> l, Mali
   }
   return m.entries.toList()..sort((a, b) => b.key.compareTo(a.key));
 }
+
+/// Tutarsızlıkların düzeltilmesi için ilgili birime gönderilecek talep metni.
+/// KVKK: yalnızca sayfa/satır, hücre değeri ve tüzel kişi fatura numarası içerir
+/// (şahıs tedarikçilerin fatura numaraları veride zaten yoktur).
+String duzeltmeTalebi(List<MaliKontrol> bulgular, {String imza = 'Ramazan Kocabaş\nTarım ve Hayvancılık Grup Müdürü'}) {
+  final b = StringBuffer()
+    ..writeln('Konu: 2026 Gelen Fatura Raporları – kayıt düzeltme talebi')
+    ..writeln()
+    ..writeln('Merhaba,')
+    ..writeln('2026 Çiftlikler İş Birimi Gelen Fatura Raporları dosyasında aşağıdaki kayıtlarda tutarsızlık '
+        'tespit edilmiştir. Bu hususların incelenerek düzeltilmesini rica ederim.');
+  var no = 0;
+  final linkler = <String>{};
+  for (final k in bulgular) {
+    no++;
+    b
+      ..writeln()
+      ..writeln('$no. ${k.baslik} (${k.deger})');
+    if (k.duzeltme.isNotEmpty) b.writeln('Yapılacak: ${k.duzeltme}');
+    for (final d in k.detay) {
+      b.writeln('• ${d.yerA}${d.yapilacak.isEmpty ? '' : ' – ${d.yapilacak}'}');
+    }
+    if (k.linkA.isNotEmpty) linkler.add(k.linkA);
+  }
+  b.writeln();
+  for (final l in linkler) {
+    b.writeln('Dosya: $l');
+  }
+  b
+    ..writeln('Düzeltmeler tamamlandığında bilgi verilmesini rica ederim.')
+    ..writeln()
+    ..writeln('Saygılarımla,')
+    ..write(imza);
+  return b.toString();
+}
