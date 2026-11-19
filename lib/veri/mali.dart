@@ -170,13 +170,19 @@ class MaliKontrol {
 }
 
 class MaliVeri {
-  const MaliVeri({this.faturalar = const [], this.acik = const [], this.kontrol = const [], this.olusturma, this.kaynak = ''});
+  const MaliVeri({this.faturalar = const [], this.acik = const [], this.kontrol = const [], this.olusturma, this.kaynak = '', this.kdv = 'dahil'});
 
   final List<MaliFatura> faturalar;
   final List<MaliAcik> acik;
   final List<MaliKontrol> kontrol;
   final DateTime? olusturma;
   final String kaynak;
+
+  /// Tutarların KDV durumu: 'hariç' ya da 'dahil'.
+  final String kdv;
+
+  /// Ödeme durumu (ödendi/açık) veride var mı.
+  bool get odemeVar => faturalar.any((f) => f.durum.isNotEmpty);
 
   bool get bos => faturalar.isEmpty && acik.isEmpty && kontrol.isEmpty;
 
@@ -190,6 +196,7 @@ class MaliVeri {
       kontrol: l('kontrol', MaliKontrol.oku),
       olusturma: tarihOku(j['olusturma']),
       kaynak: (j['kaynak'] ?? '').toString(),
+      kdv: (j['kdv'] ?? 'dahil').toString(),
     );
   }
 }

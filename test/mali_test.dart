@@ -67,7 +67,7 @@ void main() {
       home: MaliEkran(veri: RaporVerisi.json(_j)),
     ));
     await t.pumpAndSettle();
-    expect(find.text('Toplam fatura'), findsOneWidget);
+    expect(find.textContaining('Toplam fatura'), findsOneWidget);
     await t.tap(find.text('Aylık'));
     await t.pumpAndSettle();
     expect(find.text('Kasım 2026'), findsOneWidget);
@@ -83,5 +83,27 @@ void main() {
     await t.tap(find.text('Açık bakiyeler'));
     await t.pumpAndSettle();
     expect(find.text('Vadesi geçmiş'), findsOneWidget);
+  });
+  testWidgets('tek kaynak: açık bakiye sekmesi ve ödeme kutuları yok', (t) async {
+    t.view.physicalSize = const Size(2400, 5000);
+    t.view.devicePixelRatio = 1.5;
+    addTearDown(t.view.reset);
+    final j = <String, dynamic>{
+      'hayvanOzet': [], 'hayvanGunluk': [], 'tarim': [],
+      'mali': {
+        'kdv': 'hariç',
+        'kaynak': 'Gelen Fatura Raporları',
+        'fatura': [
+          ['2026-11-16', 'Aslım', 'Grup içi', 'Yem ve kaba yem', 'X A.Ş.', 1000.0, 'TRY', '', '', 'Uyumlu', '', 'ASLIM-2026 › satır 5', 1200.0],
+        ],
+        'acik': [],
+        'kontrol': [],
+      },
+    };
+    await t.pumpWidget(MaterialApp(theme: temaOlustur(), home: MaliEkran(veri: RaporVerisi.json(j))));
+    await t.pumpAndSettle();
+    expect(find.text('Toplam fatura (KDV hariç)'), findsOneWidget);
+    expect(find.text('Ödenen'), findsNothing);
+    expect(find.text('Açık bakiyeler'), findsNothing);
   });
 }

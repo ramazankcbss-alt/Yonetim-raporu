@@ -21,25 +21,26 @@ class MaliEkran extends StatelessWidget {
       listenable: VeriDeposu.ben,
       builder: (context, _) {
         final m = (VeriDeposu.ben.veri ?? veri).mali;
+        final acikVar = m.acik.isNotEmpty;
         return DefaultTabController(
-          length: 6,
+          length: acikVar ? 6 : 5,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Mali Raporlar'),
               actions: const [TabloGuncelleButonu()],
-              bottom: const TabBar(
+              bottom: TabBar(
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
                 labelColor: Colors.white,
-                unselectedLabelColor: Color(0xCCFFFFFF),
+                unselectedLabelColor: const Color(0xCCFFFFFF),
                 indicatorColor: Colors.white,
                 tabs: [
-                  Tab(text: 'Günlük'),
-                  Tab(text: 'Haftalık'),
-                  Tab(text: 'Aylık'),
-                  Tab(text: 'Yıllık'),
-                  Tab(text: 'Açık bakiyeler'),
-                  Tab(text: 'Karşılaştırma'),
+                  const Tab(text: 'Günlük'),
+                  const Tab(text: 'Haftalık'),
+                  const Tab(text: 'Aylık'),
+                  const Tab(text: 'Yıllık'),
+                  if (acikVar) const Tab(text: 'Açık bakiyeler'),
+                  const Tab(text: 'Karşılaştırma'),
                 ],
               ),
             ),
@@ -55,7 +56,7 @@ class MaliEkran extends StatelessWidget {
                     _Donem(veri: m, donem: MaliDonem.hafta),
                     _Donem(veri: m, donem: MaliDonem.ay),
                     _Donem(veri: m, donem: MaliDonem.yil),
-                    _Acik(veri: m),
+                    if (acikVar) _Acik(veri: m),
                     _Karsilastirma(veri: m),
                   ]),
           ),
@@ -120,11 +121,13 @@ class _DonemState extends State<_Donem> {
         Text(_donemAdi(sec.key, d), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         Row(children: [
-          _Kutu('Toplam fatura', tl(o.toplam), '${o.faturalar.length} fatura', Renk.ana),
-          const SizedBox(width: 8),
-          _Kutu('Ödenen', tl(o.odenen), '', Renk.yesil),
-          const SizedBox(width: 8),
-          _Kutu('Ödenmemiş', tl(o.acik), '', o.acik > 0 ? Renk.amber : Renk.soluk),
+          _Kutu('Toplam fatura (KDV ${widget.veri.kdv})', tl(o.toplam), '${o.faturalar.length} fatura', Renk.ana),
+          if (widget.veri.odemeVar) ...[
+            const SizedBox(width: 8),
+            _Kutu('Ödenen', tl(o.odenen), '', Renk.yesil),
+            const SizedBox(width: 8),
+            _Kutu('Ödenmemiş', tl(o.acik), '', o.acik > 0 ? Renk.amber : Renk.soluk),
+          ],
         ]),
         if (d != MaliDonem.gun) ...[
           const BolumBasligi('Dönemler'),
@@ -164,7 +167,7 @@ class _DonemState extends State<_Donem> {
                 Text('${e.key}: ${e.value}',
                     style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        color: e.key == 'Raporla uyumlu' ? Renk.yesil : Renk.amber)),
+                        color: e.key == 'Raporla uyumlu' || e.key == 'Uyumlu' ? Renk.yesil : Renk.amber)),
             ]),
           ),
         ),
@@ -176,9 +179,10 @@ class _DonemState extends State<_Donem> {
               child: ListTile(
                 dense: true,
                 title: Text('${f.kategori} · ${f.birim}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text('${f.tedarikci}\n${tarihKisa(f.tarih)} · ${f.durum}'
+                subtitle: Text('${f.tedarikci}\n${tarihKisa(f.tarih)}'
+                    '${f.durum.isEmpty ? '' : ' · ${f.durum}'}'
                     '${f.vade != null ? ' · vade ${tarihKisa(f.vade!)}' : ''}'
-                    '${f.kontrol == 'Raporla uyumlu' ? '' : ' · ${f.kontrol}'}'
+                    '${f.kontrol == 'Raporla uyumlu' || f.kontrol == 'Uyumlu' ? '' : ' · ${f.kontrol}'}'
                     '${f.sapYer.isEmpty ? '' : '\nSAP listesi: ${f.sapYer}'}'
                     '${f.gelenYer.isEmpty ? '' : '\nAyrıntılı rapor: ${f.gelenYer}'}'),
                 isThreeLine: true,
@@ -188,8 +192,8 @@ class _DonemState extends State<_Donem> {
             ),
         ],
         const SizedBox(height: 8),
-        const Text('Tutarlar KDV dahil TL (muhasebe satıcı listesi). Şahıs işletmesi tedarikçilerin adları KVKK gereği gösterilmez.',
-            style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+        Text('Tutarlar KDV ${widget.veri.kdv} TL · kaynak: ${widget.veri.kaynak}. Şahıs işletmesi tedarikçilerin adları KVKK gereği gösterilmez.',
+            style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
       ],
     );
   }
@@ -346,8 +350,9 @@ class _Karsilastirma extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
       children: [
         const BilgiKutusu(
-            yazi: 'Mali Raporlar klasöründeki dosyaların birbiriyle ve uygulamadaki diğer verilerle '
-                '(ESK, hayvancılık, bakım onarım) karşılaştırması: benzerlikler, eşleşmeler ve tutarsızlıklar.'),
+            yazi: 'Gelen fatura raporundaki hatalı ya da tutarsız kayıtlar ve uygulamadaki diğer verilerle '
+                '(ESK, hayvancılık, bakım onarım) karşılaştırma. Her bulgunun altındaki "Nerede?" ile '
+                'sayfa ve satır numaraları açılır.'),
         for (final b in bolumler) ...[
           BolumBasligi(b),
           for (final k in veri.kontrol.where((k) => k.bolum == b))

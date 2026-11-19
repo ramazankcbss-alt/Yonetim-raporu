@@ -217,7 +217,7 @@ String _maliOzet(RaporVerisi veri) {
   final top = m.faturalar.fold(0.0, (t, f) => t + f.tutar);
   final acik = m.acik.fold(0.0, (t, a) => t + a.tutar);
   final sorun = m.kontrol.where((k) => k.bolum == 'Tutarsızlık' || k.bolum == 'Uyarı').length;
-  return '2026 faturalar ${tl(top)} · ödenmemiş ${tl(acik)}${sorun > 0 ? ' · $sorun uyarı' : ''}';
+  return '2026 faturalar ${tl(top)} (KDV ${m.kdv})${m.acik.isNotEmpty ? ' · ödenmemiş ${tl(acik)}' : ''}${sorun > 0 ? ' · $sorun uyarı' : ''}';
 }
 
 String _vetOzet(RaporVerisi veri) {
