@@ -155,15 +155,11 @@ class _DonemState extends State<_Donem> {
                 enCok: m);
           }),
         ],
-        const BolumBasligi('Birime göre'),
-        _Cubuklar(satirlar: o.grupla((f) => f.birim), enCok: o.toplam),
         const BolumBasligi('Kategoriye göre'),
         _Cubuklar(satirlar: o.grupla((f) => f.kategori), enCok: o.toplam),
         const BolumBasligi('Tedarikçi grubu'),
         _Cubuklar(satirlar: o.grupla((f) => f.hesap), enCok: o.toplam),
-        const BolumBasligi('En büyük tedarikçiler'),
-        _Cubuklar(satirlar: o.grupla((f) => f.tedarikci).take(8).toList(), enCok: o.toplam),
-        const BolumBasligi('Dosyalar arası kontrol'),
+        const BolumBasligi('Kayıt kontrolü'),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -183,7 +179,7 @@ class _DonemState extends State<_Donem> {
               margin: const EdgeInsets.only(bottom: 6),
               child: ListTile(
                 dense: true,
-                title: Text('${f.kategori} · ${f.birim}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                title: Text(f.kategori, style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text('${f.tedarikci}\n${tarihKisa(f.tarih)}'
                     '${f.durum.isEmpty ? '' : ' · ${f.durum}'}'
                     '${f.vade != null ? ' · vade ${tarihKisa(f.vade!)}' : ''}'
