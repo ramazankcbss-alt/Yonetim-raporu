@@ -52,12 +52,25 @@ void main() {
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 
-    await t.tap(find.text('Şekersüt'));
+    expect(gecmisAnaAlan(v.gecmis[1]), 'Hayvancılık');
+    await t.tap(find.text('Hayvancılık'));
     await t.pumpAndSettle();
+    expect(find.text('2025'), findsOneWidget);
+    expect(find.text('2021-2025'), findsOneWidget);
+    await t.tap(find.text('2025'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Yıl geneli'));
+    await t.pumpAndSettle();
+    expect(find.text('Hayvancılık › 2025 › Yıl geneli'), findsOneWidget);
+    await t.tap(find.text('Süt'));
+    await t.pumpAndSettle();
+    expect(find.text('Şekersüt'), findsOneWidget);
     expect(find.text('Ortalama süt verimi'), findsOneWidget);
     expect(find.text('5 yıllık kesim'), findsNothing);
-    await t.tap(find.byType(BackButton));
-    await t.pumpAndSettle();
+    for (var i = 0; i < 4; i++) {
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+    }
 
     await t.tap(find.text('Dersler'));
     await t.pumpAndSettle();

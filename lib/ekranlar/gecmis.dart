@@ -8,10 +8,9 @@ import '../veri/model.dart';
 import 'bilesenler.dart';
 import 'esk.dart' show tl;
 
-/// Geçmiş Yıllar – Bilgi Bankası. Ana ekran bir menüdür: üstte özet,
-/// altında birimler (Ziraat, Hayvancılık, Mali, İşletme), çiftlikler,
-/// geçmişten çıkarılan dersler ve tüm kayıtlarda arama; her başlık kendi
-/// sayfasında açılır.
+/// Geçmiş Yıllar – Bilgi Bankası. Ana ekran iki alana ayrılır (Tarım,
+/// Hayvancılık); her alan yıl → ay → konu (birim başlıkları altında) →
+/// çiftlik sırasıyla açılır. Dersler ve tüm kayıtlarda arama ayrıca durur.
 class GecmisEkran extends StatelessWidget {
   const GecmisEkran({super.key, required this.veri});
 
@@ -46,6 +45,78 @@ class GecmisEkran extends StatelessWidget {
 List<GecmisVeri> _gostergeKayitlari(RaporVerisi v) =>
     v.gecmis.where((x) => x.konu != 'Hastalık kaydı').toList();
 
+/// Ana alan: Tarım, Hayvancılık ya da (ikisine de girmeyenler) Genel.
+const gecmisAnaAlanlar = ['Tarım', 'Hayvancılık', 'Genel'];
+const _tarimK = ['tarım', 'tarim', 'ziraat', 'fidan', 'pancar', 'ekim', 'hasat', 'arazi', 'tarla', 'gübre',
+  'sulama', 'tohum', 'toprak', 'mısır', 'buğday', 'arpa', 'yonca', 'zirai', 'dekar', 'ilaçlama', 'nadas',
+  'kök/da', 'verim kg/da', 'patates', 'ayçiçe', 'nohut', 'pivot'];
+const _hayvanK = ['hayvan', 'besi', 'buzağı', 'kesim', 'süt', 'doğum', 'sağmal', 'sağım', 'inek', 'düve',
+  'dana', 'tosun', 'yem', 'rasyon', 'aşı', 'ölüm', 'ölen', 'gebe', 'tohumlama', 'sürü', 'koyun', 'mastit',
+  'karkas', 'canlı ağırlık', 'baş', 'esk', 'veteriner'];
+
+String gecmisAnaAlan(GecmisVeri x) {
+  final b = gecmisBirimi(x);
+  if (b == Birim.ziraat) return 'Tarım';
+  if (b == Birim.hayvancilik) return 'Hayvancılık';
+  final a = kucuk(x.alan);
+  if (_tarimK.any(a.contains)) return 'Tarım';
+  final t = kucuk('${x.konu} ${x.gosterge} ${x.birim}');
+  final h = _hayvanK.any(t.contains), z = _tarimK.any(t.contains);
+  if (h && !z) return 'Hayvancılık';
+  if (z && !h) return 'Tarım';
+  if (RegExp(r'hayvancılık|besi').hasMatch(a)) return 'Hayvancılık';
+  return 'Genel';
+}
+
+const _aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+String _ayAdi(GecmisVeri x) => x.ay.isEmpty || kucuk(x.ay) == 'yıllık' ? 'Yıl geneli' : x.ay;
+int _aySira(String ay) {
+  if (ay == 'Yıl geneli') return 0;
+  final i = _aylar.indexWhere((a) => kucuk(a) == kucuk(ay));
+  return i < 0 ? 99 : i + 1;
+}
+String _konuAdi(GecmisVeri x) => x.konu.isEmpty ? 'Genel' : x.konu;
+
+IconData _anaIkon(String a) => switch (a) {
+      'Tarım' => Icons.agriculture,
+      'Hayvancılık' => Icons.pets,
+      _ => Icons.more_horiz,
+    };
+
+/// Bir alt sayfayı açar; veri yenilendiğinde süzgeç yeniden uygulanır.
+void _gecmisAc(BuildContext context, RaporVerisi ilk, String baslik, String yol,
+    bool Function(GecmisVeri) suz, Widget Function(List<GecmisVeri>) govde) {
+  Navigator.of(context).push(MaterialPageRoute(
+    builder: (_) => ListenableBuilder(
+      listenable: VeriDeposu.ben,
+      builder: (context, _) {
+        final k = _gostergeKayitlari(VeriDeposu.ben.veri ?? ilk).where(suz).toList();
+        return Scaffold(
+          appBar: AppBar(title: Text(baslik), actions: const [TabloGuncelleButonu()]),
+          body: Column(children: [
+            if (yol.isNotEmpty)
+              Container(
+                width: double.infinity,
+                color: Renk.anaAcik,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Text(yol, style: const TextStyle(fontSize: 12.5, color: Renk.anaKoyu, fontWeight: FontWeight.w600)),
+              ),
+            Expanded(child: govde(k)),
+          ]),
+        );
+      },
+    ),
+  ));
+}
+
+Map<String, int> _say(Iterable<GecmisVeri> k, String Function(GecmisVeri) f) {
+  final m = <String, int>{};
+  for (final x in k) {
+    m.update(f(x), (n) => n + 1, ifAbsent: () => 1);
+  }
+  return m;
+}
+
 class _GecmisMenu extends StatelessWidget {
   const _GecmisMenu({required this.veri, required this.ilk});
   final RaporVerisi veri, ilk;
@@ -53,97 +124,177 @@ class _GecmisMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final k = _gostergeKayitlari(veri);
-    final birimSay = <Birim, int>{};
-    final kokSay = <String, int>{};
-    final yillar = <int>{};
-    for (final x in k) {
-      birimSay.update(gecmisBirimi(x), (n) => n + 1, ifAbsent: () => 1);
-      kokSay.update(alanKoku(x.alan), (n) => n + 1, ifAbsent: () => 1);
-      yillar.addAll(kapsananYillar(x.yil));
-    }
-    final gostergeSayisi = {for (final x in k) '${x.alan}|${x.gosterge}'}.length;
-    final kokler = kokSay.keys.toList()
-      ..sort((a, b) => kokSay[b]!.compareTo(kokSay[a]!));
-
-    void ac(String baslik, Widget Function(RaporVerisi) govde) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => ListenableBuilder(
-          listenable: VeriDeposu.ben,
-          builder: (context, _) => Scaffold(
-            appBar: AppBar(
-                title: Text(baslik), actions: const [TabloGuncelleButonu()]),
-            body: govde(VeriDeposu.ben.veri ?? ilk),
-          ),
-        ),
-      ));
-    }
-
+    final anaSay = _say(k, gecmisAnaAlan);
+    final yillar = <int>{for (final x in k) ...kapsananYillar(x.yil)};
     final yilYazi = yillar.isEmpty
         ? ''
         : ' · ${yillar.reduce((a, b) => a < b ? a : b)}–${yillar.reduce((a, b) => a > b ? a : b)}';
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
       children: [
         Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-              color: Renk.anaAcik, borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(color: Renk.anaAcik, borderRadius: BorderRadius.circular(12)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Bilgi Bankası',
-                style: TextStyle(fontSize: 13, color: Renk.soluk)),
-            Text('$gostergeSayisi gösterge · ${k.length} kayıt',
-                style:
-                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const Text('Bilgi Bankası', style: TextStyle(fontSize: 13, color: Renk.soluk)),
+            Text('${k.length} kayıt$yilYazi', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
-            Text('${veri.dersler.length} ders$yilYazi',
-                style: const TextStyle(fontSize: 12.5)),
+            const Text('Alan → yıl → ay → konu → çiftlik sırasıyla ilerleyin.', style: TextStyle(fontSize: 12.5)),
           ]),
         ),
-        const _GMenuBaslik('Birimler'),
-        for (final b in Birim.values)
-          if ((birimSay[b] ?? 0) > 0)
+        const _GMenuBaslik('Alanlar'),
+        for (final a in gecmisAnaAlanlar)
+          if ((anaSay[a] ?? 0) > 0)
             _GMenuSatiri(
-              ikon: _birimIkon(b),
-              baslik: birimAdlari[b]!,
-              alt: '${birimSay[b]} kayıt',
-              ac: () => ac(
-                  birimAdlari[b]!,
-                  (v) => _Gostergeler(
-                      kayitlar: _gostergeKayitlari(v)
-                          .where((x) => gecmisBirimi(x) == b)
-                          .toList(),
-                      birimCipleri: false)),
+              ikon: _anaIkon(a),
+              baslik: a == 'Genel' ? 'Genel (iki alana da girmeyen)' : a,
+              alt: '${anaSay[a]} kayıt',
+              ac: () => _gecmisAc(context, ilk, a, a, (x) => gecmisAnaAlan(x) == a,
+                  (k) => _YilListesi(kayitlar: k, ana: a, ilk: ilk)),
             ),
-        const _GMenuBaslik('Çiftlikler ve işletmeler'),
-        for (final kok in kokler)
-          _GMenuSatiri(
-            ikon: Icons.location_on_outlined,
-            baslik: kok,
-            alt: '${kokSay[kok]} kayıt',
-            ac: () => ac(
-                kok,
-                (v) => _Gostergeler(
-                    kayitlar: _gostergeKayitlari(v)
-                        .where((x) => alanKoku(x.alan) == kok)
-                        .toList())),
-          ),
         const _GMenuBaslik('Değerlendirme'),
         _GMenuSatiri(
           ikon: Icons.school_outlined,
           baslik: 'Dersler',
           alt: '${veri.dersler.length} ders: geçmişte ne oldu, ne öğrenildi',
-          ac: () => ac('Dersler', (v) => _Dersler(dersler: v.dersler)),
+          ac: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Dersler')),
+                  body: _Dersler(dersler: (VeriDeposu.ben.veri ?? ilk).dersler)))),
         ),
         _GMenuSatiri(
           ikon: Icons.search,
           baslik: 'Tüm kayıtlarda ara',
-          alt: 'Yıl, birim, çiftlik ve konuya göre süzme',
-          ac: () => ac('Tüm kayıtlar',
-              (v) => _Gostergeler(kayitlar: _gostergeKayitlari(v))),
+          alt: 'Aradığınızı bulamazsanız kelimeyle arayın',
+          ac: () => _gecmisAc(context, ilk, 'Tüm kayıtlar', '', (_) => true, (k) => _Gostergeler(kayitlar: k)),
         ),
       ],
     );
+  }
+}
+
+/// 1) Alan içindeki yıllar.
+class _YilListesi extends StatelessWidget {
+  const _YilListesi({required this.kayitlar, required this.ana, required this.ilk});
+  final List<GecmisVeri> kayitlar;
+  final String ana;
+  final RaporVerisi ilk;
+
+  @override
+  Widget build(BuildContext context) {
+    final say = _say(kayitlar, (x) => x.yil);
+    final no = {for (final x in kayitlar) x.yil: x.yilNo};
+    final yillar = say.keys.toList()..sort((a, b) => no[b]!.compareTo(no[a]!) != 0 ? no[b]!.compareTo(no[a]!) : a.compareTo(b));
+    return ListView(padding: const EdgeInsets.fromLTRB(14, 10, 14, 24), children: [
+      const _GMenuBaslik('Yıllar'),
+      for (final y in yillar)
+        _GMenuSatiri(
+          ikon: Icons.event_outlined,
+          baslik: y,
+          alt: '${say[y]} kayıt',
+          ac: () => _gecmisAc(context, ilk, y, '$ana › $y', (x) => gecmisAnaAlan(x) == ana && x.yil == y,
+              (k) => _AyListesi(kayitlar: k, ana: ana, yil: y, ilk: ilk)),
+        ),
+    ]);
+  }
+}
+
+/// 2) Yıl içindeki aylar.
+class _AyListesi extends StatelessWidget {
+  const _AyListesi({required this.kayitlar, required this.ana, required this.yil, required this.ilk});
+  final List<GecmisVeri> kayitlar;
+  final String ana, yil;
+  final RaporVerisi ilk;
+
+  @override
+  Widget build(BuildContext context) {
+    final say = _say(kayitlar, _ayAdi);
+    final aylar = say.keys.toList()..sort((a, b) => _aySira(a).compareTo(_aySira(b)));
+    return ListView(padding: const EdgeInsets.fromLTRB(14, 10, 14, 24), children: [
+      const _GMenuBaslik('Aylar'),
+      for (final a in aylar)
+        _GMenuSatiri(
+          ikon: a == 'Yıl geneli' ? Icons.calendar_today_outlined : Icons.calendar_month_outlined,
+          baslik: a,
+          alt: '${say[a]} kayıt',
+          ac: () => _gecmisAc(context, ilk, '$yil $a', '$ana › $yil › $a',
+              (x) => gecmisAnaAlan(x) == ana && x.yil == yil && _ayAdi(x) == a,
+              (k) => _KonuListesi(
+                  kayitlar: k,
+                  yol: '$ana › $yil › $a',
+                  ilk: ilk,
+                  suz: (x) => gecmisAnaAlan(x) == ana && x.yil == yil && _ayAdi(x) == a)),
+        ),
+    ]);
+  }
+}
+
+/// 3) Ay içindeki konular, birimlerine göre başlıklar altında.
+class _KonuListesi extends StatelessWidget {
+  const _KonuListesi({required this.kayitlar, required this.yol, required this.ilk, required this.suz});
+  final List<GecmisVeri> kayitlar;
+  final String yol;
+  final RaporVerisi ilk;
+  final bool Function(GecmisVeri) suz;
+
+  @override
+  Widget build(BuildContext context) {
+    final grup = <Birim, Map<String, List<GecmisVeri>>>{};
+    for (final x in kayitlar) {
+      grup.putIfAbsent(gecmisBirimi(x), () => {}).putIfAbsent(_konuAdi(x), () => []).add(x);
+    }
+    final birimler = grup.keys.toList()..sort((a, b) => a.index.compareTo(b.index));
+    return ListView(padding: const EdgeInsets.fromLTRB(14, 10, 14, 24), children: [
+      for (final b in birimler) ...[
+        _GMenuBaslik(birimAdlari[b]!),
+        for (final e in (grup[b]!.entries.toList()..sort((p, q) => p.key.compareTo(q.key))))
+          _GMenuSatiri(
+            ikon: _birimIkon(b),
+            baslik: e.key,
+            alt: '${e.value.length} kayıt · ${{for (final x in e.value) alanKoku(x.alan)}.join(', ')}',
+            ac: () => _gecmisAc(context, ilk, e.key, '$yol › ${e.key}',
+                (x) => suz(x) && gecmisBirimi(x) == b && _konuAdi(x) == e.key, (k) => _CiftlikListesi(kayitlar: k)),
+          ),
+      ],
+    ]);
+  }
+}
+
+/// 4) Konunun çiftliklere göre değerleri.
+class _CiftlikListesi extends StatelessWidget {
+  const _CiftlikListesi({required this.kayitlar});
+  final List<GecmisVeri> kayitlar;
+
+  @override
+  Widget build(BuildContext context) {
+    final grup = <String, List<GecmisVeri>>{};
+    for (final x in kayitlar) {
+      grup.putIfAbsent(alanKoku(x.alan), () => []).add(x);
+    }
+    final ciftlikler = grup.keys.toList()..sort();
+    return ListView(padding: const EdgeInsets.fromLTRB(14, 6, 14, 24), children: [
+      for (final c in ciftlikler) ...[
+        BolumBasligi(c),
+        Card(
+          child: Column(children: [
+            for (final x in (grup[c]!..sort((a, b) => a.gosterge.compareTo(b.gosterge))))
+              ListTile(
+                dense: true,
+                title: Text(x.gosterge, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text([
+                  if (x.alan != c) x.alan,
+                  if (x.not.isNotEmpty) x.not,
+                  if (x.kaynak.isNotEmpty) 'Kaynak: ${x.kaynak}',
+                ].join(' · ')),
+                trailing: Text(gecmisDeger(x),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: x.birim == 'TL' && (x.sayi ?? 0) < 0 ? Renk.kirmizi : Renk.yazi)),
+              ),
+          ]),
+        ),
+      ],
+    ]);
   }
 }
 
