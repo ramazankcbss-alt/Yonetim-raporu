@@ -121,7 +121,7 @@ class _DonemState extends State<_Donem> {
         Text(_donemAdi(sec.key, d), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8),
         Row(children: [
-          _Kutu('Toplam fatura (KDV ${widget.veri.kdv})', tl(o.toplam), '${o.faturalar.length} fatura', Renk.ana),
+          _Kutu(widget.veri.kdv.isEmpty ? 'Toplam fatura' : 'Toplam fatura (KDV ${widget.veri.kdv})', tl(o.toplam), '${o.faturalar.length} fatura', Renk.ana),
           if (o.doviz.isNotEmpty) ...[
             const SizedBox(width: 8),
             _Kutu('Döviz faturaları', o.doviz.entries.map((e) => para(e.value, e.key)).join('\n'), 'TL toplamına dahil değil',
@@ -197,7 +197,7 @@ class _DonemState extends State<_Donem> {
             ),
         ],
         const SizedBox(height: 8),
-        Text('Tutarlar KDV ${widget.veri.kdv} TL; döviz faturaları kendi para biriminde ayrıca gösterilir · kaynak: ${widget.veri.kaynak}. Şahıs işletmesi tedarikçilerin adları KVKK gereği gösterilmez.',
+        Text('${widget.veri.kdv.isEmpty ? 'Tutarlar dosyadaki TOPLAM TUTAR (L sütunu) olarak, KDV ayrımı yapılmadan' : 'Tutarlar KDV ${widget.veri.kdv}'} TL; döviz faturaları kendi para biriminde ayrıca gösterilir · kaynak: ${widget.veri.kaynak}. Şahıs işletmesi tedarikçilerin adları KVKK gereği gösterilmez.',
             style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
       ],
     );

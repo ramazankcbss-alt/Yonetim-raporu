@@ -91,7 +91,7 @@ void main() {
     final j = <String, dynamic>{
       'hayvanOzet': [], 'hayvanGunluk': [], 'tarim': [],
       'mali': {
-        'kdv': 'hariç',
+        'kdv': '',
         'kaynak': 'Gelen Fatura Raporları',
         'fatura': [
           ['2026-11-16', 'Aslım', 'Grup içi', 'Yem ve kaba yem', 'X A.Ş.', 1000.0, 'TRY', '', '', 'Uyumlu', '', 'ASLIM-2026 › satır 5', 1200.0],
@@ -103,7 +103,7 @@ void main() {
     };
     await t.pumpWidget(MaterialApp(theme: temaOlustur(), home: MaliEkran(veri: RaporVerisi.json(j))));
     await t.pumpAndSettle();
-    expect(find.text('Toplam fatura (KDV hariç)'), findsOneWidget);
+    expect(find.text('Toplam fatura'), findsOneWidget);
     expect(find.text('Ödenen'), findsNothing);
     expect(find.text('Açık bakiyeler'), findsNothing);
     expect(find.text('Döviz faturaları'), findsOneWidget);
