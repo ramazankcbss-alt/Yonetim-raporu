@@ -68,11 +68,10 @@ String gecmisAnaAlan(GecmisVeri x) {
   return 'Genel';
 }
 
-const _aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 String _ayAdi(GecmisVeri x) => x.ay.isEmpty || kucuk(x.ay) == 'yıllık' ? 'Yıl geneli' : x.ay;
 int _aySira(String ay) {
   if (ay == 'Yıl geneli') return 0;
-  final i = _aylar.indexWhere((a) => kucuk(a) == kucuk(ay));
+  final i = _ayAdlari.indexWhere((a) => kucuk(a) == kucuk(ay));
   return i < 0 ? 99 : i + 1;
 }
 String _konuAdi(GecmisVeri x) => x.konu.isEmpty ? 'Genel' : x.konu;
@@ -608,9 +607,9 @@ class _BirimCip extends StatelessWidget {
       );
 }
 
-const _aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const _ayAdlari = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 int _ayNo(String ay) {
-  final i = _aylar.indexWhere((a) => ay.startsWith(a));
+  final i = _ayAdlari.indexWhere((a) => ay.startsWith(a));
   return i < 0 ? 13 : i;
 }
 
