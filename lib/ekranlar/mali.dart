@@ -333,9 +333,11 @@ class _Karsilastirma extends StatelessWidget {
   const _Karsilastirma({required this.veri});
   final MaliVeri veri;
 
-  static const _sira = ['Tutarsızlık', 'Uyarı', 'Karşılaştırma', 'Bilgi'];
+  static const _sira = ['Tutarsızlık', 'Uyuşmayan kayıtlar', 'Eşleşen kayıtlar', 'Uyarı', 'Karşılaştırma', 'Bilgi'];
+  static const _talep = {'Tutarsızlık', 'Uyuşmayan kayıtlar'};
   static Color _renk(String b) => switch (b) {
-        'Tutarsızlık' => Renk.kirmizi,
+        'Tutarsızlık' || 'Uyuşmayan kayıtlar' => Renk.kirmizi,
+        'Eşleşen kayıtlar' => Renk.yesil,
         'Uyarı' => Renk.amber,
         'Karşılaştırma' => Renk.mavi,
         _ => Renk.soluk,
@@ -348,7 +350,7 @@ class _Karsilastirma extends StatelessWidget {
         final x = _sira.indexOf(a), y = _sira.indexOf(b);
         return (x < 0 ? 99 : x).compareTo(y < 0 ? 99 : y);
       });
-    final hatalar = veri.kontrol.where((k) => k.bolum == 'Tutarsızlık').toList();
+    final hatalar = veri.kontrol.where((k) => _talep.contains(k.bolum)).toList();
     final hataSay = hatalar.fold<int>(0, (t, k) => t + k.detay.length);
     void gonder(List<MaliKontrol> l) =>
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => DuzeltmeTalebiEkran(bulgular: l)));
@@ -412,7 +414,7 @@ class _Karsilastirma extends StatelessWidget {
                         icon: const Icon(Icons.list_alt),
                         label: Text('Nerede? ${k.detay.length} kaydın yeri'),
                       ),
-                    if (b == 'Tutarsızlık')
+                    if (_talep.contains(b))
                       TextButton.icon(
                         onPressed: () => gonder([k]),
                         icon: const Icon(Icons.send),

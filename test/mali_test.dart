@@ -25,6 +25,9 @@ final _j = <String, dynamic>{
       ['Tutarsızlık', 'Tutarı farklı çıkan faturalar', '79 fatura', 'Açıklama', 'SAP listesi', 'https://drive.google.com/x', 'Ayrıntılı rapor', '', 'Düzeltin.',
         [['2026-07-02', 'Şekersüt (Fethiye)', 37815168, 0, 'satır 825 · belge 7300010738', 'FETHİYE (ŞEKERSÜT) 2026 › satır 916', 'Tutar boş; yazılmalı.']]],
       ['Karşılaştırma', 'ESK sap balyası', '6,77 milyon TL', 'Açıklama'],
+      ['Eşleşen kayıtlar', 'Fatura, SAT ve SAS numarası aynı kayıtlar', '1 fatura', 'Açıklama'],
+      ['Uyuşmayan kayıtlar', 'Fatura, SAT ve SAS numarası uyuşmayan kayıtlar', '1 kayıt', 'Açıklama', '', '', '', '', 'Düzeltin.',
+        [['2026-02-11', 'Tarım ve Hayvancılık', 16050, 3000, 'ASLIM-2026 › satır 84', 'FETHİYE (ŞEKERSÜT) 2026 › satır 209', 'SAT/SAS farklı.']]],
     ],
   },
 };
@@ -80,7 +83,9 @@ void main() {
     expect(find.textContaining('FETHİYE (ŞEKERSÜT) 2026 › satır 916'), findsOneWidget);
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    expect(find.text('Bu bulguyu gönder'), findsOneWidget);
+    expect(find.text('Eşleşen kayıtlar'), findsOneWidget);
+    expect(find.text('Uyuşmayan kayıtlar'), findsOneWidget);
+    expect(find.text('Bu bulguyu gönder'), findsNWidgets(2));
     await t.tap(find.text('Düzeltme talebi gönder'));
     await t.pumpAndSettle();
     expect(find.byKey(const Key('talepMetni')), findsOneWidget);
