@@ -78,7 +78,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Tutarı farklı çıkan faturalar'), findsOneWidget);
     expect(find.text('Dosyayı aç'), findsOneWidget);
-    await t.tap(find.text('Nerede? 1 kaydın yeri'));
+    await t.tap(find.text('Nerede? 1 kaydın yeri').first);
     await t.pumpAndSettle();
     expect(find.textContaining('FETHİYE (ŞEKERSÜT) 2026 › satır 916'), findsOneWidget);
     await t.tap(find.byType(BackButton));
