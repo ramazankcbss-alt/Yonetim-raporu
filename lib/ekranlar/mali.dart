@@ -122,6 +122,11 @@ class _DonemState extends State<_Donem> {
         const SizedBox(height: 8),
         Row(children: [
           _Kutu('Toplam fatura (KDV ${widget.veri.kdv})', tl(o.toplam), '${o.faturalar.length} fatura', Renk.ana),
+          if (o.doviz.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            _Kutu('Döviz faturaları', o.doviz.entries.map((e) => para(e.value, e.key)).join('\n'), 'TL toplamına dahil değil',
+                Renk.mavi),
+          ],
           if (widget.veri.odemeVar) ...[
             const SizedBox(width: 8),
             _Kutu('Ödenen', tl(o.odenen), '', Renk.yesil),
@@ -186,13 +191,13 @@ class _DonemState extends State<_Donem> {
                     '${f.sapYer.isEmpty ? '' : '\nSAP listesi: ${f.sapYer}'}'
                     '${f.gelenYer.isEmpty ? '' : '\nAyrıntılı rapor: ${f.gelenYer}'}'),
                 isThreeLine: true,
-                trailing: Text(tl(f.tutar),
+                trailing: Text(para(f.tutar, f.paraBirimi),
                     style: TextStyle(fontWeight: FontWeight.w700, color: f.acik ? Renk.amber : Renk.yazi)),
               ),
             ),
         ],
         const SizedBox(height: 8),
-        Text('Tutarlar KDV ${widget.veri.kdv} TL · kaynak: ${widget.veri.kaynak}. Şahıs işletmesi tedarikçilerin adları KVKK gereği gösterilmez.',
+        Text('Tutarlar KDV ${widget.veri.kdv} TL; döviz faturaları kendi para biriminde ayrıca gösterilir · kaynak: ${widget.veri.kaynak}. Şahıs işletmesi tedarikçilerin adları KVKK gereği gösterilmez.',
             style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
       ],
     );
@@ -533,3 +538,6 @@ class _Yer extends StatelessWidget {
         ])),
       );
 }
+
+/// Tutarı para birimiyle yazar: TL için [tl], dövizde "12.345,67 EUR".
+String para(double v, String pb) => pb == 'TRY' ? tl(v) : '${sayi(v, ondalik: 2)} $pb';

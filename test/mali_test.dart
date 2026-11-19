@@ -95,6 +95,7 @@ void main() {
         'kaynak': 'Gelen Fatura Raporları',
         'fatura': [
           ['2026-11-16', 'Aslım', 'Grup içi', 'Yem ve kaba yem', 'X A.Ş.', 1000.0, 'TRY', '', '', 'Uyumlu', '', 'ASLIM-2026 › satır 5', 1200.0],
+          ['2026-11-16', 'Aslım', 'Grup dışı', 'Yem ve kaba yem', 'Y A.Ş.', 500.0, 'EUR', '', '', 'Uyumlu', '', 'ASLIM-2026 › satır 6', 500.0],
         ],
         'acik': [],
         'kontrol': [],
@@ -105,5 +106,8 @@ void main() {
     expect(find.text('Toplam fatura (KDV hariç)'), findsOneWidget);
     expect(find.text('Ödenen'), findsNothing);
     expect(find.text('Açık bakiyeler'), findsNothing);
+    expect(find.text('Döviz faturaları'), findsOneWidget);
+    expect(find.text('1.000 TL'), findsWidgets);
+    expect(find.text('500,00 EUR'), findsWidgets);
   });
 }

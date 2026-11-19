@@ -30,7 +30,7 @@ class MaliFatura {
   /// fatura raporu (sayfa, satır).
   final String sapYer, gelenYer;
 
-  /// KDV dahil, TL.
+  /// Fatura tutarı, [paraBirimi] cinsinden.
   final double tutar;
   final DateTime? vade;
 
@@ -206,14 +206,26 @@ class MaliOzet {
   MaliOzet(this.faturalar);
   final List<MaliFatura> faturalar;
 
-  double get toplam => faturalar.fold(0.0, (t, f) => t + f.tutar);
-  double get acik => faturalar.where((f) => f.acik).fold(0.0, (t, f) => t + f.tutar);
+  Iterable<MaliFatura> get _tl => faturalar.where((f) => f.paraBirimi == 'TRY');
+
+  /// TL faturaların toplamı (döviz faturaları hariç).
+  double get toplam => _tl.fold(0.0, (t, f) => t + f.tutar);
+  double get acik => _tl.where((f) => f.acik).fold(0.0, (t, f) => t + f.tutar);
+
+  /// Döviz faturalarının para birimine göre toplamı.
+  Map<String, double> get doviz {
+    final m = <String, double>{};
+    for (final f in faturalar.where((f) => f.paraBirimi != 'TRY')) {
+      m.update(f.paraBirimi, (v) => v + f.tutar, ifAbsent: () => f.tutar);
+    }
+    return m;
+  }
   double get odenen => toplam - acik;
 
   /// Anahtara göre toplam, büyükten küçüğe.
   List<MapEntry<String, double>> grupla(String Function(MaliFatura) anahtar) {
     final m = <String, double>{};
-    for (final f in faturalar) {
+    for (final f in _tl) {
       m.update(anahtar(f), (v) => v + f.tutar, ifAbsent: () => f.tutar);
     }
     return m.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
