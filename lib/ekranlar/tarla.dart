@@ -112,6 +112,10 @@ class _HaritaState extends State<_Harita> {
     final ciftlikler = widget.s.ciftlikler.where((c) => c.parseller.any((p) => p.koord.length > 2)).toList();
     final c = ciftlikler[_c.clamp(0, ciftlikler.length - 1)];
     final cizili = c.parseller.where((p) => p.koord.length > 2).toList();
+    final cksAdlari = {
+      for (final p in cizili)
+        if (parselCks(c, p, widget.v.cks, widget.s.sezon).isNotEmpty) p.ad
+    };
     final toplam = c.urunToplami;
     return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
       SizedBox(
@@ -127,16 +131,38 @@ class _HaritaState extends State<_Harita> {
       Text('${widget.s.sezon} sezonu · kaynak: ${widget.s.kaynak}', style: const TextStyle(fontSize: 12, color: Renk.soluk)),
       const SizedBox(height: 8),
       Card(
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: AspectRatio(
-              aspectRatio: 1,
-              child: CustomPaint(
-                  painter: _HaritaCizer(cizili, {
-                for (final p in cizili)
-                  if (parselCks(c, p, widget.v.cks, widget.s.sezon).isNotEmpty) p.ad
-              }))),
-        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(children: [
+          AspectRatio(
+            aspectRatio: 0.82,
+            child: InteractiveViewer(
+              maxScale: 6,
+              child: CustomPaint(size: Size.infinite, painter: _HaritaCizer(cizili, cksAdlari)),
+            ),
+          ),
+          Positioned(
+            right: 6,
+            top: 6,
+            child: IconButton.filledTonal(
+              tooltip: 'Tam ekran',
+              icon: const Icon(Icons.fullscreen),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => Scaffold(
+                  appBar: AppBar(title: Text('${c.ad} · ${widget.s.sezon}')),
+                  body: InteractiveViewer(
+                    maxScale: 8,
+                    child: CustomPaint(size: Size.infinite, painter: _HaritaCizer(cizili, cksAdlari)),
+                  ),
+                ),
+              )),
+            ),
+          ),
+        ]),
+      ),
+      const Padding(
+        padding: EdgeInsets.only(top: 2, bottom: 6),
+        child: Text('İki parmakla yakınlaştırabilir, sağ üstteki düğmeyle tam ekran açabilirsiniz.',
+            style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
       ),
       Wrap(spacing: 10, runSpacing: 4, children: [
         if (widget.v.cks.isNotEmpty)
@@ -197,16 +223,30 @@ class _HaritaCizer extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = cks.contains(x.ad) ? 3 : 1);
     }
+    final yazi = (size.shortestSide / 34).clamp(9.0, 15.0);
     for (final x in p) {
       final pts = [for (final c in x.koord) nok(c)];
       final m = Offset(pts.map((e) => e.dx).reduce((a, b) => a + b) / pts.length, pts.map((e) => e.dy).reduce((a, b) => a + b) / pts.length);
-      final etiket = RegExp(r'^\d+').stringMatch(x.ad) ?? x.ad.split(' ').first;
+      final urun = [for (final u in x.urunler) '${_kisaUrun(u.$1)} ${sayi(u.$2)} da'];
       final tp = TextPainter(
-        text: TextSpan(text: etiket, style: const TextStyle(fontSize: 11, color: Colors.black, fontWeight: FontWeight.w700)),
+        text: TextSpan(children: [
+          TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
+          for (final u in urun) TextSpan(text: '\n$u', style: TextStyle(fontSize: yazi * 0.9, color: Colors.black87, fontWeight: FontWeight.w600)),
+        ]),
+        textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: 80);
+      )..layout(maxWidth: yazi * 9);
+      final r = Rect.fromCenter(center: m, width: tp.width + 6, height: tp.height + 4);
+      canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), Paint()..color = Colors.white.withValues(alpha: 0.72));
       tp.paint(canvas, m - Offset(tp.width / 2, tp.height / 2));
     }
+  }
+
+  static String _kisaUrun(String u) {
+    final k = urunAnahtari(u);
+    if (k.startsWith('Silajlık mısır')) return k.contains('2.') ? 'Mısır (2. ürün)' : 'Mısır';
+    if (k == 'Şeker pancarı') return 'Pancar';
+    return u;
   }
 
   @override
