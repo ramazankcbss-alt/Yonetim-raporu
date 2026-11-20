@@ -29,7 +29,11 @@ class TarlaEkran extends StatefulWidget {
 class _TarlaEkranState extends State<TarlaEkran> {
   late final Future<List<TarlaSezonu>> _yuk =
       widget.sezonlar != null ? Future.value(widget.sezonlar) : TarlaSezonu.yukle();
-  int _sezon = 0;
+
+  void _ac(BuildContext context, List<TarlaSezonu> paket, String sezon, {bool yerine = false}) {
+    final r = MaterialPageRoute<void>(builder: (_) => _SezonEkrani(paket: paket, sezon: sezon, ilk: widget.veri));
+    yerine ? Navigator.of(context).pushReplacement(r) : Navigator.of(context).push(r);
+  }
 
   @override
   Widget build(BuildContext context) => FutureBuilder<List<TarlaSezonu>>(
@@ -44,45 +48,96 @@ class _TarlaEkranState extends State<TarlaEkran> {
                 appBar: AppBar(title: const Text('Tarla Haritası')),
                 body: const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(yazi: 'Tarla haritası verisi yok.')));
           }
-          // Paketlenmiş sezonlar + haritadan girilen yeni sezon.
-          List<TarlaSezonu> tum(RaporVerisi v) => [...l, girisSezonu(l.first, v.sezonParsel)];
           return ListenableBuilder(
             listenable: VeriDeposu.ben,
             builder: (context, _) {
               final v = VeriDeposu.ben.veri ?? widget.veri;
-              final hepsi = tum(v);
-              final i = _sezon.clamp(0, hepsi.length - 1);
-              final s = hepsi[i];
-              TarlaSezonu sezonBul(RaporVerisi v) => tum(v)[i];
-              return DefaultTabController(
-                length: 4,
-                child: Scaffold(
-                  appBar: AppBar(
-                    title: Text('Tarla Haritası ${s.sezon}'),
-                    actions: [
-                      PopupMenuButton<int>(
-                        tooltip: 'Sezon',
-                        icon: const Icon(Icons.calendar_month_outlined),
-                        onSelected: (i) => setState(() => _sezon = i),
-                        itemBuilder: (_) => [
-                          for (final (i, x) in hepsi.indexed)
-                            PopupMenuItem(value: i, child: Text(x.giris ? '${x.sezon} (haritadan giriş)' : x.sezon)),
-                        ],
-                      ),
-                    ],
-                    bottom: const TabBar(
-                        isScrollable: true,
-                        tabs: [Tab(text: 'Harita'), Tab(text: 'Parseller'), Tab(text: 'Karşılaştırma'), Tab(text: 'ÇKS')]),
-                  ),
-                  body: TabBarView(children: [
-                    GonderAlani(konu: 'Tarla Haritası ${s.sezon} – Harita', child: _Harita(s: s, v: v, sezonBul: sezonBul, sezonSec: () => setState(() => _sezon = hepsi.length - 1))),
-                    GonderAlani(konu: 'Tarla Haritası ${s.sezon} – Parseller', child: _Parseller(s: s, v: v, ilk: widget.veri)),
-                    GonderAlani(konu: 'Tarla Haritası ${s.sezon} – Karşılaştırma', child: s.giris ? _GirisKarsilastirma(s: s, v: v) : _Karsilastirma(s: s, v: v)),
-                    GonderAlani(konu: 'Tarla Haritası ${s.sezon} – ÇKS', child: _Cks(s: s, v: v, ilk: widget.veri)),
+              final hepsi = tarlaSezonlari(l, v.sezonParsel);
+              return Scaffold(
+                appBar: AppBar(title: const Text('Tarla Haritası')),
+                body: GonderAlani(
+                  konu: 'Tarla Haritası – Sezonlar',
+                  child: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+                    const BilgiKutusu(
+                        yazi: 'Her sezon ayrı bir bölümdür; içinde Harita, Parseller, Karşılaştırma ve ÇKS sekmeleri yer alır. '
+                            'Parsel çizimleri 2025-2026 KMZ haritasından alınır. 2024-2025 ve 2026-2027 sezonlarında ürün ve '
+                            'alanlar haritada parsele dokunularak girilir. Alanlarda Excel dosyaları esas alınır.'),
+                    const SizedBox(height: 8),
+                    for (final x in hepsi) _sezonKarti(context, l, x, v),
                   ]),
                 ),
               );
             },
+          );
+        },
+      );
+
+  Widget _sezonKarti(BuildContext context, List<TarlaSezonu> l, TarlaSezonu x, RaporVerisi v) {
+    final parseller = [for (final c in x.ciftlikler) ...c.parseller.where((p) => p.tip != 'diger')];
+    final girilen = parseller.where((p) => p.urunler.isNotEmpty).length;
+    final cks = v.cks.where((k) => k.sezon == x.sezon).length;
+    final excel = [for (final c in x.ciftlikler) ...sezonExcel(v.ekim, v.ekimPlani, x, c.ad).values].fold<double>(0, (a, b) => a + b);
+    final alt = [
+      '${x.uretimYili} üretim yılı',
+      x.giris ? 'Haritadan girilen: $girilen / ${parseller.length} parsel' : 'KMZ haritası (${x.kaynak})',
+      excel > 0 ? 'Excel: ${sayi(excel)} da' : 'Excel kaydı yok',
+      if (cks > 0) 'ÇKS: $cks kayıt',
+    ].join(' · ');
+    return _MenuKarti(
+      baslik: '${x.sezon} sezonu',
+      alt: alt,
+      ikon: x.giris ? Icons.edit_location_alt_outlined : Icons.map_outlined,
+      dokun: () => _ac(context, l, x.sezon),
+    );
+  }
+}
+
+/// Bir sezon bölümü: Harita, Parseller, Karşılaştırma, ÇKS.
+class _SezonEkrani extends StatelessWidget {
+  const _SezonEkrani({required this.paket, required this.sezon, required this.ilk});
+  final List<TarlaSezonu> paket;
+  final String sezon;
+  final RaporVerisi ilk;
+
+  TarlaSezonu _bul(RaporVerisi v) {
+    final l = tarlaSezonlari(paket, v.sezonParsel);
+    return l.firstWhere((x) => x.sezon == sezon, orElse: () => l.first);
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: VeriDeposu.ben,
+        builder: (context, _) {
+          final v = VeriDeposu.ben.veri ?? ilk;
+          final s = _bul(v);
+          final sonraki = sonrakiSezon(s.sezon);
+          return DefaultTabController(
+            length: 4,
+            child: Scaffold(
+              appBar: AppBar(
+                title: Text('Tarla Haritası ${s.sezon}'),
+                bottom: const TabBar(
+                    isScrollable: true,
+                    tabs: [Tab(text: 'Harita'), Tab(text: 'Parseller'), Tab(text: 'Karşılaştırma'), Tab(text: 'ÇKS')]),
+              ),
+              body: TabBarView(children: [
+                GonderAlani(
+                    konu: 'Tarla Haritası ${s.sezon} – Harita',
+                    child: _Harita(
+                        s: s,
+                        v: v,
+                        sezonBul: _bul,
+                        sezonSec: s.giris
+                            ? null
+                            : () => Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
+                                builder: (_) => _SezonEkrani(paket: paket, sezon: sonraki, ilk: ilk))))),
+                GonderAlani(konu: 'Tarla Haritası ${s.sezon} – Parseller', child: _Parseller(s: s, v: v, ilk: ilk)),
+                GonderAlani(
+                    konu: 'Tarla Haritası ${s.sezon} – Karşılaştırma',
+                    child: s.giris ? _GirisKarsilastirma(s: s, v: v) : _Karsilastirma(s: s, v: v)),
+                GonderAlani(konu: 'Tarla Haritası ${s.sezon} – ÇKS', child: _Cks(s: s, v: v, ilk: ilk)),
+              ]),
+            ),
           );
         },
       );
@@ -145,7 +200,7 @@ class _HaritaState extends State<_Harita> {
     final giris = widget.s.giris;
     // Alanlar Excel ekim planından; yeni sezonda haritadan girilen alanlar.
     final excel = giris ? c.urunToplami : excelAlanlari(widget.v.ekim, c.ad);
-    final plan = giris ? yilPlani(widget.v.ekimPlani, widget.s.uretimYili, c.ad) : const <String, double>{};
+    final plan = giris ? sezonExcel(widget.v.ekim, widget.v.ekimPlani, widget.s, c.ad) : const <String, double>{};
     final cinsler = c.urunCinsleri;
     final urunler = [...excel.keys, ...cinsler.where((u) => !excel.containsKey(u)), ...plan.keys.where((u) => !excel.containsKey(u) && !cinsler.contains(u))];
     final toplam = excel.values.fold<double>(0, (a, b) => a + b);
@@ -250,7 +305,7 @@ class _HaritaState extends State<_Harita> {
       const BolumBasligi('Ekiliş özeti'),
       Text(
           giris
-              ? 'Alanlar: haritadan girilen bilgiler. Karşısında ${widget.s.uretimYili} Excel ekim planı gösterilir.'
+              ? 'Alanlar: haritadan girilen bilgiler. Karşısında Excel kaydı gösterilir: ${sezonExcelKaynak(widget.s)}.'
               : 'Alanlar: 2026-2027 Ekim Planı (Excel). Haritadan yalnızca ekili ürün cinsi alınır.',
           style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
       const SizedBox(height: 4),
@@ -261,7 +316,7 @@ class _HaritaState extends State<_Harita> {
                 dense: true,
                 title: Text(u),
                 subtitle: giris
-                    ? Text('${widget.s.uretimYili} Excel planı: ${plan[u] == null ? 'yok' : _da(plan[u])}',
+                    ? Text('Excel: ${plan[u] == null ? 'yok' : _da(plan[u])}',
                         style: const TextStyle(fontSize: 12))
                     : cinsler.contains(u)
                         ? null
@@ -1254,7 +1309,8 @@ class _CksState extends State<_Cks> {
 
   @override
   Widget build(BuildContext context) {
-    final l = widget.v.cks;
+    // Bölümün sezonuna ait ÇKS kayıtları.
+    final l = [for (final x in widget.v.cks) if (x.sezon == widget.s.sezon) x];
     final yillar = <String, List<CksParsel>>{};
     for (final x in l) {
       yillar.putIfAbsent(x.sezon.isEmpty ? 'Sezon belirtilmemiş' : x.sezon, () => []).add(x);
@@ -1285,8 +1341,8 @@ class _CksState extends State<_Cks> {
         ),
       ]),
       if (_yukleniyor) const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
-      BolumBasligi("ÇKS'de bildirilen parseller (${l.length} kayıt)"),
-      if (l.isEmpty) const Text('Henüz işlenmiş ÇKS kaydı yok.'),
+      BolumBasligi("${widget.s.sezon} ÇKS'de bildirilen parseller (${l.length} kayıt)"),
+      if (l.isEmpty) Text('${widget.s.sezon} sezonu için işlenmiş ÇKS kaydı yok.'),
       for (final y in sirali)
         _MenuKarti(
           baslik: '$y sezonu',
@@ -1321,7 +1377,7 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
         final v = VeriDeposu.ben.veri;
         final g = v == null ? null : parselGirisi(v.sezonParsel, hedef, c.ad, p.ad);
         final once = s.giris ? oncekiUrunler(s, c.ad, p.ad) : [for (final u in p.urunler) urunAnahtari(u.$1)];
-        final onceSezon = s.giris ? s.onceki!.sezon : s.sezon;
+        final onceSezon = s.giris ? s.onceki?.sezon : s.sezon;
         final ayni = g != null && once.contains(urunAnahtari(g.urun));
         return SafeArea(
           child: Padding(
@@ -1329,7 +1385,8 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text('${c.ad} · ${p.ad}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
               const SizedBox(height: 6),
-              Text('$onceSezon: ${once.isEmpty ? 'ürün yok' : once.join(' + ')}', style: const TextStyle(color: Renk.soluk)),
+              if (onceSezon != null)
+                Text('$onceSezon: ${once.isEmpty ? 'ürün yok' : once.join(' + ')}', style: const TextStyle(color: Renk.soluk)),
               Text('$hedef: ${g == null ? 'girilmedi' : '${g.urun}${g.alan == null ? '' : ' · ${_da(g.alan)}'}'}',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               if (ayni)
@@ -1497,22 +1554,32 @@ class _GirisKarsilastirma extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final yil = s.uretimYili;
-    final planVar = v.ekimPlani.any((x) => x.yil == yil);
-    final satirlar = <(String, String, double?, double?)>[];
+    final kaynak = sezonExcelKaynak(s);
+    // Çiftlik, ürün, girilen, Excel, ÇKS
+    final satirlar = <(String, String, double?, double?, double?)>[];
+    var excelVar = false;
     for (final c in s.ciftlikler) {
-      final g = c.urunToplami, pl = yilPlani(v.ekimPlani, yil, c.ad);
-      for (final u in {...g.keys, ...pl.keys}) {
-        satirlar.add((c.ad, u, g[u], pl[u]));
+      final g = c.urunToplami, ex = sezonExcel(v.ekim, v.ekimPlani, s, c.ad);
+      if (ex.isNotEmpty) excelVar = true;
+      final k = <String, double>{};
+      for (final x in v.cks) {
+        if (x.sezon != s.sezon || ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad) || x.alan == null) continue;
+        k.update(urunAnahtari(x.urun), (a) => a + x.alan!, ifAbsent: () => x.alan!);
+      }
+      for (final u in {...g.keys, ...ex.keys, ...k.keys}) {
+        satirlar.add((c.ad, u, g[u], ex[u], k[u]));
       }
     }
+    // Münavebe: önceki sezon → bu sezon; ilk sezonda bu sezon → sonraki sezon.
+    final ileri = s.onceki == null && s.sonraki != null;
+    final karsiSezon = ileri ? s.sonraki! : s.onceki;
     final munavebe = <(String, TarlaParsel, List<String>)>[];
     var girilmeyen = 0;
     for (final c in s.ciftlikler) {
       for (final p in c.parseller) {
         if (p.girilmedi) girilmeyen++;
         if (p.urunler.isEmpty) continue;
-        munavebe.add((c.ad, p, oncekiUrunler(s, c.ad, p.ad)));
+        munavebe.add((c.ad, p, sezonUrunleri(karsiSezon, c.ad, p.ad)));
       }
     }
     Widget h(String t, {TextAlign a = TextAlign.right}) => Padding(
@@ -1524,34 +1591,38 @@ class _GirisKarsilastirma extends StatelessWidget {
     return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
       BilgiKutusu(
           yazi: '${s.sezon} sezonu, haritada parsellere dokunularak girilen ürün ve alanlardan oluşur. '
-              'Girilen alanlar $yil Excel ekim planıyla karşılaştırılır.'
-              '${planVar ? '' : ' Ekim planı dosyasında henüz $yil yılı yok; plan girildiğinde burada görünür.'}'),
+              'Esas alınan kaynak Excel: $kaynak. Girilen alanlar ve ÇKS bu rakamlarla karşılaştırılır.'
+              '${excelVar ? '' : ' Excel dosyalarında bu yıl için henüz kayıt yok; girildiğinde burada görünür.'}'),
       if (girilmeyen > 0)
         Padding(
           padding: const EdgeInsets.only(top: 6),
           child: Text('Ürün girilmemiş parsel: $girilmeyen', style: const TextStyle(color: Renk.amber, fontSize: 12.5)),
         ),
-      const BolumBasligi('Girilen alanlar ve Excel planı (da)'),
+      const BolumBasligi('Excel esaslı ekim alanları (da)'),
       if (satirlar.isEmpty)
-        const Text('Henüz giriş yok. Harita sekmesinde bir parsele dokunun.')
+        const Text('Henüz kayıt yok. Harita sekmesinde bir parsele dokunarak ürün ve dekar girin.')
       else
         Card(
           child: Padding(
             padding: const EdgeInsets.all(8),
             child: Table(
-              columnWidths: const {0: FlexColumnWidth(2.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1)},
+              columnWidths: const {
+                0: FlexColumnWidth(2.3), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1), 4: FlexColumnWidth(1)
+              },
               border: TableBorder(horizontalInside: BorderSide(color: Colors.black.withValues(alpha: 0.08))),
               children: [
-                TableRow(children: [h('Çiftlik · Ürün', a: TextAlign.left), h('Girilen'), h('$yil planı'), h('Fark')]),
-                for (final (c, u, g, pl) in satirlar)
+                TableRow(children: [h('Çiftlik · Ürün', a: TextAlign.left), h('Excel'), h('Harita'), h('ÇKS'), h('Fark')]),
+                for (final (c, u, g, pl, k) in satirlar)
                   TableRow(children: [
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                       child: Text('$c · $u', style: const TextStyle(fontSize: 12.5)),
                     ),
-                    d(g == null ? '—' : sayi(g)),
                     d(pl == null ? '—' : sayi(pl)),
-                    g == null || pl == null
+                    d(g == null ? '—' : (g > 0 ? sayi(g) : 'ekili'),
+                        renk: g != null && g > 0 && pl != null && !alanYakin(g, pl) ? Renk.amber : null),
+                    d(k == null ? '—' : sayi(k), renk: k != null && pl != null && !alanYakin(k, pl) ? Renk.amber : null),
+                    g == null || pl == null || g <= 0
                         ? d('—')
                         : alanYakin(g, pl)
                             ? d('✓', renk: Renk.yesil)
@@ -1561,7 +1632,11 @@ class _GirisKarsilastirma extends StatelessWidget {
             ),
           ),
         ),
-      const BolumBasligi('Münavebe (önceki sezon → yeni sezon)'),
+      BolumBasligi(karsiSezon == null
+          ? 'Münavebe'
+          : ileri
+              ? 'Münavebe (${s.sezon} → ${karsiSezon.sezon})'
+              : 'Münavebe (${karsiSezon.sezon} → ${s.sezon})'),
       if (munavebe.isEmpty) const Text('Henüz giriş yok.'),
       for (final (c, p, once) in munavebe)
         Card(
@@ -1571,7 +1646,7 @@ class _GirisKarsilastirma extends StatelessWidget {
             leading: Icon(once.contains(urunAnahtari(p.urunler.first.$1)) ? Icons.warning_amber_rounded : Icons.check_circle_outline,
                 color: once.contains(urunAnahtari(p.urunler.first.$1)) ? Renk.amber : Renk.yesil),
             title: Text('$c · ${p.ad}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('${once.isEmpty ? 'ürün yok' : once.join(' + ')} → ${p.urunYazi}'
+            subtitle: Text('${ileri ? '${p.urunYazi} → ${once.isEmpty ? 'ürün yok' : once.join(' + ')}' : '${once.isEmpty ? 'ürün yok' : once.join(' + ')} → ${p.urunYazi}'}'
                 '${once.contains(urunAnahtari(p.urunler.first.$1)) ? '\nAynı ürün üst üste ekiliyor.' : ''}'),
           ),
         ),

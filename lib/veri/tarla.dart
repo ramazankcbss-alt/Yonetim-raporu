@@ -88,13 +88,19 @@ class TarlaCiftlik {
 }
 
 class TarlaSezonu {
-  const TarlaSezonu({required this.sezon, required this.kaynak, required this.tarih, required this.ciftlikler, this.onceki});
+  const TarlaSezonu(
+      {required this.sezon, required this.kaynak, required this.tarih, required this.ciftlikler, this.onceki, this.sonraki, this.giris = false});
   final String sezon, kaynak, tarih;
   final List<TarlaCiftlik> ciftlikler;
 
   /// Haritadan girilen yeni sezonda, çizimlerin alındığı önceki sezon.
   final TarlaSezonu? onceki;
-  bool get giris => onceki != null;
+
+  /// İlk sezonda münavebe karşılaştırması için bir sonraki sezon.
+  final TarlaSezonu? sonraki;
+
+  /// Ürün ve alanları haritadan girilen sezon (2024-2025, 2026-2027).
+  final bool giris;
 
   /// Sezonun üretim yılı ("2026-2027" → "2027").
   String get uretimYili => sezon.contains('-') ? sezon.split('-').last : sezon;
@@ -297,19 +303,29 @@ SezonParsel? parselGirisi(List<SezonParsel> l, String sezon, String ciftlik, Str
   return d;
 }
 
-/// Önceki sezonun çizimleriyle yeni sezon haritası.
-TarlaSezonu girisSezonu(TarlaSezonu onceki, List<SezonParsel> l) {
-  final sezon = sonrakiSezon(onceki.sezon);
+/// "2025-2026" → "2024-2025".
+String oncekiSezon(String s) {
+  final m = RegExp(r'^(\d{4})-(\d{4})$').firstMatch(s);
+  return m == null ? '$s (önceki)' : '${int.parse(m[1]!) - 1}-${int.parse(m[2]!) - 1}';
+}
+
+/// [taban] sezonunun parsel çizimleriyle, ürün ve alanları haritadan girilen sezon.
+/// [sezon] verilmezse bir sonraki sezon olur; [onceki] münavebe karşılaştırması içindir.
+TarlaSezonu girisSezonu(TarlaSezonu taban, List<SezonParsel> l, {String? sezon, TarlaSezonu? onceki, bool ilkSezon = false, TarlaSezonu? sonraki}) {
+  final ad = sezon ?? sonrakiSezon(taban.sezon);
+  final once = ilkSezon ? null : (onceki ?? taban);
   return TarlaSezonu(
-    sezon: sezon,
+    sezon: ad,
     kaynak: 'haritadan girilen bilgiler',
     tarih: '',
-    onceki: onceki,
+    onceki: once,
+    sonraki: sonraki,
+    giris: true,
     ciftlikler: [
-      for (final c in onceki.ciftlikler)
+      for (final c in taban.ciftlikler)
         TarlaCiftlik(ad: c.ad, tesis: c.tesis, gorseller: c.gorseller, parseller: [
           for (final p in c.parseller)
-            if (parselGirisi(l, sezon, c.ad, p.ad) case final g?)
+            if (parselGirisi(l, ad, c.ad, p.ad) case final g?)
               TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(g.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord)
             else
               TarlaParsel(
@@ -320,8 +336,10 @@ TarlaSezonu girisSezonu(TarlaSezonu onceki, List<SezonParsel> l) {
 }
 
 /// Önceki sezonda aynı parselde ekili ürünler (münavebe için).
-List<String> oncekiUrunler(TarlaSezonu s, String ciftlik, String parsel) {
-  final o = s.onceki;
+List<String> oncekiUrunler(TarlaSezonu s, String ciftlik, String parsel) => sezonUrunleri(s.onceki, ciftlik, parsel);
+
+/// Bir sezonda bir parselde ekili ürünler.
+List<String> sezonUrunleri(TarlaSezonu? o, String ciftlik, String parsel) {
   if (o == null) return const [];
   for (final c in o.ciftlikler) {
     if (ciftlikAnahtari(c.ad) != ciftlikAnahtari(ciftlik)) continue;
@@ -347,3 +365,42 @@ const secilebilirUrunler = [
   'Buğday', 'Arpa', 'Şeker pancarı', 'Silajlık mısır', 'Silajlık mısır (2. ürün)', 'Yonca', 'Patates',
   'Tritikale', 'Fiğ', 'Nadas',
 ];
+
+
+/// Tarla Haritası bölümleri: 2024-2025 (haritadan giriş), KMZ sezonu (2025-2026),
+/// 2026-2027 (haritadan giriş). Hepsi KMZ sezonunun parsel çizimlerini kullanır.
+List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l) {
+  if (paket.isEmpty) return const [];
+  final kmz = paket.first;
+  final eski = girisSezonu(kmz, l, sezon: oncekiSezon(kmz.sezon), ilkSezon: true, sonraki: kmz);
+  return [eski, ...paket, girisSezonu(kmz, l, onceki: kmz)];
+}
+
+/// 2025 üretim yılı (2024-2025 sezonu) ekilen alanları. Kaynak: 2026-2027 Tarımsal Faaliyet
+/// › ÇİFTLİK BAZINDA ("2025 YILI ÇİFTLİKLER TARIMSAL ÜRETİMİ"), EKİLEN DEKAR sütunu.
+const excel2025 = <(String, String, double)>[
+  ('Şekersüt', 'Silajlık mısır', 670), ('Şekersüt', 'Buğday', 1700), ('Şekersüt', 'Şeker pancarı', 700),
+  ('Aslım', 'Silajlık mısır', 140), ('Aslım', 'Şeker pancarı', 900), ('Aslım', 'Arpa', 1340), ('Aslım', 'Buğday', 520),
+  ('Aslım', 'Tritikale', 200), ('Aslım', 'Yonca', 1360),
+  ('Taşağıl', 'Patates', 400), ('Ormanlık', 'Şeker pancarı', 230),
+  ('Fidanlık', 'Buğday', 130), ('Fidanlık', 'Arpa', 600),
+];
+
+/// Bir sezonun Excel'deki çiftlik/ürün alanları (esas alınan değerler).
+Map<String, double> sezonExcel(List<EkimSatir> ekim, List<EkimPlanSatir> plan, TarlaSezonu s, String ciftlik) {
+  if (!s.giris) return excelAlanlari(ekim, ciftlik);
+  final p = yilPlani(plan, s.uretimYili, ciftlik);
+  if (p.isNotEmpty || s.uretimYili != '2025') return p;
+  final m = <String, double>{};
+  for (final (c, u, a) in excel2025) {
+    if (ciftlikAnahtari(c) == ciftlikAnahtari(ciftlik)) m.update(urunAnahtari(u), (v) => v + a, ifAbsent: () => a);
+  }
+  return m;
+}
+
+/// Sezonun Excel kaynağının adı.
+String sezonExcelKaynak(TarlaSezonu s) => !s.giris
+    ? '2026-2027 Ekim Planı (Excel)'
+    : s.uretimYili == '2025'
+        ? 'Tarımsal Faaliyet › ÇİFTLİK BAZINDA, 2025 yılı (Excel)'
+        : '${s.uretimYili} Excel ekim planı';

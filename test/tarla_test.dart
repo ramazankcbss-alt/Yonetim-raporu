@@ -84,6 +84,14 @@ void main() {
     expect(oncekiUrunler(y, 'Şekersüt', '1. pivot'), ['Buğday']);
     expect(yilPlani(v.ekimPlani, '2027', 'Şekersüt')['Buğday'], 900);
     expect(parselGirisi(v.sezonParsel, '2026-2027', 'Şekersüt', '4. pivot')?.alan, 300);
+    final ss = tarlaSezonlari([s], v.sezonParsel);
+    expect([for (final x in ss) x.sezon], ['2024-2025', '2025-2026', '2026-2027']);
+    expect(ss.first.giris, isTrue);
+    expect(ss.first.onceki, isNull);
+    expect(ss.first.sonraki?.sezon, '2025-2026');
+    expect(sezonExcel(v.ekim, v.ekimPlani, ss.first, 'Şekersüt')['Buğday'], 1700);
+    expect(sezonExcel(v.ekim, v.ekimPlani, ss.first, 'Taşağıl')['Şeker pancarı'], 230);
+    expect(sezonExcel(v.ekim, v.ekimPlani, ss.last, 'Şekersüt')['Buğday'], 900);
   });
 
   testWidgets('Tarla Haritası ekranı', (t) async {
@@ -91,6 +99,10 @@ void main() {
     t.view.devicePixelRatio = 2;
     addTearDown(t.view.reset);
     await t.pumpWidget(MaterialApp(home: TarlaEkran(veri: v, sezonlar: [s])));
+    await t.pumpAndSettle();
+    expect(find.text('2024-2025 sezonu'), findsOneWidget);
+    expect(find.text('2026-2027 sezonu'), findsOneWidget);
+    await t.tap(find.text('2025-2026 sezonu'));
     await t.pumpAndSettle();
     expect(find.text('Tarla Haritası 2025-2026'), findsOneWidget);
     expect(find.text('Ekiliş özeti'), findsOneWidget);
@@ -136,13 +148,13 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(MaterialApp(home: TarlaEkran(veri: v, sezonlar: [s])));
     await t.pumpAndSettle();
-    await t.tap(find.text('2026-2027 sezonu haritasını aç'));
+    await t.tap(find.text('2026-2027 sezonu'));
     await t.pumpAndSettle();
     expect(find.text('Tarla Haritası 2026-2027'), findsOneWidget);
     expect(find.textContaining('Ürün girilmemiş parsel'), findsOneWidget);
     await t.tap(find.text('Karşılaştırma'));
     await t.pumpAndSettle();
-    expect(find.text('Girilen alanlar ve Excel planı (da)'), findsOneWidget);
+    expect(find.text('Excel esaslı ekim alanları (da)'), findsOneWidget);
     expect(find.textContaining('Aynı ürün üst üste'), findsWidgets);
   });
 }
