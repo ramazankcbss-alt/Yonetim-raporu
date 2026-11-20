@@ -165,3 +165,20 @@ if "checkReleaseBuilds" not in g:
         sys.exit("android { bloğu bulunamadı (lint)")
 yaz(p, g)
 print("Android ayarları uygulandı:", p)
+
+# --- Eklentilerin compileSdk değeri ------------------------------------------
+# Bazı eklentiler (file_picker) eski compileSdk ile derlenir; bağımlılıkları 36 ister.
+kok_g = os.path.join(KOK, "android", "build.gradle.kts")
+if os.path.exists(kok_g):
+    k = oku(kok_g)
+    if "compileSdkVersion(36)" not in k:
+        k = k.rstrip() + """
+
+subprojects {
+    afterEvaluate {
+        val a = extensions.findByName("android")
+        if (a is com.android.build.gradle.BaseExtension) a.compileSdkVersion(36)
+    }
+}
+"""
+        yaz(kok_g, k)
