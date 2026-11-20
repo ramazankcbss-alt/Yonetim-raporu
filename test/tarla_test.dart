@@ -42,12 +42,18 @@ void main() {
     expect(s.sezon, '2025-2026');
     final sk = s.ciftlikler.firstWhere((c) => c.ad == 'Şekersüt');
     expect(sk.urunToplami['Buğday'], 1700);
-    final k = ekimKarsilastir(s, v.ekim);
-    expect(k.firstWhere((x) => x.ciftlik == 'Şekersüt' && x.urun == 'Buğday').durum, 'Uyumlu');
-    final m = k.firstWhere((x) => x.ciftlik == 'Şekersüt' && x.urun == 'Silajlık mısır');
-    expect(m.durum, 'Fark');
-    expect(m.fark, 60);
-    expect(k.firstWhere((x) => x.ciftlik == 'Aslım' && x.urun == 'Arpa').fark, -235);
+    final t = excelKarsilastir(s, v.ekim, v.resmiParsel, v.cks);
+    final b = t.firstWhere((x) => x.ciftlik == 'Şekersüt' && x.urun == 'Buğday');
+    expect(b.esas, 1700);
+    expect(b.haritada, isTrue);
+    expect(b.resmiFarkli, isTrue); // PARSEL 721 / plan 1700
+    expect(b.cksFarkli, isTrue); // ÇKS 800 / plan 1700
+    // Haritadaki dekar (730) dikkate alınmaz: Excel 670, haritada ekili → uyumlu.
+    expect(t.firstWhere((x) => x.ciftlik == 'Şekersüt' && x.urun == 'Silajlık mısır').uyumlu, isTrue);
+    expect(t.firstWhere((x) => x.ciftlik == 'Aslım' && x.urun == 'Arpa').uyumlu, isTrue);
+    expect(t.firstWhere((x) => x.ciftlik == 'Aslım' && x.urun == 'Yonca').excelYok, isTrue);
+    expect(excelAlanlari(v.ekim, 'Taşağıl')['Patates'], 400);
+    expect(sk.parseller.first.urunCinsi.contains(' da'), isFalse);
     final p4 = sk.parseller.firstWhere((p) => p.ad == '4. pivot');
     expect(parselKayitlari(sk, p4, v.tarim).length, 1);
     expect(urunAnahtari('MISIR SİLAJI'), 'Silajlık mısır');
@@ -56,11 +62,6 @@ void main() {
     expect(planYillari(v.ekimPlani), ['2026', '2027']);
     expect(aktifDuzeltme(v.ekimDuzeltme, s.sezon, 'Aslım', 'Arpa')?.deger, 1105);
     expect(aktifDuzeltme(v.ekimDuzeltme, s.sezon, 'Aslım', 'Buğday'), isNull);
-    expect(const KaynakSatiri('A', 'Pancar', 670, 700, 651).sapan, {1});
-    expect(const KaynakSatiri('A', 'Yonca', 1410, 1360, 1410).sapan, {1});
-    expect(const KaynakSatiri('A', 'Patates', 420, 420, 420).uyumlu, isTrue);
-    expect(kaynakTablosu(s, v.ekim, v.cks).isNotEmpty, isTrue);
-    expect(resmiKarsilastir(s, v.resmiParsel).any((e) => e.$2 == 'Buğday' && e.$3 == 721), isTrue);
   });
 
   testWidgets('Tarla Haritası ekranı', (t) async {
@@ -71,15 +72,15 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Tarla Haritası 2025-2026'), findsOneWidget);
     expect(find.text('Ekiliş özeti'), findsOneWidget);
+    expect(find.text('1.700 da'), findsWidgets); // Excel alanı
     await t.tap(find.text('Karşılaştırma'));
     await t.pumpAndSettle();
-    expect(find.text('Tutarsızlıklar: harita ve tarım icmali'), findsOneWidget);
-    expect(find.textContaining('Şekersüt · Silajlık mısır'), findsWidgets);
+    expect(find.text('Tutarsızlıklar: Excel esas alınarak'), findsOneWidget);
+    expect(find.textContaining('Şekersüt · Buğday'), findsWidgets);
     await t.tap(find.text('Uyumlu'));
     await t.pumpAndSettle();
     expect(find.text('Olumlu: uyumlu olanlar'), findsOneWidget);
-    expect(find.text('Düzeltilenler'), findsOneWidget);
-    expect(find.text('Kaynaklara göre ekim alanları (da)'), findsOneWidget);
+        expect(find.text('Excel esaslı ekim alanları (da)'), findsOneWidget);
     expect(find.text('Düzelt'), findsWidgets);
     await t.tap(find.text('Parseller'));
     await t.pumpAndSettle();

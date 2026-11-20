@@ -116,7 +116,11 @@ class _HaritaState extends State<_Harita> {
       for (final p in cizili)
         if (parselCks(c, p, widget.v.cks, widget.s.sezon).isNotEmpty) p.ad
     };
-    final toplam = c.urunToplami;
+    // Alanlar Excel ekim planından; haritadan yalnızca ürün cinsi alınır.
+    final excel = excelAlanlari(widget.v.ekim, c.ad);
+    final cinsler = c.urunCinsleri;
+    final urunler = [...excel.keys, ...cinsler.where((u) => !excel.containsKey(u))];
+    final toplam = excel.values.fold<double>(0, (a, b) => a + b);
     return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
       SizedBox(
         height: 44,
@@ -165,25 +169,35 @@ class _HaritaState extends State<_Harita> {
             const SizedBox(width: 4),
             const Text("Mavi kenarlı: ÇKS'de bildirildi", style: TextStyle(fontSize: 12.5)),
           ]),
-        for (final e in toplam.entries)
+        for (final u in urunler)
           Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 12, height: 12, color: _renkler[e.key] ?? const Color(0xFF6D8B74)),
+            Container(width: 12, height: 12, color: _renkler[u] ?? const Color(0xFF6D8B74)),
             const SizedBox(width: 4),
-            Text('${e.key}: ${sayi(e.value)} da', style: const TextStyle(fontSize: 12.5)),
+            Text('$u: ${excel[u] == null ? "Excel'de yok" : _da(excel[u])}', style: const TextStyle(fontSize: 12.5)),
           ]),
       ]),
       const BolumBasligi('Ekiliş özeti'),
+      const Text('Alanlar: 2026-2027 Ekim Planı (Excel). Haritadan yalnızca ekili ürün cinsi alınır.',
+          style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+      const SizedBox(height: 4),
       Card(
         child: Column(children: [
-          for (final e in toplam.entries)
-            ListTile(dense: true, title: Text(e.key), trailing: Text(_da(e.value), style: const TextStyle(fontWeight: FontWeight.w700))),
+          for (final u in urunler)
+            ListTile(
+                dense: true,
+                title: Text(u),
+                subtitle: cinsler.contains(u)
+                    ? null
+                    : const Text('Haritada bu ürün yok', style: TextStyle(color: Renk.amber, fontSize: 12)),
+                trailing: Text(excel[u] == null ? "Excel'de yok" : _da(excel[u]),
+                    style: TextStyle(fontWeight: FontWeight.w700, color: excel[u] == null ? Renk.amber : null))),
           ListTile(
               dense: true,
-              title: const Text('Toplam ekili alan', style: TextStyle(fontWeight: FontWeight.w800)),
-              trailing: Text(_da(toplam.values.fold<double>(0, (a, b) => a + b)), style: const TextStyle(fontWeight: FontWeight.w800))),
+              title: const Text('Toplam ekili alan (Excel)', style: TextStyle(fontWeight: FontWeight.w800)),
+              trailing: Text(excel.isEmpty ? '–' : _da(toplam), style: const TextStyle(fontWeight: FontWeight.w800))),
         ]),
       ),
-      for (final n in c.notlar) Padding(padding: const EdgeInsets.only(top: 6), child: BilgiKutusu(yazi: n)),
+      for (final n in c.notlar.where((n) => !n.contains('uyuşmuyor'))) Padding(padding: const EdgeInsets.only(top: 6), child: BilgiKutusu(yazi: n)),
       if (c.tesis.isNotEmpty)
         Padding(
           padding: const EdgeInsets.only(top: 6),
@@ -379,9 +393,9 @@ class _YaziCizer extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(children: [
           TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
-          for (final u in x.urunler)
+          for (final u in {for (final u in x.urunler) _kisaUrun(u.$1)})
             TextSpan(
-                text: '\n${_kisaUrun(u.$1)} ${sayi(u.$2)} da',
+                text: '\n$u',
                 style: TextStyle(fontSize: yazi * 0.92, color: Colors.black87, fontWeight: FontWeight.w600)),
         ]),
         textAlign: TextAlign.center,
@@ -421,7 +435,7 @@ class _Parseller extends StatelessWidget {
             child: ListTile(
               leading: const CircleAvatar(backgroundColor: Renk.anaAcik, child: Icon(Icons.grid_view, color: Renk.ana)),
               title: Text(c.ad, style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('${c.parseller.length} parsel · ${sayi(c.urunToplami.values.fold<double>(0, (a, b) => a + b))} da ekili'
+              subtitle: Text('${c.parseller.length} parsel · Excel: ${sayi(excelAlanlari(v.ekim, c.ad).values.fold<double>(0, (a, b) => a + b))} da ekili'
                   '${_cksSay(c) > 0 ? ' · ${_cksSay(c)} parsel ÇKS\'de bildirildi' : ''}'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _ac(context, '${c.ad} parselleri', 'Tarla Haritası ${s.sezon} – ${c.ad} parselleri',
@@ -507,10 +521,9 @@ class _ParselKarti extends StatelessWidget {
         Container(width: 12, height: 12, color: urunRengi(p)),
         const SizedBox(width: 8),
         Expanded(child: Text(p.ad, style: const TextStyle(fontWeight: FontWeight.w800))),
-        Text(_da(p.beyan), style: const TextStyle(fontWeight: FontWeight.w700)),
       ]),
       const SizedBox(height: 2),
-      Text(p.urunYazi),
+      Text(p.urunCinsi),
       if (cks.isNotEmpty)
         Padding(
           padding: const EdgeInsets.only(top: 4),
@@ -644,22 +657,25 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
   @override
   Widget build(BuildContext context) {
     final s = widget.s, v = widget.v;
-    final k = ekimKarsilastir(s, v.ekim);
-    final uyumlu = k.where((x) => x.durum == 'Uyumlu').toList();
-    final farkTum = k.where((x) => x.durum != 'Uyumlu').toList();
-    final duzeltilen = [
-      for (final x in farkTum)
-        if (aktifDuzeltme(v.ekimDuzeltme, s.sezon, x.ciftlik, x.urun) case final d?) (x, d)
-    ];
+    final tablo = excelKarsilastir(s, v.ekim, v.resmiParsel, v.cks);
+    final uyumlu = tablo.where((x) => x.uyumlu).toList();
+    final farkTum = tablo.where((x) => !x.uyumlu).toList();
+    final duzeltilen = [for (final x in farkTum) if (aktifDuzeltme(v.ekimDuzeltme, s.sezon, x.ciftlik, x.urun) != null) x];
     final fark = [for (final x in farkTum) if (aktifDuzeltme(v.ekimDuzeltme, s.sezon, x.ciftlik, x.urun) == null) x];
-    final etiket = [for (final c in s.ciftlikler) for (final p in c.parseller) if (p.not.contains('yazıyor')) (c, p)];
+    // Yalnızca ürün cinsi çelişkileri; haritadaki dekar çelişkileri dikkate alınmaz.
+    final dekarCeliskisi = RegExp(r'"\d+ da", alan çizimi "\d+ da"');
+    final etiket = [
+      for (final c in s.ciftlikler)
+        for (final p in c.parseller)
+          if (p.not.contains('yazıyor') && !dekarCeliskisi.hasMatch(p.not)) (c, p)
+    ];
     final hasat = <(HasatSatir, double)>[];
     for (final h in v.hasat) {
       if ((h.alan ?? 0) <= 0 || h.toplam == null) continue;
       for (final c in s.ciftlikler) {
         if (ciftlikAnahtari(c.ad) != ciftlikAnahtari(h.ciftlik)) continue;
-        final a = c.urunToplami[urunAnahtari(h.urun)];
-        if (a != null && (a - h.alan!).abs() > 10) hasat.add((h, a));
+        final a = excelAlanlari(v.ekim, c.ad)[urunAnahtari(h.urun)];
+        if (a != null && !alanYakin(a, h.alan!)) hasat.add((h, a));
       }
     }
     final cksEslesmeyen = [
@@ -668,17 +684,38 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
             !s.ciftlikler.any((c) => c.parseller.any((p) => parselCks(c, p, [x], s.sezon).isNotEmpty)))
           x
     ];
-    final resmi = resmiKarsilastir(s, v.resmiParsel);
     final yillar = planYillari(v.ekimPlani);
     final cksYok = [
       for (final c in s.ciftlikler)
         for (final p in c.parseller)
           if (p.urunler.isNotEmpty && p.tip != 'diger' && parselCks(c, p, v.cks, s.sezon).isEmpty) (c, p)
     ];
+    String kaynaklar(UrunSatiri x) => [
+          'Excel planı ${_da(x.excel)}',
+          if (x.resmi != null) 'Excel PARSEL ${_da(x.resmi)}',
+          'ÇKS ${_da(x.cks)}',
+          'Harita: ${x.haritada ? 'ekili' : 'yok'}',
+          if (x.ekilen != null) 'ekilen ${_da(x.ekilen)}',
+        ].join(' · ');
+    Widget farkKarti(UrunSatiri x) => _kart(context,
+        ciftlik: x.ciftlik,
+        konu: x.urun,
+        baslik: '${x.ciftlik} · ${x.urun}',
+        alt: '${kaynaklar(x)}\n${x.bulgular.join('; ')}',
+        ikon: Icons.warning_amber_rounded,
+        secenekler: [
+          if ((x.excel ?? 0) > 0) ('Excel ekim planı doğru', x.excel),
+          if (x.resmi != null) ('Excel PARSEL kaydı doğru', x.resmi),
+          if (x.cks != null) ('ÇKS doğru', x.cks),
+          if (x.excelYok) ("Excel'e eklenecek", null),
+          if (x.haritadaYok) ('Harita güncellenecek', null),
+        ],
+        ozelDeger: true);
     return SingleChildScrollView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      BilgiKutusu(
-          yazi: 'Harita (${s.kaynak}, ${s.sezon}) ile tarım icmalinin ekim alanları (plan / ekilen) karşılaştırılır. '
-              'Tarım icmalindeki Ekim–Kasım güz ekimleri bir sonraki sezona ait olabilir; o satırlarda fark beklenir.'),
+      const BilgiKutusu(
+          yazi: 'Esas alınan kaynak Excel dosyalarıdır: ekim planı (2026-2027 Ekim Planı) ve resmî parsel kayıtları '
+              '(2026-2027 Tarımsal Faaliyet › PARSEL). ÇKS bu rakamlarla karşılaştırılır. Haritadan yalnızca ekili ürün '
+              'cinsi alınır; haritada yazan dekarlar kullanılmaz.'),
       const SizedBox(height: 6),
       Row(children: [
         Expanded(child: _Sayac('Uyumlu', uyumlu.length, Renk.yesil, () => _git(_kUyumlu))),
@@ -693,109 +730,43 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
         ),
       if (v.cks.isNotEmpty) ...[
         const SizedBox(height: 8),
-        _Sayac("ÇKS ile eşleşmeyen", cksEslesmeyen.length + cksYok.length, Renk.mavi, () => _git(_kCks)),
+        _Sayac("ÇKS ile eşleşmeyen parsel", cksEslesmeyen.length + cksYok.length, Renk.mavi, () => _git(_kCks)),
       ],
-      const BolumBasligi('Kaynaklara göre ekim alanları (da)'),
-      _KaynakTablosu(satirlar: kaynakTablosu(s, v.ekim, v.cks)),
-      BolumBasligi('Tutarsızlıklar: harita ve tarım icmali', key: _kFark),
+      const BolumBasligi('Excel esaslı ekim alanları (da)'),
+      _KaynakTablosu(satirlar: tablo),
+      BolumBasligi('Tutarsızlıklar: Excel esas alınarak', key: _kFark),
       if (fark.isEmpty) const Text('Fark yok.'),
-      for (final x in fark)
-        Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              ListTile(
-                dense: true,
-                leading: const Icon(Icons.warning_amber_rounded, color: Renk.amber),
-                title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('Harita ${_da(x.harita)} · İcmal planı ${_da(x.plan)} · ÇKS ${_da(cksToplami(v.cks, s.sezon, x.ciftlik, x.urun))}'
-                    '${x.ekilen == null ? '' : ' · ekilen ${_da(x.ekilen)}'}'
-                    '${x.fark == null ? '' : '\nFark: ${x.fark! >= 0 ? '+' : ''}${sayi(x.fark!)} da'} · ${x.durum}'),
-                isThreeLine: x.fark != null,
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  key: Key('duzelt_${x.ciftlik}_${x.urun}'),
-                  onPressed: () => _duzelt(context,
-                      ciftlik: x.ciftlik,
-                      konu: x.urun,
-                      baslik: '${x.ciftlik} · ${x.urun}',
-                      secenekler: [
-                        ('Harita doğru', x.harita),
-                        if (x.plan != null) ('Plan doğru', x.plan),
-                        if (cksToplami(v.cks, s.sezon, x.ciftlik, x.urun) case final k?) ('ÇKS doğru', k),
-                      ],
-                      ozelDeger: true),
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('Düzelt'),
-                ),
-              ),
-            ]),
-          ),
-        ),
+      for (final x in fark) farkKarti(x),
       if (duzeltilen.isNotEmpty) ...[
         const BolumBasligi('Düzeltilenler'),
-        for (final (x, d) in duzeltilen)
-          Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-              dense: true,
-              leading: const Icon(Icons.task_alt, color: Renk.yesil),
-              title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('Düzeltildi: ${d.secim}${d.deger == null || d.deger == 0 ? '' : ' · ${_da(d.deger)}'}'
-                  '${d.aciklama.isEmpty ? '' : '\n${d.aciklama}'}'
-                  '\nKaynakta: harita ${_da(x.harita)} · icmal planı ${_da(x.plan)}${d.tarih.isEmpty ? '' : ' · ${d.tarih}'}'),
-              isThreeLine: true,
-              trailing: TextButton(onPressed: () => _geriAl(context, x.ciftlik, x.urun), child: const Text('Geri al')),
-            ),
-          ),
+        for (final x in duzeltilen) farkKarti(x),
       ],
-      BolumBasligi('Haritadaki etiket tutarsızlıkları', key: _kOlcum),
-      for (final (c, p) in etiket)
-        _kart(context,
-            ciftlik: c.ad,
-            konu: 'Etiket: ${p.ad}',
-            baslik: '${c.ad} · ${p.ad}',
-            alt: p.not,
-            ikon: Icons.label_important_outline,
-            secenekler: const [('Haritadaki işaret doğru', null), ('Alan çizimi doğru', null), ('İncelendi, sorun yok', null)]),
-      for (final c in s.ciftlikler)
-        for (final n in c.notlar.where((n) => n.contains('uyuşmuyor')))
+      if (etiket.isNotEmpty) ...[
+        BolumBasligi('Haritada ürün cinsi tutarsızlıkları', key: _kOlcum),
+        for (final (c, p) in etiket)
           _kart(context,
               ciftlik: c.ad,
-              konu: 'Not: ${n.length > 40 ? n.substring(0, 40) : n}',
-              baslik: c.ad,
-              alt: n,
-              ikon: Icons.notes,
-              secenekler: const [('İncelendi, dikkate alınmayacak', null), ('Harita düzeltilecek', null)]),
+              konu: 'Etiket: ${p.ad}',
+              baslik: '${c.ad} · ${p.ad}',
+              alt: p.not,
+              ikon: Icons.label_important_outline,
+              secenekler: const [('Haritadaki işaret doğru', null), ('Alan çizimindeki ürün doğru', null), ('İncelendi, sorun yok', null)]),
+      ],
       if (hasat.isNotEmpty) ...[
-        const BolumBasligi('Hasat ve verim (haritadaki alanla)'),
+        const BolumBasligi('Hasat ve verim (Excel alanıyla)'),
         for (final (h, a) in hasat)
           _kart(context,
               ciftlik: h.ciftlik,
               konu: 'Hasat: ${h.urun}',
               baslik: '${h.ciftlik} · ${h.urun}',
               alt: 'Hasat kaydında alan ${_da(h.alan)}, verim ${sayi(h.toplam! / h.alan!)} kg/da. '
-                  'Haritadaki alan ${_da(a)} esas alınırsa verim ${sayi(h.toplam! / a)} kg/da.',
+                  'Excel ekim planındaki alan ${_da(a)} esas alınırsa verim ${sayi(h.toplam! / a)} kg/da.',
               ikon: Icons.agriculture,
-              secenekler: [('Hasat kaydındaki alan doğru', h.alan), ('Haritadaki alan doğru', a)],
+              secenekler: [('Hasat kaydındaki alan doğru', h.alan), ('Excel alanı doğru', a)],
               ozelDeger: true),
       ],
       if (v.cks.isNotEmpty) ...[
-        BolumBasligi('ÇKS ile harita', key: _kCks),
-        for (final (c, u, k, h) in cksUrunKarsilastir(s, v.cks))
-          _yakin(k, h)
-              ? _uyumluKart('$c · $u', 'ÇKS: ${_da(k)} · Harita: ${_da(h)}')
-              : _kart(context,
-                  ciftlik: c,
-                  konu: 'ÇKS: $u',
-                  baslik: '$c · $u',
-                  alt: 'ÇKS: ${_da(k)} · Harita: ${_da(h)} · Fark: ${h - k >= 0 ? '+' : ''}${sayi(h - k)} da',
-                  ikon: Icons.compare_arrows,
-                  secenekler: [('Harita doğru', h), ('ÇKS doğru', k)],
-                  ozelDeger: true),
+        BolumBasligi('ÇKS ile haritadaki ekili ürünler', key: _kCks),
         for (final x in cksEslesmeyen)
           _kart(context,
               ciftlik: x.ciftlik,
@@ -809,25 +780,10 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
               ciftlik: c.ad,
               konu: 'ÇKS bildirimi: ${p.ad}',
               baslik: '${c.ad} · ${p.ad}',
-              alt: "${p.urunYazi}: haritada ekili, ÇKS'de bildirimi görünmüyor.",
+              alt: "${p.urunCinsi}: haritada ekili, ÇKS'de bildirimi görünmüyor.",
               ikon: Icons.report_outlined,
               secenekler: const [("ÇKS'de bildirildi (başka parsel altında)", null), ("ÇKS'ye bildirilecek", null), ('İncelendi, sorun yok', null)]),
         if (cksEslesmeyen.isEmpty && cksYok.isEmpty) const Text("Tüm parseller ÇKS'de bildirilmiş."),
-      ],
-      if (resmi.isNotEmpty) ...[
-        const BolumBasligi('Resmî parsel kayıtları ile harita'),
-        const Text('Kaynak: 2026-2027 Tarımsal Faaliyet › PARSEL', style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
-        for (final (c, u, r, h) in resmi)
-          _yakin(r, h)
-              ? _uyumluKart('$c · $u', 'Resmî kayıt: ${_da(r)} · Harita: ${_da(h)}')
-              : _kart(context,
-                  ciftlik: c,
-                  konu: 'Resmî kayıt: $u',
-                  baslik: '$c · $u',
-                  alt: 'Resmî kayıt: ${_da(r)} · Harita: ${_da(h)} · Fark: ${h - r >= 0 ? '+' : ''}${sayi(h - r)} da',
-                  ikon: Icons.compare_arrows,
-                  secenekler: [('Harita doğru', h), ('Resmî kayıt doğru', r)],
-                  ozelDeger: true),
       ],
       const BolumBasligi('Ekim planı yıllara göre (münavebe)'),
       if (yillar.length < 2)
@@ -852,16 +808,8 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
             ),
           ),
       BolumBasligi('Olumlu: uyumlu olanlar', key: _kUyumlu),
-      for (final x in uyumlu)
-        Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          child: ListTile(
-            dense: true,
-            leading: const Icon(Icons.check_circle_outline, color: Renk.yesil),
-            title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('Harita ${_da(x.harita)} · İcmal planı ${_da(x.plan)}'),
-          ),
-        ),
+      if (uyumlu.isEmpty) const Text('Uyumlu satır yok.'),
+      for (final x in uyumlu) _uyumluKart('${x.ciftlik} · ${x.urun}', kaynaklar(x)),
     ]));
   }
 }
@@ -938,33 +886,37 @@ class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
   }
 }
 
-/// Harita / icmal planı / ÇKS tablosu; diğerlerinden sapan değer turuncu.
+/// Excel planı (esas) / Excel PARSEL / ÇKS / harita tablosu; Excel'den sapan değer turuncu.
 class _KaynakTablosu extends StatelessWidget {
   const _KaynakTablosu({required this.satirlar});
-  final List<KaynakSatiri> satirlar;
+  final List<UrunSatiri> satirlar;
 
   @override
   Widget build(BuildContext context) {
     Widget h(String t, {TextAlign a = TextAlign.right}) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
         child: Text(t, textAlign: a, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)));
-    Widget d(double? x, bool sapan) => Container(
+    Widget d(String t, bool sapan, {bool kalin = false}) => Container(
           color: sapan ? Renk.amber.withValues(alpha: 0.18) : null,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          child: Text(x == null ? '—' : sayi(x),
+          child: Text(t,
               textAlign: TextAlign.right,
-              style: TextStyle(fontSize: 12.5, fontWeight: sapan ? FontWeight.w800 : null, color: sapan ? Renk.amber : null)),
+              style: TextStyle(
+                  fontSize: 12.5, fontWeight: sapan || kalin ? FontWeight.w800 : null, color: sapan ? Renk.amber : null)),
         );
+    String n(double? x) => x == null ? '—' : sayi(x);
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Table(
-            columnWidths: const {0: FlexColumnWidth(2.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1)},
+            columnWidths: const {
+              0: FlexColumnWidth(2.3), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1), 4: FlexColumnWidth(0.8)
+            },
             border: TableBorder(horizontalInside: BorderSide(color: Colors.black.withValues(alpha: 0.08))),
             children: [
-              TableRow(children: [h('Çiftlik · Ürün', a: TextAlign.left), h('Harita'), h('İcmal'), h('ÇKS')]),
+              TableRow(children: [h('Çiftlik · Ürün', a: TextAlign.left), h('Excel plan'), h('PARSEL'), h('ÇKS'), h('Harita')]),
               for (final r in satirlar)
                 TableRow(children: [
                   Padding(
@@ -975,14 +927,17 @@ class _KaynakTablosu extends StatelessWidget {
                       if (r.uyumlu) const TextSpan(text: '  ✓', style: TextStyle(color: Renk.yesil, fontWeight: FontWeight.w800)),
                     ]), style: const TextStyle(fontSize: 12.5)),
                   ),
-                  d(r.harita, r.sapan.contains(0)),
-                  d(r.plan, r.sapan.contains(1)),
-                  d(r.cks, r.sapan.contains(2)),
+                  d(n(r.excel), r.excelYok, kalin: true),
+                  d(n(r.resmi), r.resmiFarkli),
+                  d(n(r.cks), r.cksFarkli),
+                  d(r.haritada ? 'ekili' : '—', r.haritadaYok || (r.excelYok && r.haritada)),
                 ]),
             ],
           ),
           const SizedBox(height: 6),
-          const Text('Turuncu: diğer kaynaklardan sapan değer. ✓: kaynaklar uyumlu. —: o kaynakta kayıt yok.',
+          const Text(
+              "Esas: Excel ekim planı (yoksa Excel PARSEL). Turuncu: Excel'den sapan ya da Excel'de karşılığı olmayan kayıt. "
+              'Harita sütunu yalnızca ürünün haritada ekili olup olmadığını gösterir. ✓: uyumlu. —: kayıt yok.',
               style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
         ]),
       ),
@@ -990,7 +945,6 @@ class _KaynakTablosu extends StatelessWidget {
   }
 }
 
-bool _yakin(double a, double b) => (a - b).abs() <= 10 || (a > 0 && (a - b).abs() / a <= 0.03);
 
 class _Sayac extends StatelessWidget {
   const _Sayac(this.etiket, this.n, this.renk, this.dokun);

@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 
+import '../bicim.dart';
 import 'kategori.dart';
 import 'model.dart';
 
@@ -20,6 +21,11 @@ class TarlaParsel {
   String get urunYazi => urunler.isEmpty
       ? (tip == 'bos' ? 'Boş alan' : 'Ürün belirtilmemiş')
       : urunler.map((u) => '${u.$1} ${_s(u.$2)} da').join(' + ');
+
+  /// Yalnızca ekili ürün cinsleri (haritadaki dekarlar esas alınmaz).
+  String get urunCinsi => urunler.isEmpty
+      ? (tip == 'bos' ? 'Boş alan' : 'Ürün belirtilmemiş')
+      : {for (final u in urunler) u.$1}.join(' + ');
 
   /// Ölçülen alanın beyandan farkı (%), anlamlı değilse null.
   double? get olcumFarki =>
@@ -43,6 +49,9 @@ class TarlaCiftlik {
   final List<TarlaParsel> parseller;
   final Map<String, dynamic> tesis;
   final List<String> notlar;
+
+  /// Haritada ekili ürün cinsleri (ortak adlarla).
+  Set<String> get urunCinsleri => {for (final p in parseller) for (final u in p.urunler) urunAnahtari(u.$1)};
 
   Map<String, double> get urunToplami {
     final m = <String, double>{};
@@ -113,50 +122,6 @@ String ciftlikAnahtari(String c) {
   return k;
 }
 
-class EkimKarsilastirma {
-  const EkimKarsilastirma({required this.ciftlik, required this.urun, required this.harita, this.plan, this.ekilen});
-  final String ciftlik, urun;
-  final double harita;
-  final double? plan, ekilen;
-  double? get fark => plan == null ? null : harita - plan!;
-
-  /// 'Uyumlu', 'Fark', 'Planda yok', 'Haritada yok'.
-  String get durum {
-    if (plan == null) return 'Planda yok';
-    if (harita == 0) return 'Haritada yok';
-    final f = fark!.abs();
-    return f <= 10 || f <= plan! * 0.03 ? 'Uyumlu' : 'Fark';
-  }
-}
-
-/// Haritadaki ekilişi tarım icmalinin ekim alanlarıyla (Ekim_Alanları) karşılaştırır.
-List<EkimKarsilastirma> ekimKarsilastir(TarlaSezonu s, List<EkimSatir> ekim) {
-  final out = <EkimKarsilastirma>[];
-  final plan = <String, (String, String, double?, double?)>{};
-  for (final e in ekim) {
-    final k = '${ciftlikAnahtari(e.ciftlik)}|${urunAnahtari(e.urun)}';
-    final o = plan[k];
-    plan[k] = (e.ciftlik, urunAnahtari(e.urun), (o?.$3 ?? 0) + (e.plan ?? 0), e.ekilen == null && o?.$4 == null ? null : (o?.$4 ?? 0) + (e.ekilen ?? 0));
-  }
-  final gorulen = <String>{};
-  for (final c in s.ciftlikler) {
-    final t = c.urunToplami;
-    if (t.isEmpty) continue;
-    for (final u in t.keys) {
-      final k = '${ciftlikAnahtari(c.ad)}|$u';
-      gorulen.add(k);
-      final p = plan[k];
-      out.add(EkimKarsilastirma(ciftlik: c.ad, urun: u, harita: t[u]!, plan: p?.$3, ekilen: p?.$4));
-    }
-  }
-  for (final e in plan.entries) {
-    if (gorulen.contains(e.key)) continue;
-    if (!s.ciftlikler.any((c) => ciftlikAnahtari(c.ad) == e.key.split('|')[0])) continue;
-    out.add(EkimKarsilastirma(ciftlik: e.value.$1, urun: e.value.$2, harita: 0, plan: e.value.$3, ekilen: e.value.$4));
-  }
-  return out;
-}
-
 /// Bir parseli anan tarım icmali kayıtları ("5. pivot", "5.pivot", "1. parsel").
 List<TarimKaydi> parselKayitlari(TarlaCiftlik c, TarlaParsel p, List<TarimKaydi> tarim) {
   final m = RegExp(r'^(\d+)\.\s*(pivot|parsel)').firstMatch(kucuk(p.ad));
@@ -178,45 +143,8 @@ List<CksParsel> parselCks(TarlaCiftlik c, TarlaParsel p, List<CksParsel> cks, St
     ];
 
 
-/// Resmî parsel kayıtlarının (PARSEL sekmesi) ürün toplamı ile haritanın karşılaştırması.
-List<(String ciftlik, String urun, double resmi, double harita)> resmiKarsilastir(TarlaSezonu s, List<ResmiParsel> l) {
-  final out = <(String, String, double, double)>[];
-  for (final c in s.ciftlikler) {
-    final r = <String, double>{};
-    for (final x in l) {
-      if (ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad) || x.alan == null) continue;
-      r.update(urunAnahtari(x.urun), (v) => v + x.alan!, ifAbsent: () => x.alan!);
-    }
-    if (r.isEmpty) continue;
-    final h = c.urunToplami;
-    for (final u in {...r.keys, ...h.keys}) {
-      out.add((c.ad, u, r[u] ?? 0, h[u] ?? 0));
-    }
-  }
-  return out;
-}
-
 /// Ekim planı dosyasında verisi olan yıllar (küçükten büyüğe).
 List<String> planYillari(List<EkimPlanSatir> l) => ({for (final x in l) x.yil}.toList()..sort());
-
-
-/// ÇKS ile haritanın ürün bazında karşılaştırması (sezon, çiftlik, ürün, ÇKS da, harita da).
-List<(String ciftlik, String urun, double cks, double harita)> cksUrunKarsilastir(TarlaSezonu s, List<CksParsel> l) {
-  final out = <(String, String, double, double)>[];
-  for (final c in s.ciftlikler) {
-    final r = <String, double>{};
-    for (final x in l) {
-      if (x.sezon != s.sezon || ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad) || x.alan == null) continue;
-      r.update(urunAnahtari(x.urun), (v) => v + x.alan!, ifAbsent: () => x.alan!);
-    }
-    if (r.isEmpty) continue;
-    final h = c.urunToplami;
-    for (final u in {...r.keys, ...h.keys}) {
-      out.add((c.ad, u, r[u] ?? 0, h[u] ?? 0));
-    }
-  }
-  return out;
-}
 
 
 /// Karşılaştırma satırı için geçerli (aktif) düzeltme.
@@ -234,61 +162,83 @@ EkimDuzeltme? aktifDuzeltme(List<EkimDuzeltme> l, String sezon, String ciftlik, 
 }
 
 
-/// Bir çiftlik/ürün için ÇKS'de bildirilen toplam alan (yoksa null).
-double? cksToplami(List<CksParsel> l, String sezon, String ciftlik, String urun) {
-  double? t;
+// ---------------------------------------------------------------------------
+// Excel esaslı karşılaştırma. Alanlar Excel dosyalarından alınır:
+//  • Ekim planı (2026-2027 Ekim Planı Tarımsal Faaliyetler › Ekim_Alanları plan)
+//  • Resmî parsel kayıtları (2026-2027 Tarımsal Faaliyet › PARSEL)
+// Haritadan yalnızca ekili ürün cinsi alınır; haritadaki dekarlar kullanılmaz.
+
+bool alanYakin(double a, double b) => (a - b).abs() <= 10 || (a - b).abs() <= math.max(a, b) * 0.03;
+
+/// Excel ekim planına göre bir çiftliğin ürün alanları (ürün → da).
+Map<String, double> excelAlanlari(List<EkimSatir> ekim, String ciftlik) {
+  final m = <String, double>{};
+  for (final e in ekim) {
+    if (ciftlikAnahtari(e.ciftlik) != ciftlikAnahtari(ciftlik) || (e.plan ?? 0) <= 0) continue;
+    m.update(urunAnahtari(e.urun), (v) => v + e.plan!, ifAbsent: () => e.plan!);
+  }
+  return m;
+}
+
+Map<String, double> _resmiAlanlar(List<ResmiParsel> l, String ciftlik) {
+  final m = <String, double>{};
   for (final x in l) {
-    if (x.sezon == sezon &&
-        ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(ciftlik) &&
-        urunAnahtari(x.urun) == urunAnahtari(urun) &&
-        x.alan != null) {
-      t = (t ?? 0) + x.alan!;
-    }
+    if (ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(ciftlik) || x.alan == null) continue;
+    m.update(urunAnahtari(x.urun), (v) => v + x.alan!, ifAbsent: () => x.alan!);
   }
-  return t;
+  return m;
 }
 
-/// Kaynaklara göre ekim alanları: harita, icmal planı, ÇKS.
-class KaynakSatiri {
-  const KaynakSatiri(this.ciftlik, this.urun, this.harita, this.plan, this.cks);
+/// Bir çiftlik/ürün için kaynaklar: Excel planı (esas), Excel PARSEL, ÇKS, haritada var mı.
+class UrunSatiri {
+  const UrunSatiri(this.ciftlik, this.urun, {this.excel, this.resmi, this.cks, this.haritada = false, this.ekilen});
   final String ciftlik, urun;
-  final double? harita, plan, cks;
+  final double? excel, resmi, cks, ekilen;
+  final bool haritada;
 
-  /// Diğerlerinden sapan kaynaklar (0: harita, 1: plan, 2: ÇKS).
-  Set<int> get sapan {
-    final d = [harita, plan, cks];
-    final dolu = [for (var i = 0; i < 3; i++) if (d[i] != null && d[i]! > 0) i];
-    bool yakin(double a, double b) => (a - b).abs() <= 10 || (a - b).abs() <= math.max(a, b) * 0.03;
-    if (dolu.length < 2) return {};
-    if (dolu.length == 2) return yakin(d[dolu[0]]!, d[dolu[1]]!) ? {} : {...dolu};
-    final out = <int>{};
-    for (final i in dolu) {
-      final digerleri = dolu.where((j) => j != i).toList();
-      if (yakin(d[digerleri[0]]!, d[digerleri[1]]!) && !yakin(d[i]!, d[digerleri[0]]!)) out.add(i);
-    }
-    if (out.isEmpty && !(yakin(d[0]!, d[1]!) && yakin(d[1]!, d[2]!))) return {...dolu};
-    return out;
-  }
+  /// Esas alınan alan: Excel ekim planı, yoksa Excel PARSEL kaydı.
+  double? get esas => (excel ?? 0) > 0 ? excel : ((resmi ?? 0) > 0 ? resmi : null);
 
-  bool get uyumlu => sapan.isEmpty;
+  double? farki(double? x) => esas == null || x == null ? null : x - esas!;
+
+  bool get cksFarkli => esas != null && cks != null && !alanYakin(cks!, esas!);
+  bool get resmiFarkli => (excel ?? 0) > 0 && resmi != null && !alanYakin(resmi!, excel!);
+  bool get excelYok => esas == null;
+  bool get haritadaYok => esas != null && !haritada;
+
+  bool get uyumlu => !cksFarkli && !resmiFarkli && !excelYok && !haritadaYok;
+
+  /// Bulguların kısa açıklaması.
+  List<String> get bulgular => [
+        if (excelYok)
+          [if (haritada) 'haritada', if (cks != null) "ÇKS'de"].join(' ve ') + " ekili, Excel dosyalarında kaydı yok",
+        if (haritadaYok) "Excel'de ${sayiKisa(esas!)} da, haritada bu ürün yok",
+        if (resmiFarkli) 'Excel PARSEL kaydı ekim planından ${_isaretli(resmi! - excel!)} da farklı',
+        if (cksFarkli) "ÇKS Excel'den ${_isaretli(cks! - esas!)} da farklı",
+      ];
 }
 
-List<KaynakSatiri> kaynakTablosu(TarlaSezonu s, List<EkimSatir> ekim, List<CksParsel> cks) {
-  final out = <KaynakSatiri>[];
-  final gorulen = <String>{};
-  for (final x in ekimKarsilastir(s, ekim)) {
-    gorulen.add('${ciftlikAnahtari(x.ciftlik)}|${urunAnahtari(x.urun)}');
-    out.add(KaynakSatiri(x.ciftlik, x.urun, x.harita == 0 ? null : x.harita, x.plan, cksToplami(cks, s.sezon, x.ciftlik, x.urun)));
-  }
+String sayiKisa(double v) => sayi(v);
+String _isaretli(double v) => '${v >= 0 ? '+' : '−'}${sayi(v.abs())}';
+
+/// Haritadaki çiftlikler için Excel esaslı ürün tablosu.
+List<UrunSatiri> excelKarsilastir(TarlaSezonu s, List<EkimSatir> ekim, List<ResmiParsel> resmi, List<CksParsel> cks) {
+  final out = <UrunSatiri>[];
   for (final c in s.ciftlikler) {
+    final e = excelAlanlari(ekim, c.ad), r = _resmiAlanlar(resmi, c.ad), h = c.urunCinsleri;
+    final k = <String, double>{};
     for (final x in cks) {
-      if (x.sezon != s.sezon || ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad)) continue;
-      final k = '${ciftlikAnahtari(c.ad)}|${urunAnahtari(x.urun)}';
-      if (!gorulen.add(k)) continue;
-      out.add(KaynakSatiri(c.ad, urunAnahtari(x.urun), null, null, cksToplami(cks, s.sezon, c.ad, x.urun)));
+      if (x.sezon != s.sezon || ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad) || x.alan == null) continue;
+      k.update(urunAnahtari(x.urun), (v) => v + x.alan!, ifAbsent: () => x.alan!);
+    }
+    final ekilen = <String, double>{};
+    for (final x in ekim) {
+      if (ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad) || x.ekilen == null) continue;
+      ekilen.update(urunAnahtari(x.urun), (v) => v + x.ekilen!, ifAbsent: () => x.ekilen!);
+    }
+    for (final u in {...e.keys, ...r.keys, ...k.keys, ...h}) {
+      out.add(UrunSatiri(c.ad, u, excel: e[u], resmi: r[u], cks: k[u], haritada: h.contains(u), ekilen: ekilen[u]));
     }
   }
-  final sira = {for (final (i, c) in s.ciftlikler.indexed) ciftlikAnahtari(c.ad): i};
-  out.sort((a, b) => (sira[ciftlikAnahtari(a.ciftlik)] ?? 99).compareTo(sira[ciftlikAnahtari(b.ciftlik)] ?? 99));
   return out;
 }
