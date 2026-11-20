@@ -2,6 +2,7 @@
 // Kaynak: Google Earth "Yerlerim" KMZ dosyasından üretilen assets/veri/tarla_*.json
 // (araclar/tarla). KVKK: kişi adı içermez.
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart';
 
@@ -230,4 +231,64 @@ EkimDuzeltme? aktifDuzeltme(List<EkimDuzeltme> l, String sezon, String ciftlik, 
     }
   }
   return d;
+}
+
+
+/// Bir çiftlik/ürün için ÇKS'de bildirilen toplam alan (yoksa null).
+double? cksToplami(List<CksParsel> l, String sezon, String ciftlik, String urun) {
+  double? t;
+  for (final x in l) {
+    if (x.sezon == sezon &&
+        ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(ciftlik) &&
+        urunAnahtari(x.urun) == urunAnahtari(urun) &&
+        x.alan != null) {
+      t = (t ?? 0) + x.alan!;
+    }
+  }
+  return t;
+}
+
+/// Kaynaklara göre ekim alanları: harita, icmal planı, ÇKS.
+class KaynakSatiri {
+  const KaynakSatiri(this.ciftlik, this.urun, this.harita, this.plan, this.cks);
+  final String ciftlik, urun;
+  final double? harita, plan, cks;
+
+  /// Diğerlerinden sapan kaynaklar (0: harita, 1: plan, 2: ÇKS).
+  Set<int> get sapan {
+    final d = [harita, plan, cks];
+    final dolu = [for (var i = 0; i < 3; i++) if (d[i] != null && d[i]! > 0) i];
+    bool yakin(double a, double b) => (a - b).abs() <= 10 || (a - b).abs() <= math.max(a, b) * 0.03;
+    if (dolu.length < 2) return {};
+    if (dolu.length == 2) return yakin(d[dolu[0]]!, d[dolu[1]]!) ? {} : {...dolu};
+    final out = <int>{};
+    for (final i in dolu) {
+      final digerleri = dolu.where((j) => j != i).toList();
+      if (yakin(d[digerleri[0]]!, d[digerleri[1]]!) && !yakin(d[i]!, d[digerleri[0]]!)) out.add(i);
+    }
+    if (out.isEmpty && !(yakin(d[0]!, d[1]!) && yakin(d[1]!, d[2]!))) return {...dolu};
+    return out;
+  }
+
+  bool get uyumlu => sapan.isEmpty;
+}
+
+List<KaynakSatiri> kaynakTablosu(TarlaSezonu s, List<EkimSatir> ekim, List<CksParsel> cks) {
+  final out = <KaynakSatiri>[];
+  final gorulen = <String>{};
+  for (final x in ekimKarsilastir(s, ekim)) {
+    gorulen.add('${ciftlikAnahtari(x.ciftlik)}|${urunAnahtari(x.urun)}');
+    out.add(KaynakSatiri(x.ciftlik, x.urun, x.harita == 0 ? null : x.harita, x.plan, cksToplami(cks, s.sezon, x.ciftlik, x.urun)));
+  }
+  for (final c in s.ciftlikler) {
+    for (final x in cks) {
+      if (x.sezon != s.sezon || ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad)) continue;
+      final k = '${ciftlikAnahtari(c.ad)}|${urunAnahtari(x.urun)}';
+      if (!gorulen.add(k)) continue;
+      out.add(KaynakSatiri(c.ad, urunAnahtari(x.urun), null, null, cksToplami(cks, s.sezon, c.ad, x.urun)));
+    }
+  }
+  final sira = {for (final (i, c) in s.ciftlikler.indexed) ciftlikAnahtari(c.ad): i};
+  out.sort((a, b) => (sira[ciftlikAnahtari(a.ciftlik)] ?? 99).compareTo(sira[ciftlikAnahtari(b.ciftlik)] ?? 99));
+  return out;
 }

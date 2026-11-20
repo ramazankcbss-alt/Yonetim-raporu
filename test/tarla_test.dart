@@ -56,6 +56,10 @@ void main() {
     expect(planYillari(v.ekimPlani), ['2026', '2027']);
     expect(aktifDuzeltme(v.ekimDuzeltme, s.sezon, 'Aslım', 'Arpa')?.deger, 1105);
     expect(aktifDuzeltme(v.ekimDuzeltme, s.sezon, 'Aslım', 'Buğday'), isNull);
+    expect(const KaynakSatiri('A', 'Pancar', 670, 700, 651).sapan, {1});
+    expect(const KaynakSatiri('A', 'Yonca', 1410, 1360, 1410).sapan, {1});
+    expect(const KaynakSatiri('A', 'Patates', 420, 420, 420).uyumlu, isTrue);
+    expect(kaynakTablosu(s, v.ekim, v.cks).isNotEmpty, isTrue);
     expect(resmiKarsilastir(s, v.resmiParsel).any((e) => e.$2 == 'Buğday' && e.$3 == 721), isTrue);
   });
 
@@ -75,6 +79,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Olumlu: uyumlu olanlar'), findsOneWidget);
     expect(find.text('Düzeltilenler'), findsOneWidget);
+    expect(find.text('Kaynaklara göre ekim alanları (da)'), findsOneWidget);
     expect(find.text('Düzelt'), findsWidgets);
     await t.tap(find.text('Parseller'));
     await t.pumpAndSettle();

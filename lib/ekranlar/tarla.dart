@@ -639,6 +639,8 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
         const SizedBox(height: 8),
         _Sayac("ÇKS ile eşleşmeyen", cksEslesmeyen.length + cksYok.length, Renk.mavi, () => _git(_kCks)),
       ],
+      const BolumBasligi('Kaynaklara göre ekim alanları (da)'),
+      _KaynakTablosu(satirlar: kaynakTablosu(s, v.ekim, v.cks)),
       BolumBasligi('Tutarsızlıklar: harita ve tarım icmali', key: _kFark),
       if (fark.isEmpty) const Text('Fark yok.'),
       for (final x in fark)
@@ -651,7 +653,8 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
                 dense: true,
                 leading: const Icon(Icons.warning_amber_rounded, color: Renk.amber),
                 title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('Harita ${_da(x.harita)} · İcmal planı ${_da(x.plan)}${x.ekilen == null ? '' : ' · ekilen ${_da(x.ekilen)}'}'
+                subtitle: Text('Harita ${_da(x.harita)} · İcmal planı ${_da(x.plan)} · ÇKS ${_da(cksToplami(v.cks, s.sezon, x.ciftlik, x.urun))}'
+                    '${x.ekilen == null ? '' : ' · ekilen ${_da(x.ekilen)}'}'
                     '${x.fark == null ? '' : '\nFark: ${x.fark! >= 0 ? '+' : ''}${sayi(x.fark!)} da'} · ${x.durum}'),
                 isThreeLine: x.fark != null,
               ),
@@ -864,6 +867,58 @@ class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
           child: const Text('Kaydet'),
         ),
       ],
+    );
+  }
+}
+
+/// Harita / icmal planı / ÇKS tablosu; diğerlerinden sapan değer turuncu.
+class _KaynakTablosu extends StatelessWidget {
+  const _KaynakTablosu({required this.satirlar});
+  final List<KaynakSatiri> satirlar;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget h(String t, {TextAlign a = TextAlign.right}) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Text(t, textAlign: a, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)));
+    Widget d(double? x, bool sapan) => Container(
+          color: sapan ? Renk.amber.withValues(alpha: 0.18) : null,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: Text(x == null ? '—' : sayi(x),
+              textAlign: TextAlign.right,
+              style: TextStyle(fontSize: 12.5, fontWeight: sapan ? FontWeight.w800 : null, color: sapan ? Renk.amber : null)),
+        );
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Table(
+            columnWidths: const {0: FlexColumnWidth(2.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1)},
+            border: TableBorder(horizontalInside: BorderSide(color: Colors.black.withValues(alpha: 0.08))),
+            children: [
+              TableRow(children: [h('Çiftlik · Ürün', a: TextAlign.left), h('Harita'), h('İcmal'), h('ÇKS')]),
+              for (final r in satirlar)
+                TableRow(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    child: Text.rich(TextSpan(children: [
+                      TextSpan(text: '${r.ciftlik} · ', style: const TextStyle(color: Renk.soluk)),
+                      TextSpan(text: r.urun, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      if (r.uyumlu) const TextSpan(text: '  ✓', style: TextStyle(color: Renk.yesil, fontWeight: FontWeight.w800)),
+                    ]), style: const TextStyle(fontSize: 12.5)),
+                  ),
+                  d(r.harita, r.sapan.contains(0)),
+                  d(r.plan, r.sapan.contains(1)),
+                  d(r.cks, r.sapan.contains(2)),
+                ]),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text('Turuncu: diğer kaynaklardan sapan değer. ✓: kaynaklar uyumlu. —: o kaynakta kayıt yok.',
+              style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+        ]),
+      ),
     );
   }
 }
