@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../bicim.dart';
@@ -7,6 +6,7 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
+import 'gonder.dart';
 import 'esk.dart' show tl;
 
 /// Mali Raporlar: çiftliklerin gelen faturaları günlük, haftalık, aylık ve
@@ -53,12 +53,12 @@ class MaliEkran extends StatelessWidget {
                             'mali_veri.json olmalı ve Apps Script güncel olmalı.'),
                   )
                 : TabBarView(children: [
-                    _Donem(veri: m, donem: MaliDonem.gun),
-                    _Donem(veri: m, donem: MaliDonem.hafta),
-                    _Donem(veri: m, donem: MaliDonem.ay),
-                    _Donem(veri: m, donem: MaliDonem.yil),
-                    if (acikVar) _Acik(veri: m),
-                    _Karsilastirma(veri: m),
+                    GonderAlani(konu: 'Mali Raporlar – Günlük', child: _Donem(veri: m, donem: MaliDonem.gun)),
+                    GonderAlani(konu: 'Mali Raporlar – Haftalık', child: _Donem(veri: m, donem: MaliDonem.hafta)),
+                    GonderAlani(konu: 'Mali Raporlar – Aylık', child: _Donem(veri: m, donem: MaliDonem.ay)),
+                    GonderAlani(konu: 'Mali Raporlar – Yıllık', child: _Donem(veri: m, donem: MaliDonem.yil)),
+                    if (acikVar) GonderAlani(konu: 'Mali Raporlar – Açık bakiyeler', child: _Acik(veri: m)),
+                    GonderAlani(konu: 'Mali Raporlar – Karşılaştırma', child: _Karsilastirma(veri: m)),
                   ]),
           ),
         );
@@ -569,52 +569,14 @@ class _Yer extends StatelessWidget {
 /// Tutarı para birimiyle yazar: TL için [tl], dövizde "12.345,67 EUR".
 String para(double v, String pb) => pb == 'TRY' ? tl(v) : '${sayi(v, ondalik: 2)} $pb';
 
-/// Düzeltme talebinin önizlemesi: metin düzenlenebilir, "Paylaş" telefonun
-/// paylaşım menüsünü açar. Uygulama kendiliğinden hiçbir şey göndermez.
-class DuzeltmeTalebiEkran extends StatefulWidget {
+/// Düzeltme talebinin önizlemesi (ortak paylaşım önizlemesiyle).
+class DuzeltmeTalebiEkran extends StatelessWidget {
   const DuzeltmeTalebiEkran({super.key, required this.bulgular});
   final List<MaliKontrol> bulgular;
 
   @override
-  State<DuzeltmeTalebiEkran> createState() => _DuzeltmeTalebiEkranState();
-}
-
-class _DuzeltmeTalebiEkranState extends State<DuzeltmeTalebiEkran> {
-  late final TextEditingController _metin = TextEditingController(text: duzeltmeTalebi(widget.bulgular));
-
-  @override
-  void dispose() {
-    _metin.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Düzeltme talebi')),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
-          children: [
-            const BilgiKutusu(
-                yazi: 'Metni gerektiği gibi düzenleyebilirsiniz. "Paylaş" telefonun paylaşım menüsünü açar; '
-                    'e-posta ya da mesaj uygulamasını ve alıcıyı siz seçersiniz. Talebi yalnızca dosyaya '
-                    'erişimi olan kurum içi kişilere gönderin (KVKK).'),
-            const SizedBox(height: 8),
-            TextField(
-              key: const Key('talepMetni'),
-              controller: _metin,
-              maxLines: null,
-              minLines: 12,
-              style: const TextStyle(fontSize: 13.5, height: 1.4),
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 10),
-            FilledButton.icon(
-              onPressed: () => Share.share(_metin.text,
-                  subject: '2026 Gelen Fatura Raporları – kayıt düzeltme talebi'),
-              icon: const Icon(Icons.share),
-              label: const Text('Paylaş'),
-            ),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) => PaylasimOnizleme(
+      baslik: 'Düzeltme talebi',
+      konu: '2026 Gelen Fatura Raporları – kayıt düzeltme',
+      metin: duzeltmeTalebi(bulgular));
 }

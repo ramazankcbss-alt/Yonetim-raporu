@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../tema.dart';
 import '../veri/model.dart';
+import 'gonder.dart';
 
 /// Araç Takip uygulamasından gelen kayıtların yönetim görünümü.
 class AraclarEkran extends StatelessWidget {
@@ -34,9 +35,10 @@ class AraclarEkran extends StatelessWidget {
                 'eklendikçe kullanım, bakım ve arıza kayıtları burada görünür.')
             : TabBarView(
                 children: [
-                  _Genel(a: a),
-                  _IsEmirleri(a: a),
-                  _AracListesi(a: a),
+                  GonderAlani(konu: 'Araçlar – Genel durum', gizle: _adlar(a), child: _Genel(a: a)),
+                  GonderAlani(konu: 'Araçlar – İş emirleri', gizle: _adlar(a), child: _IsEmirleri(a: a)),
+                  GonderAlani(konu: 'Araçlar – Araç listesi', gizle: _adlar(a), child: _AracListesi(a: a)),
+                  // KVKK: personel sekmesi kişi bazlı olduğu için gönderilmez.
                   _PersonelListesi(a: a),
                 ],
               ),
@@ -44,6 +46,18 @@ class AraclarEkran extends StatelessWidget {
     );
   }
 }
+
+List<Widget> _sarli(String arac, List<String> gizle, List<Widget> l) => [
+      for (final (i, w) in l.indexed)
+        GonderAlani(konu: 'Araçlar – $arac – ${const ['Kullanım geçmişi', 'Bakım', 'Arıza'][i]}', gizle: gizle, child: w),
+    ];
+
+/// KVKK: gönderilen metinlerde gizlenecek personel adları.
+List<String> _adlar(AracVerisi a) => {
+      for (final x in a.kullanim) x.personel,
+      for (final x in a.isEmri) x.personel,
+      for (final x in a.ariza) x.personel,
+    }.where((s) => s.trim().isNotEmpty).toList();
 
 String _sayi(double? d) {
   if (d == null) return '–';
@@ -319,7 +333,7 @@ class _AracDetay extends StatelessWidget {
           ]),
         ),
         body: TabBarView(
-          children: [
+          children: _sarli(arac.no, _adlar(a), [
             ListView(
               padding: const EdgeInsets.all(12),
               children: [
@@ -391,7 +405,7 @@ class _AracDetay extends StatelessWidget {
                     padding: const EdgeInsets.all(12),
                     children: [for (final x in ariza) _ArizaSatiri(x)],
                   ),
-          ],
+          ]),
         ),
       ),
     );

@@ -6,6 +6,7 @@ import '../tema.dart';
 import '../veri/kategori.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
+import 'gonder.dart';
 import 'esk.dart' show tl;
 
 /// Geçmiş Yıllar – Bilgi Bankası. Ana ekran iki alana ayrılır (Tarım,
@@ -100,7 +101,7 @@ void _gecmisAc(BuildContext context, RaporVerisi ilk, String baslik, String yol,
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: Text(yol, style: const TextStyle(fontSize: 12.5, color: Renk.anaKoyu, fontWeight: FontWeight.w600)),
               ),
-            Expanded(child: govde(k)),
+            Expanded(child: GonderAlani(konu: 'Geçmiş Yıllar – ${yol.isEmpty ? baslik : yol}', child: govde(k))),
           ]),
         );
       },
@@ -159,7 +160,8 @@ class _GecmisMenu extends StatelessWidget {
           ac: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => Scaffold(
                   appBar: AppBar(title: const Text('Dersler')),
-                  body: _Dersler(dersler: (VeriDeposu.ben.veri ?? ilk).dersler)))),
+                  body: GonderAlani(
+                      konu: 'Geçmiş Yıllar – Dersler', child: _Dersler(dersler: (VeriDeposu.ben.veri ?? ilk).dersler))))),
         ),
         _GMenuSatiri(
           ikon: Icons.search,

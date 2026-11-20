@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../tema.dart';
 import '../veri/hastalik.dart';
 import '../veri/model.dart';
+import 'gonder.dart';
 
 const _sonucRenk = {
   'Ölüm': Renk.kirmizi,
@@ -54,9 +55,9 @@ class _HastalikEkranState extends State<HastalikEkran> {
                 _filtreler(h),
                 Expanded(
                   child: TabBarView(children: [
-                    _Aylik(k: _suz(h)),
-                    _Hastaliklar(k: _suz(h)),
-                    _Tedbirler(k: _suz(h)),
+                    GonderAlani(konu: 'Hastalık Dağılımı – Aylık', child: _Aylik(k: _suz(h))),
+                    GonderAlani(konu: 'Hastalık Dağılımı – Hastalıklar', child: _Hastaliklar(k: _suz(h))),
+                    GonderAlani(konu: 'Hastalık Dağılımı – Tedbirler', child: _Tedbirler(k: _suz(h))),
                   ]),
                 ),
               ]),

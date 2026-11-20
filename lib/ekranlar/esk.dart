@@ -6,6 +6,7 @@ import '../tema.dart';
 import '../veri/esk_rapor.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
+import 'gonder.dart';
 
 /// ESK (Et ve Süt Kurumu) – Taşağıl bakım besleme. Ana ekran bir menüdür:
 /// üstte güncel durum, altında raporlar (haftalık, aylık, yıllık), finans,
@@ -34,7 +35,7 @@ class EskEkran extends StatelessWidget {
                           "ve 'ESK_Bilgi' sayfalarını okuyabilmek için "
                           'Apps Script güncel olmalı.'),
                 )
-              : _Menu(veri: v, ilk: veri),
+              : GonderAlani(konu: 'ESK – Genel durum', child: _Menu(veri: v, ilk: veri)),
         );
       },
     );
@@ -70,7 +71,7 @@ class _Menu extends StatelessWidget {
           builder: (context, _) => Scaffold(
             appBar: AppBar(
                 title: Text(baslik), actions: const [TabloGuncelleButonu()]),
-            body: govde(VeriDeposu.ben.veri ?? ilk),
+            body: GonderAlani(konu: 'ESK – $baslik', child: govde(VeriDeposu.ben.veri ?? ilk)),
           ),
         ),
       ));

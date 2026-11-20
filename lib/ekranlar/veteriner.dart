@@ -5,6 +5,7 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
+import 'gonder.dart';
 
 /// Veteriner Kontrol Paneli (uygulama sahibi tarafı): veteriner hekimlerin
 /// web panelinden gönderdiği değerlendirmeler ve panel erişim kodları.
@@ -41,7 +42,11 @@ class VeterinerEkran extends StatelessWidget {
               ),
             ),
             body: TabBarView(children: [
-              _Bildirimler(liste: v.vetBildirimleri),
+              GonderAlani(
+                  konu: 'Veteriner Kontrol Paneli – Bildirimler',
+                  gizle: [for (final k in v.vetKodlari) k.etiket, for (final k in v.vetKodlari) k.kod],
+                  child: _Bildirimler(liste: v.vetBildirimleri)),
+              // Erişim kodları gizli bilgidir; gönderilmez.
               _Kodlar(kodlar: v.vetKodlari),
             ]),
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
+import 'gonder.dart';
 
 /// Günlük Tarım Bildirimi formundan gelen bakım onarım kayıtlarının yönetim
 /// görünümü. Bakım onarım formeninin onayladığı kayıtlar özetlere girer;
@@ -59,7 +60,7 @@ class _BakimOnarimEkranState extends State<BakimOnarimEkran> {
                     '"Bakım onarım kaydı" seçilerek girilen kayıtlar burada görünür.',
               ),
             )
-          : _govde(o),
+          : GonderAlani(konu: 'Bakım Onarım', child: _govde(o)),
     );
   }
 
