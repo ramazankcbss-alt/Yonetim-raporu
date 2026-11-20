@@ -365,7 +365,7 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
         for (final p in c.parseller)
           if (p.urunler.isNotEmpty && p.tip != 'diger' && parselCks(c, p, v.cks, s.sezon).isEmpty) (c, p)
     ];
-    return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+    return SingleChildScrollView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       BilgiKutusu(
           yazi: 'Harita (${s.kaynak}, ${s.sezon}) ile tarım icmalinin ekim alanları (plan / ekilen) karşılaştırılır. '
               'Tarım icmalindeki Ekim–Kasım güz ekimleri bir sonraki sezona ait olabilir; o satırlarda fark beklenir.'),
@@ -464,7 +464,7 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
             subtitle: Text('Harita ${_da(x.harita)} · İcmal planı ${_da(x.plan)}'),
           ),
         ),
-    ]);
+    ]));
   }
 }
 
