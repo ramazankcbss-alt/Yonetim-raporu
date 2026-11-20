@@ -53,10 +53,12 @@ List<Widget> _sarli(String arac, List<String> gizle, List<Widget> l) => [
     ];
 
 /// KVKK: gönderilen metinlerde gizlenecek personel adları.
-List<String> _adlar(AracVerisi a) => {
+List<String> _adlar(AracVerisi a) => <String>{
       for (final x in a.kullanim) x.personel,
-      for (final x in a.isEmri) x.personel,
-      for (final x in a.ariza) x.personel,
+      for (final x in a.isEmri) ...[x.personel, x.formen],
+      for (final x in a.ariza) ...[x.bildiren, x.guncelleyen],
+      for (final x in a.bakim) x.giren,
+      for (final x in a.mutabakat) x.personel,
     }.where((s) => s.trim().isNotEmpty).toList();
 
 String _sayi(double? d) {
