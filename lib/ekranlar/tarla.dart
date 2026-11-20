@@ -393,9 +393,9 @@ class _YaziCizer extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(children: [
           TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
-          for (final u in {for (final u in x.urunler) _kisaUrun(u.$1)})
+          for (final kisa in {for (final u in x.urunler) _kisaUrun(u.$1)})
             TextSpan(
-                text: '\n$u',
+                text: '\n$kisa',
                 style: TextStyle(fontSize: yazi * 0.92, color: Colors.black87, fontWeight: FontWeight.w600)),
         ]),
         textAlign: TextAlign.center,
