@@ -85,7 +85,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Eşleşen kayıtlar'), findsOneWidget);
     expect(find.text('Uyuşmayan kayıtlar'), findsOneWidget);
-    expect(find.text('Bu bulguyu gönder'), findsNWidgets(2));
+    expect(find.text('Bu bulguyu gönder'), findsNWidgets(3));
     await t.tap(find.text('Düzeltme talebi gönder'));
     await t.pumpAndSettle();
     expect(find.byKey(const Key('talepMetni')), findsOneWidget);
