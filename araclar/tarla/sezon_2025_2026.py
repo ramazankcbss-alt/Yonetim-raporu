@@ -2,7 +2,8 @@
 """2025-2026 sezonu ekiliş verisi: "Yerlerim Gücel 03.12.2025.kmz" → assets/veri/tarla_2025_2026.json
 
 Kullanım: python3 -I kmz_oku.py doc.kml pm.json && python3 -I sezon_2025_2026.py pm.json CIKTI.json
-KMZ'deki etiketler (nokta adları) ekiliş beyanı, alan çizimleri (poligon) ölçülen alan olarak alınır.
+KMZ'den yalnızca harita şekilleri (parsel çizimleri), ekili ürün cinsi ve görseller (kuyu, direk,
+enerji hatları, pivot merkezleri) alınır. KMZ'de yazan dekarlar alınmaz; alanlar Excel dosyalarından gelir.
 KVKK: dosyada kişi adı yoktur; kişi adı içeren etiket çıkarsa alınmaz.
 """
 import json, sys, math
@@ -22,9 +23,8 @@ def sade(c, n=48):
 
 def p(ad, tip, urunler, beyan, kaynak, not_='', i=0):
     k = poly(*kaynak, i=i) if kaynak else None
-    return dict(ad=ad, tip=tip, urunler=[[u, d] for u, d in urunler], beyan=beyan,
-                # Haritadan ölçülen alan kullanılmaz (çizimler resmî ölçüm değildir).
-                etiket=k['ad'] if k else '', not_=not_, koord=sade(k['koord']) if k else [])
+    # KMZ'deki dekarlar (etiket ve çizim adları) kullanılmaz; yalnızca ürün cinsi ve şekil alınır.
+    return dict(ad=ad, tip=tip, urunler=[u for u, _ in urunler], not_=not_, koord=sade(k['koord']) if k else [])
 
 S, A, T, F = 'ŞEKERSÜT', 'ASLIM', 'TAŞAĞIL', 'FİDANLIK'
 ciftlikler = [
@@ -34,7 +34,7 @@ ciftlikler = [
    p('3. pivot', 'pivot', [('Buğday', 400)], 400, (S, '3. Pivot 400 da Buğday')),
    p('4. pivot', 'pivot', [('Şeker pancarı', 400)], 400, (S, '4. Pivot 400 da. Pancar')),
    p('5. pivot', 'pivot', [('Buğday', 300)], 300, (S, '5.Pivot 300 da. S.Mısır'),
-     'Haritadaki işaret "Buğday 300 da", alan çizimi "S.Mısır 300 da" yazıyor; ürün teyit edilmeli.'),
+     'Haritadaki işaret "Buğday", alan çizimi "Silajlık mısır" yazıyor; ürün teyit edilmeli.'),
    p('1. parsel', 'parsel', [('Silajlık mısır', 270)], 270, (S, 'MISIR 270 da.')),
    p('2. parsel', 'parsel', [('Silajlık mısır', 100)], 100, (S, 'Mısır 100 da.')),
    p('3. parsel', 'parsel', [('Silajlık mısır', 140)], 140, (S, '3. parsel Mısır 140 da')),
@@ -43,14 +43,14 @@ ciftlikler = [
    p('6. parsel', 'parsel', [('Silajlık mısır', 70)], 70, (S, '6. Mısır 70 da.')),
    p('7. parsel', 'parsel', [('Şeker pancarı', 270)], 270, (S, '7.Parsel 270 da. Pancar')),
   ], tesis=dict(kuyu=11, hayvansalKuyu=1),
-  notlar=['Haritadaki "AÇIKLAMA" tablosu: mısır silajı 1.000, arpa danelik 570, buğday danelik 400, tritikale danelik 1.610, yonca 950; toplam 4.530 da. Bu tablo parsel etiketleriyle uyuşmuyor (eski sezon ya da başka bir plan olabilir).']),
+  notlar=[]),
  dict(ad='Aslım', parseller=[
    p('1. pivot', 'pivot', [('Arpa', 450)], 450, (A, '1.pivot'), 'Pivot uzunluğu 407 m'),
    p('2. pivot', 'pivot', [('Yonca', 470)], 470, (A, '2.pivot'), 'Açıklama: "Survivor arpa"; pivot uzunluğu 385 m'),
    p('3. pivot', 'pivot', [('Yonca', 470)], 470, (A, '3.pivot'), '2024 güz döneminde ekildi'),
    p('4. pivot', 'pivot', [('Şeker pancarı', 400)], 400, (A, '4.pivot')),
    p('5. pivot', 'pivot', [("4'lü karışım (yem bitkisi)", 210), ('Silajlık mısır (2. ürün)', 210)], 460, (A, '5.pivot'),
-     "Etiket: \"460 da. 210 da 4'lü karışım 2. ekim mısır\"; kalan 250 da'nın ürünü yazılmamış. Pivot uzunluğu 380 m"),
+     "Etiket: 4'lü karışım, 2. ekim mısır; pivotun kalan kısmının ürünü yazılmamış. Pivot uzunluğu 380 m"),
    p('6. pivot', 'pivot', [('Yonca', 470)], 470, (A, '6.pivot'), 'Pivot uzunluğu 380 m'),
    p('7. pivot', 'pivot', [('Arpa', 250), ('Buğday', 250)], 500, (A, '7.pivot')),
    p('8. pivot', 'pivot', [('Buğday', 290), ('Arpa', 120)], 410, (A, '8.pivot')),
@@ -61,36 +61,62 @@ ciftlikler = [
    p('Buğday parseli', 'parsel', [('Buğday', 120)], 120, (A, 'Buğday 120 da.')),
    p('Arpa parseli', 'parsel', [('Arpa', 285)], 285, (A, '285 da. Arpa')),
    p('1. ekim mısır parseli', 'parsel', [('Silajlık mısır', 140)], 140, (A, '1. Ekim mısır 200 da.'),
-     'İşaret "140 da", alan çizimi "200 da" yazıyor.'),
-   p('Boş alan (135 da)', 'bos', [], 135, (A, 'Boş alan 135 da.')),
-   p('Boş alan (70 da)', 'bos', [], 70, (A, 'Boş alan 70 da.')),
-   p('Boş alan (30 da)', 'bos', [], 30, (A, 'Boş alan 30 da.')),
+     ''),
+   p('Boş alan 1', 'bos', [], 135, (A, 'Boş alan 135 da.')),
+   p('Boş alan 2', 'bos', [], 70, (A, 'Boş alan 70 da.')),
+   p('Boş alan 3', 'bos', [], 30, (A, 'Boş alan 30 da.')),
   ], tesis=dict(kuyu=15, direk=9), notlar=['15 kuyudan biri gözlem kuyusu, biri içme suyu kuyusu; OG hatları ve yeraltı enerji hatları haritada çizili.']),
  dict(ad='Taşağıl', parseller=[
-   p('Tarım alanı (400 da)', 'parsel', [('Patates', 400)], 400, (T, 'TARIM ALANI 400 DEKAR')),
-   p('Tarım alanı (50 da)', 'parsel', [('Patates', 50)], 50, (T, 'TARIM ALANI 50 DEKAR')),
+   p('Tarım alanı 1', 'parsel', [('Patates', 400)], 400, (T, 'TARIM ALANI 400 DEKAR')),
+   p('Tarım alanı 2', 'parsel', [('Patates', 50)], 50, (T, 'TARIM ALANI 50 DEKAR')),
    p('Pancar parseli', 'parsel', [('Şeker pancarı', 300)], 300, (T, 'Pancar 300 DA.')),
   ], tesis={}, notlar=[]),
  dict(ad='Fidanlık', parseller=[
    p('1. parsel', 'parsel', [('Buğday', 80)], 80, (F, '1. Mısır silajı 80 da.'),
-     'İşaret "Buğday 80 da", alan çizimleri "Mısır silajı 80 da" yazıyor (iki üst üste çizim).'),
-   p('2. parsel', 'parsel', [('Buğday', 70)], 70, (F, '2. Parsel Buğday 70 da.'), 'Aynı yerde "Arpa 70 da" çizimi de var.'),
+     'İşaret "Buğday", alan çizimleri "Mısır silajı" yazıyor (iki üst üste çizim).'),
+   p('2. parsel', 'parsel', [('Buğday', 70)], 70, (F, '2. Parsel Buğday 70 da.'), 'Aynı yerde "Arpa" çizimi de var.'),
    p('3. parsel', 'parsel', [('Silajlık mısır', 100)], 100, (F, '3. Mısır 100 da.'),
-     'Aynı yerde "Arge deneme buğday / toprak dökme alanı 100 da" çizimi de var.'),
-   p('4. parsel', 'parsel', [('Arpa', 100)], 100, (F, '4. Arpa  100 da.'), 'Aynı yerde "Buğday 100 da" çizimi de var.'),
-   p('5. parsel', 'parsel', [('Arpa', 210)], 210, (F, '5. Arpa 210 da.'), 'Aynı yerde "Buğday 210 da" çizimi de var.'),
-   p('6. parsel', 'parsel', [('Arpa', 160)], 160, (F, 'Arpa 180 da.'), 'İşaret "160 da", alan çizimi "180 da" yazıyor.'),
+     'Aynı yerde "Arge deneme buğday / toprak dökme alanı" çizimi de var.'),
+   p('4. parsel', 'parsel', [('Arpa', 100)], 100, (F, '4. Arpa  100 da.'), 'Aynı yerde "Buğday" çizimi de var.'),
+   p('5. parsel', 'parsel', [('Arpa', 210)], 210, (F, '5. Arpa 210 da.'), 'Aynı yerde "Buğday" çizimi de var.'),
+   p('6. parsel', 'parsel', [('Arpa', 160)], 160, (F, 'Arpa 180 da.'), ''),
    p('7. parsel', 'parsel', [('Arpa', 150)], 150, (F, '7. Parsel Arpa 150 da.')),
    p('Deneme alanı', 'diger', [('Deneme', 15)], 15, (F, 'Deneme alanı 15 da.')),
    p('Ceviz ve üzüm', 'diger', [('Ceviz ve üzüm', 42)], 42, (F, 'Ceviz ve Üzüm yeri 42 da.')),
    p('Pancar toprağı döküm alanı', 'diger', [], 0, (F, 'pancar toprağı'), 'Tel örgü ile çevrili'),
   ], tesis=dict(kuyu=5), notlar=['Fidanlıkta parseller iki kez çizilmiş (farklı ürün adlarıyla); ürün olarak parsel işaretleri esas alındı.']),
 ]
+# Görseller: kuyu, direk, enerji hatları, pivot merkez çizgileri (adlarda dekar yok).
+import re
+def gorsel_turu(x):
+    ad = x['ad'].replace('İ', 'i').replace('I', 'ı').lower()
+    if x['tur'] == 'çizgi':
+        if 'og' in ad.split() or ad.startswith('og'): return 'og'
+        if 'pivot' in ad: return 'pivot'
+        return 'hat'
+    if 'kuyu' in ad: return 'kuyu'
+    if 'direk' in ad: return 'direk'
+    if 'abone' in ad or 'hücre' in ad: return 'nokta'
+    return None
+GORSEL_YOL = ('kuyular', 'KUYULAR', 'DİREKLER', 'Pivot merkezleri')
+for c in ciftlikler:
+    anahtar = {'Şekersüt': S, 'Aslım': A, 'Taşağıl': T, 'Fidanlık': F}[c['ad']]
+    g = []
+    for x in L:
+        yol = x['yol'].split(' / ')
+        if len(yol) < 2 or yol[1] != anahtar or x['tur'] not in ('nokta', 'çizgi'): continue
+        if not any(k in yol for k in GORSEL_YOL): continue
+        t = gorsel_turu(x)
+        if not t: continue
+        ad = re.sub(r'\s*\d+[.,]?\d*\s*(da|dekar)\.?', '', x['ad'], flags=re.I).strip()
+        g.append(dict(tur=t, ad=ad, koord=sade(x['koord'], 60)))
+    c['gorseller'] = g
+
 out = dict(sezon='2025-2026', kaynak='Yerlerim Gücel 03.12.2025.kmz', tarih='2025-12-03', ciftlikler=ciftlikler)
 json.dump(out, open(sys.argv[2], 'w'), ensure_ascii=False, separators=(',', ':'))
 import os; print(os.path.getsize(sys.argv[2]))
 for c in ciftlikler:
     t = {}
     for x in c['parseller']:
-        for u, d in x['urunler']: t[u] = t.get(u, 0) + d
-    print(c['ad'], t)
+        for u in x['urunler']: t[u] = t.get(u, 0) + 1
+    print(c['ad'], 'parsel/ürün:', t, 'görsel:', len(c['gorseller']))

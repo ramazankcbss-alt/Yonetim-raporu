@@ -37,7 +37,11 @@ class TarlaParsel {
   static TarlaParsel oku(Map<String, dynamic> j) => TarlaParsel(
         ad: j['ad'] ?? '',
         tip: j['tip'] ?? '',
-        urunler: [for (final u in (j['urunler'] as List? ?? [])) ((u[0] as String), (u[1] as num).toDouble())],
+        // KMZ'den yalnızca ürün cinsi gelir (dekar yok); eski biçim [ad, da] de okunur.
+        urunler: [
+          for (final u in (j['urunler'] as List? ?? []))
+            u is List ? ((u[0] as String), (u.length > 1 ? (u[1] as num).toDouble() : 0.0)) : ('$u', 0.0)
+        ],
         beyan: (j['beyan'] as num?)?.toDouble(),
         olculen: (j['olculen'] as num?)?.toDouble(),
         etiket: j['etiket'] ?? '',
@@ -46,10 +50,26 @@ class TarlaParsel {
       );
 }
 
+/// KMZ'deki görsel öğe: kuyu, direk, enerji hattı (hat/og), pivot merkez çizgisi, nokta.
+class TarlaGorsel {
+  const TarlaGorsel({required this.tur, this.ad = '', this.koord = const []});
+  final String tur, ad;
+  final List<(double, double)> koord;
+  bool get cizgi => tur == 'hat' || tur == 'og' || tur == 'pivot';
+
+  static TarlaGorsel oku(Map<String, dynamic> j) => TarlaGorsel(
+        tur: j['tur'] ?? '',
+        ad: j['ad'] ?? '',
+        koord: [for (final c in (j['koord'] as List? ?? [])) ((c[0] as num).toDouble(), (c[1] as num).toDouble())],
+      );
+}
+
 class TarlaCiftlik {
-  const TarlaCiftlik({required this.ad, required this.parseller, this.tesis = const {}, this.notlar = const []});
+  const TarlaCiftlik(
+      {required this.ad, required this.parseller, this.tesis = const {}, this.notlar = const [], this.gorseller = const []});
   final String ad;
   final List<TarlaParsel> parseller;
+  final List<TarlaGorsel> gorseller;
   final Map<String, dynamic> tesis;
   final List<String> notlar;
 
@@ -90,6 +110,7 @@ class TarlaSezonu {
               parseller: [for (final p in (c['parseller'] as List? ?? [])) TarlaParsel.oku(p)],
               tesis: Map<String, dynamic>.from(c['tesis'] ?? {}),
               notlar: [for (final n in (c['notlar'] as List? ?? [])) '$n'],
+              gorseller: [for (final g in (c['gorseller'] as List? ?? [])) TarlaGorsel.oku(Map<String, dynamic>.from(g))],
             ),
         ],
       );
@@ -286,7 +307,7 @@ TarlaSezonu girisSezonu(TarlaSezonu onceki, List<SezonParsel> l) {
     onceki: onceki,
     ciftlikler: [
       for (final c in onceki.ciftlikler)
-        TarlaCiftlik(ad: c.ad, tesis: c.tesis, parseller: [
+        TarlaCiftlik(ad: c.ad, tesis: c.tesis, gorseller: c.gorseller, parseller: [
           for (final p in c.parseller)
             if (parselGirisi(l, sezon, c.ad, p.ad) case final g?)
               TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(g.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord)

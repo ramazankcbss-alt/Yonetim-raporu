@@ -46,7 +46,9 @@ void main() {
   test('KMZ sezonu okunur ve icmalle karşılaştırılır', () {
     expect(s.sezon, '2025-2026');
     final sk = s.ciftlikler.firstWhere((c) => c.ad == 'Şekersüt');
-    expect(sk.urunToplami['Buğday'], 1700);
+    expect(sk.urunCinsleri.contains('Buğday'), isTrue);
+    expect(sk.parseller.every((p) => p.urunler.every((u) => u.$2 == 0)), isTrue); // KMZ dekarı alınmaz
+    expect(s.ciftlikler.firstWhere((c) => c.ad == 'Aslım').gorseller.any((g) => g.tur == 'kuyu'), isTrue);
     final t = excelKarsilastir(s, v.ekim, v.resmiParsel, v.cks);
     final b = t.firstWhere((x) => x.ciftlik == 'Şekersüt' && x.urun == 'Buğday');
     expect(b.esas, 1700);

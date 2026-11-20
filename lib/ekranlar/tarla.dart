@@ -102,6 +102,18 @@ Color urunRengi(TarlaParsel p) {
   return _renkler[urunAnahtari(p.urunler.first.$1)] ?? const Color(0xFF6D8B74);
 }
 
+/// KMZ görsel renkleri.
+Color gorselRengi(String tur) => switch (tur) {
+      'kuyu' => const Color(0xFF0277BD),
+      'direk' => const Color(0xFF37474F),
+      'og' => const Color(0xFFD32F2F),
+      'pivot' => const Color(0xFF455A64),
+      'nokta' => const Color(0xFFD32F2F),
+      _ => const Color(0xFFEF6C00),
+    };
+
+const _gorselAdlari = {'kuyu': 'Kuyu', 'direk': 'Enerji direği', 'og': 'OG hattı', 'hat': 'Enerji / su hattı', 'pivot': 'Pivot merkezi'};
+
 String _da(double? v) => v == null ? '–' : '${sayi(v)} da';
 
 class _Harita extends StatefulWidget {
@@ -157,7 +169,7 @@ class _HaritaState extends State<_Harita> {
         child: Stack(children: [
           AspectRatio(
             aspectRatio: 0.82,
-            child: _HaritaGorunum(p: cizili, cks: cksAdlari, maxOlcek: 6, dekar: giris, onDokun: dokun),
+            child: _HaritaGorunum(p: cizili, g: c.gorseller, cks: cksAdlari, maxOlcek: 6, dekar: giris, onDokun: dokun),
           ),
           Positioned(
             right: 6,
@@ -175,6 +187,7 @@ class _HaritaState extends State<_Harita> {
                       appBar: AppBar(title: Text('${c.ad} · ${s2.sezon}')),
                       body: _HaritaGorunum(
                           p: c2.parseller.where((p) => p.koord.length > 2).toList(),
+                          g: c2.gorseller,
                           cks: cksAdlari,
                           maxOlcek: 10,
                           yazi: 13,
@@ -215,6 +228,17 @@ class _HaritaState extends State<_Harita> {
             Container(width: 12, height: 12, decoration: BoxDecoration(border: Border.all(color: Renk.mavi, width: 2.5))),
             const SizedBox(width: 4),
             const Text("Mavi kenarlı: ÇKS'de bildirildi", style: TextStyle(fontSize: 12.5)),
+          ]),
+        for (final t in {for (final x in c.gorseller) x.tur}.where(_gorselAdlari.containsKey))
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            {'hat', 'og', 'pivot'}.contains(t)
+                ? Container(width: 14, height: 3, color: gorselRengi(t))
+                : Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: gorselRengi(t), shape: t == 'direk' ? BoxShape.rectangle : BoxShape.circle)),
+            const SizedBox(width: 4),
+            Text(_gorselAdlari[t]!, style: const TextStyle(fontSize: 12.5)),
           ]),
         for (final u in urunler)
           Row(mainAxisSize: MainAxisSize.min, children: [
@@ -298,7 +322,7 @@ double _kenarUzakligi(_N n, List<_N> k) {
 /// Haritanın düzlem geometrisi ve her parselin yazı noktası (üstteki
 /// küçük parsellerin dışında, kenarlardan en uzak iç nokta).
 class _Geometri {
-  _Geometri(List<TarlaParsel> p) {
+  _Geometri(List<TarlaParsel> p, [List<TarlaGorsel> g = const []]) {
     final tum = [for (final x in p) ...x.koord];
     final lat0 = tum.map((c) => c.$2).reduce((a, b) => a + b) / tum.length;
     final kx = math.cos(lat0 * math.pi / 180);
@@ -307,7 +331,12 @@ class _Geometri {
       alan[x] = _alan(poligon[x]!);
     }
     sirali = [...p]..sort((a, b) => alan[b]!.compareTo(alan[a]!));
-    final xs = poligon.values.expand((e) => e).map((e) => e.$1), ys = poligon.values.expand((e) => e).map((e) => e.$2);
+    gorsel = [
+      for (final x in g)
+        if (x.koord.isNotEmpty) (x, [for (final c in x.koord) (c.$1 * kx, c.$2)])
+    ];
+    final hepsi = [...poligon.values.expand((e) => e), ...gorsel.expand((e) => e.$2)];
+    final xs = hepsi.map((e) => e.$1), ys = hepsi.map((e) => e.$2);
     minX = xs.reduce(math.min);
     maxX = xs.reduce(math.max);
     minY = ys.reduce(math.min);
@@ -320,6 +349,9 @@ class _Geometri {
   final poligon = <TarlaParsel, List<_N>>{};
   final alan = <TarlaParsel, double>{};
   final yaziNoktasi = <TarlaParsel, _N>{};
+
+  /// KMZ görselleri (kuyu, direk, hatlar) düzlem koordinatında.
+  late final List<(TarlaGorsel, List<_N>)> gorsel;
   late final List<TarlaParsel> sirali;
   late final double minX, maxX, minY, maxY;
 
@@ -363,8 +395,9 @@ class _Geometri {
 /// Yakınlaştırılabilir harita: parseller yakınlaşır, yazılar sabit boyutta
 /// kalır; üst üste gelen yazılar gizlenir, yakınlaştırınca görünür.
 class _HaritaGorunum extends StatefulWidget {
-  const _HaritaGorunum({required this.p, required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun});
+  const _HaritaGorunum({required this.p, this.g = const [], required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun});
   final List<TarlaParsel> p;
+  final List<TarlaGorsel> g;
   final Set<String> cks;
   final double maxOlcek, yazi;
 
@@ -377,7 +410,7 @@ class _HaritaGorunum extends StatefulWidget {
 
 class _HaritaGorunumState extends State<_HaritaGorunum> {
   final _ctl = TransformationController();
-  late _Geometri _g = _Geometri(widget.p);
+  late _Geometri _g = _Geometri(widget.p, widget.g);
 
   @override
   void didUpdateWidget(covariant _HaritaGorunum old) {
@@ -385,7 +418,7 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
     if (old.p != widget.p) {
       final ayniCizim = old.p.length == widget.p.length &&
           [for (var i = 0; i < old.p.length; i++) identical(old.p[i].koord, widget.p[i].koord)].every((e) => e);
-      _g = _Geometri(widget.p);
+      _g = _Geometri(widget.p, widget.g);
       if (!ayniCizim) _ctl.value = Matrix4.identity();
     }
   }
@@ -452,6 +485,26 @@ class _PoligonCizer extends CustomPainter {
             ..color = cks.contains(x.ad) ? Renk.mavi : Colors.black54
             ..style = PaintingStyle.stroke
             ..strokeWidth = cks.contains(x.ad) ? 3 : 1);
+    }
+    // KMZ görselleri: hatlar, pivot merkez çizgileri, kuyu ve direkler.
+    for (final (x, k) in g.gorsel) {
+      final n = [for (final c in k) d(c)];
+      if (x.cizgi && n.length > 1) {
+        canvas.drawPath(
+            Path()..addPolygon(n, false),
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = x.tur == 'og' ? 2.2 : 1.4
+              ..color = gorselRengi(x.tur));
+      } else if (n.isNotEmpty) {
+        final m = n.first;
+        if (x.tur == 'direk') {
+          canvas.drawRect(Rect.fromCenter(center: m, width: 6, height: 6), Paint()..color = gorselRengi(x.tur));
+        } else {
+          canvas.drawCircle(m, 4.5, Paint()..color = Colors.white);
+          canvas.drawCircle(m, 3.5, Paint()..color = gorselRengi(x.tur));
+        }
+      }
     }
   }
 
