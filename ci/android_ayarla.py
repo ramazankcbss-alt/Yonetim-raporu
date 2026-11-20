@@ -172,13 +172,15 @@ kok_g = os.path.join(KOK, "android", "build.gradle.kts")
 if os.path.exists(kok_g):
     k = oku(kok_g)
     if "compileSdkVersion(36)" not in k:
-        k = k.rstrip() + """
-
-subprojects {
+        blok = """subprojects {
     afterEvaluate {
         val a = extensions.findByName("android")
         if (a is com.android.build.gradle.BaseExtension) a.compileSdkVersion(36)
     }
 }
+
 """
+        # evaluationDependsOn(":app") satırından önce olmalı; sonra eklenirse proje zaten değerlendirilmiş olur.
+        i = k.find("subprojects {")
+        k = (k[:i] + blok + k[i:]) if i >= 0 else (k.rstrip() + "\n\n" + blok)
         yaz(kok_g, k)
