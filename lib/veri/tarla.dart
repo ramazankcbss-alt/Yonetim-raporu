@@ -105,6 +105,7 @@ String urunAnahtari(String u) {
 
 String ciftlikAnahtari(String c) {
   final k = kucuk(c);
+  if (k.contains('ormanlık')) return 'taşağıl'; // Ormanlık, Taşağıl'a ait alan
   for (final a in ['şekersüt', 'aslım', 'taşağıl', 'fidanlık', 'pangev', 'pankent']) {
     if (k.contains(a)) return a;
   }

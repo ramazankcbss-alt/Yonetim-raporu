@@ -1006,7 +1006,8 @@ function ciftlikAdi_(x) {
   var k = t.toLocaleLowerCase('tr');
   if (k.indexOf('şeker') === 0 || k.indexOf('fethiye') >= 0) return 'Şekersüt';
   if (k.indexOf('aslım') >= 0) return 'Aslım';
-  if (k.indexOf('taşağıl') >= 0 || k.indexOf('camili') >= 0) return 'Taşağıl';
+  // Ormanlık, Taşağıl çiftliğine ait alandır.
+  if (k.indexOf('taşağıl') >= 0 || k.indexOf('camili') >= 0 || k.indexOf('ormanlık') >= 0) return 'Taşağıl';
   if (k.indexOf('fidanlık') >= 0) return 'Fidanlık';
   return t;
 }
