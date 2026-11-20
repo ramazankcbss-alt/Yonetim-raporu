@@ -559,25 +559,81 @@ class _Karsilastirma extends StatefulWidget {
 class _KarsilastirmaState extends State<_Karsilastirma> {
   final _kFark = GlobalKey(), _kOlcum = GlobalKey(), _kUyumlu = GlobalKey(), _kCks = GlobalKey();
 
-  Future<void> _geriAl(BuildContext context, EkimKarsilastirma x) async {
+  Future<void> _geriAl(BuildContext context, String ciftlik, String konu) async {
     try {
-      final m = await VeriDeposu.ben.ekimDuzelt(sezon: widget.s.sezon, ciftlik: x.ciftlik, urun: x.urun, geriAl: true);
+      final m = await VeriDeposu.ben.ekimDuzelt(sezon: widget.s.sezon, ciftlik: ciftlik, urun: konu, geriAl: true);
       if (context.mounted) bildir(context, m);
     } catch (e) {
       if (context.mounted) bildir(context, '$e');
     }
   }
 
-  Future<void> _duzelt(BuildContext context, EkimKarsilastirma x) async {
-    final sonuc = await showDialog<(String, double, String)>(context: context, builder: (_) => _DuzeltDiyalog(x: x));
+  Future<void> _duzelt(BuildContext context,
+      {required String ciftlik,
+      required String konu,
+      required String baslik,
+      required List<(String, double?)> secenekler,
+      bool ozelDeger = false}) async {
+    final sonuc = await showDialog<(String, double?, String)>(
+        context: context, builder: (_) => _DuzeltDiyalog(baslik: baslik, secenekler: secenekler, ozelDeger: ozelDeger));
     if (sonuc == null || !context.mounted) return;
     try {
       final m = await VeriDeposu.ben.ekimDuzelt(
-          sezon: widget.s.sezon, ciftlik: x.ciftlik, urun: x.urun, secim: sonuc.$1, deger: sonuc.$2, aciklama: sonuc.$3);
+          sezon: widget.s.sezon, ciftlik: ciftlik, urun: konu, secim: sonuc.$1, deger: sonuc.$2, aciklama: sonuc.$3);
       if (context.mounted) bildir(context, m);
     } catch (e) {
       if (context.mounted) bildir(context, '$e');
     }
+  }
+
+  Widget _uyumluKart(String baslik, String alt) => Card(
+        margin: const EdgeInsets.only(bottom: 6),
+        child: ListTile(
+          dense: true,
+          leading: const Icon(Icons.check_circle_outline, color: Renk.yesil),
+          title: Text(baslik, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(alt),
+        ),
+      );
+
+  /// Farklılık kartı: "Düzelt" ya da (düzeltildiyse) "Düzeltildi · Geri al".
+  Widget _kart(BuildContext context,
+      {required String ciftlik,
+      required String konu,
+      required String baslik,
+      required String alt,
+      required IconData ikon,
+      required List<(String, double?)> secenekler,
+      bool ozelDeger = false}) {
+    final d = aktifDuzeltme(widget.v.ekimDuzeltme, widget.s.sezon, ciftlik, konu);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          ListTile(
+            dense: true,
+            leading: Icon(d == null ? ikon : Icons.task_alt, color: d == null ? Renk.amber : Renk.yesil),
+            title: Text(baslik, style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Text(d == null
+                ? alt
+                : '$alt\nDüzeltildi: ${d.secim}${d.deger == null || d.deger == 0 ? '' : ' · ${_da(d.deger)}'}'
+                    '${d.aciklama.isEmpty ? '' : ' · ${d.aciklama}'}'),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: d == null
+                ? TextButton.icon(
+                    onPressed: () => _duzelt(context,
+                        ciftlik: ciftlik, konu: konu, baslik: baslik, secenekler: secenekler, ozelDeger: ozelDeger),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Düzelt'),
+                  )
+                : TextButton(onPressed: () => _geriAl(context, ciftlik, konu), child: const Text('Geri al')),
+          ),
+        ]),
+      ),
+    );
   }
 
   void _git(GlobalKey k) {
@@ -662,7 +718,16 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
                   key: Key('duzelt_${x.ciftlik}_${x.urun}'),
-                  onPressed: () => _duzelt(context, x),
+                  onPressed: () => _duzelt(context,
+                      ciftlik: x.ciftlik,
+                      konu: x.urun,
+                      baslik: '${x.ciftlik} · ${x.urun}',
+                      secenekler: [
+                        ('Harita doğru', x.harita),
+                        if (x.plan != null) ('Plan doğru', x.plan),
+                        if (cksToplami(v.cks, s.sezon, x.ciftlik, x.urun) case final k?) ('ÇKS doğru', k),
+                      ],
+                      ozelDeger: true),
                   icon: const Icon(Icons.edit_outlined, size: 18),
                   label: const Text('Düzelt'),
                 ),
@@ -679,89 +744,90 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
               dense: true,
               leading: const Icon(Icons.task_alt, color: Renk.yesil),
               title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('Düzeltildi: ${d.secim} · ${_da(d.deger)}'
+              subtitle: Text('Düzeltildi: ${d.secim}${d.deger == null || d.deger == 0 ? '' : ' · ${_da(d.deger)}'}'
                   '${d.aciklama.isEmpty ? '' : '\n${d.aciklama}'}'
                   '\nKaynakta: harita ${_da(x.harita)} · icmal planı ${_da(x.plan)}${d.tarih.isEmpty ? '' : ' · ${d.tarih}'}'),
               isThreeLine: true,
-              trailing: TextButton(onPressed: () => _geriAl(context, x), child: const Text('Geri al')),
+              trailing: TextButton(onPressed: () => _geriAl(context, x.ciftlik, x.urun), child: const Text('Geri al')),
             ),
           ),
       ],
       BolumBasligi('Haritadaki etiket tutarsızlıkları', key: _kOlcum),
       for (final (c, p) in etiket)
-        Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          child: ListTile(
-              dense: true,
-              leading: const Icon(Icons.label_important_outline, color: Renk.amber),
-              title: Text('${c.ad} · ${p.ad}', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text(p.not)),
-        ),
+        _kart(context,
+            ciftlik: c.ad,
+            konu: 'Etiket: ${p.ad}',
+            baslik: '${c.ad} · ${p.ad}',
+            alt: p.not,
+            ikon: Icons.label_important_outline,
+            secenekler: const [('Haritadaki işaret doğru', null), ('Alan çizimi doğru', null), ('İncelendi, sorun yok', null)]),
       for (final c in s.ciftlikler)
         for (final n in c.notlar.where((n) => n.contains('uyuşmuyor')))
-          Card(margin: const EdgeInsets.only(bottom: 6), child: ListTile(dense: true, title: Text(c.ad), subtitle: Text(n))),
+          _kart(context,
+              ciftlik: c.ad,
+              konu: 'Not: ${n.length > 40 ? n.substring(0, 40) : n}',
+              baslik: c.ad,
+              alt: n,
+              ikon: Icons.notes,
+              secenekler: const [('İncelendi, dikkate alınmayacak', null), ('Harita düzeltilecek', null)]),
       if (hasat.isNotEmpty) ...[
         const BolumBasligi('Hasat ve verim (haritadaki alanla)'),
         for (final (h, a) in hasat)
-          Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-              dense: true,
-              title: Text('${h.ciftlik} · ${h.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('Hasat kaydında alan ${_da(h.alan)}, verim ${sayi(h.toplam! / h.alan!)} kg/da. '
-                  'Haritadaki alan ${_da(a)} esas alınırsa verim ${sayi(h.toplam! / a)} kg/da.'),
-            ),
-          ),
+          _kart(context,
+              ciftlik: h.ciftlik,
+              konu: 'Hasat: ${h.urun}',
+              baslik: '${h.ciftlik} · ${h.urun}',
+              alt: 'Hasat kaydında alan ${_da(h.alan)}, verim ${sayi(h.toplam! / h.alan!)} kg/da. '
+                  'Haritadaki alan ${_da(a)} esas alınırsa verim ${sayi(h.toplam! / a)} kg/da.',
+              ikon: Icons.agriculture,
+              secenekler: [('Hasat kaydındaki alan doğru', h.alan), ('Haritadaki alan doğru', a)],
+              ozelDeger: true),
       ],
       if (v.cks.isNotEmpty) ...[
         BolumBasligi('ÇKS ile harita', key: _kCks),
         for (final (c, u, k, h) in cksUrunKarsilastir(s, v.cks))
-          Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-              dense: true,
-              leading: Icon(_yakin(k, h) ? Icons.check_circle_outline : Icons.compare_arrows,
-                  color: _yakin(k, h) ? Renk.yesil : Renk.amber),
-              title: Text('$c · $u', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('ÇKS: ${_da(k)} · Harita: ${_da(h)}'
-                  '${_yakin(k, h) ? '' : ' · Fark: ${h - k >= 0 ? '+' : ''}${sayi(h - k)} da'}'),
-            ),
-          ),
+          _yakin(k, h)
+              ? _uyumluKart('$c · $u', 'ÇKS: ${_da(k)} · Harita: ${_da(h)}')
+              : _kart(context,
+                  ciftlik: c,
+                  konu: 'ÇKS: $u',
+                  baslik: '$c · $u',
+                  alt: 'ÇKS: ${_da(k)} · Harita: ${_da(h)} · Fark: ${h - k >= 0 ? '+' : ''}${sayi(h - k)} da',
+                  ikon: Icons.compare_arrows,
+                  secenekler: [('Harita doğru', h), ('ÇKS doğru', k)],
+                  ozelDeger: true),
         for (final x in cksEslesmeyen)
-          Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-                dense: true,
-                leading: const Icon(Icons.help_outline, color: Renk.mavi),
-                title: Text("${x.ciftlik} · ÇKS: ${x.urun} ${_da(x.alan)}", style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${[x.mevki, x.adaParsel].where((e) => e.isNotEmpty).join(' · ')}\nHaritada bu ürün için parsel yok.')),
-          ),
+          _kart(context,
+              ciftlik: x.ciftlik,
+              konu: 'ÇKS kaydı: ${x.urun} ${x.adaParsel}',
+              baslik: "${x.ciftlik} · ÇKS: ${x.urun} ${_da(x.alan)}",
+              alt: '${[x.mevki, x.adaParsel].where((e) => e.isNotEmpty).join(' · ')}\nHaritada bu ürün için parsel yok.',
+              ikon: Icons.help_outline,
+              secenekler: const [('ÇKS kaydı doğru, harita güncellenecek', null), ('İncelendi, sorun yok', null)]),
         for (final (c, p) in cksYok)
-          Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-                dense: true,
-                leading: const Icon(Icons.report_outlined, color: Renk.mavi),
-                title: Text('${c.ad} · ${p.ad}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text("${p.urunYazi}: haritada ekili, ÇKS'de bildirimi görünmüyor.")),
-          ),
+          _kart(context,
+              ciftlik: c.ad,
+              konu: 'ÇKS bildirimi: ${p.ad}',
+              baslik: '${c.ad} · ${p.ad}',
+              alt: "${p.urunYazi}: haritada ekili, ÇKS'de bildirimi görünmüyor.",
+              ikon: Icons.report_outlined,
+              secenekler: const [("ÇKS'de bildirildi (başka parsel altında)", null), ("ÇKS'ye bildirilecek", null), ('İncelendi, sorun yok', null)]),
         if (cksEslesmeyen.isEmpty && cksYok.isEmpty) const Text("Tüm parseller ÇKS'de bildirilmiş."),
       ],
       if (resmi.isNotEmpty) ...[
         const BolumBasligi('Resmî parsel kayıtları ile harita'),
         const Text('Kaynak: 2026-2027 Tarımsal Faaliyet › PARSEL', style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
         for (final (c, u, r, h) in resmi)
-          Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-              dense: true,
-              leading: Icon(_yakin(r, h) ? Icons.check_circle_outline : Icons.compare_arrows,
-                  color: _yakin(r, h) ? Renk.yesil : Renk.amber),
-              title: Text('$c · $u', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('Resmî kayıt: ${_da(r)} · Harita: ${_da(h)}'
-                  '${_yakin(r, h) ? '' : ' · Fark: ${h - r >= 0 ? '+' : ''}${sayi(h - r)} da'}'),
-            ),
-          ),
+          _yakin(r, h)
+              ? _uyumluKart('$c · $u', 'Resmî kayıt: ${_da(r)} · Harita: ${_da(h)}')
+              : _kart(context,
+                  ciftlik: c,
+                  konu: 'Resmî kayıt: $u',
+                  baslik: '$c · $u',
+                  alt: 'Resmî kayıt: ${_da(r)} · Harita: ${_da(h)} · Fark: ${h - r >= 0 ? '+' : ''}${sayi(h - r)} da',
+                  ikon: Icons.compare_arrows,
+                  secenekler: [('Harita doğru', h), ('Resmî kayıt doğru', r)],
+                  ozelDeger: true),
       ],
       const BolumBasligi('Ekim planı yıllara göre (münavebe)'),
       if (yillar.length < 2)
@@ -801,14 +867,17 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
 }
 
 class _DuzeltDiyalog extends StatefulWidget {
-  const _DuzeltDiyalog({required this.x});
-  final EkimKarsilastirma x;
+  const _DuzeltDiyalog({required this.baslik, required this.secenekler, this.ozelDeger = false});
+  final String baslik;
+  final List<(String, double?)> secenekler;
+  final bool ozelDeger;
   @override
   State<_DuzeltDiyalog> createState() => _DuzeltDiyalogState();
 }
 
 class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
-  String _secim = 'Harita doğru';
+  static const _ozel = 'Doğru değer';
+  late String _secim = widget.secenekler.isEmpty ? _ozel : widget.secenekler.first.$1;
   final _deger = TextEditingController(), _aciklama = TextEditingController();
 
   @override
@@ -818,15 +887,14 @@ class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
     super.dispose();
   }
 
-  double? get _sonDeger => switch (_secim) {
-        'Harita doğru' => widget.x.harita,
-        'Plan doğru' => widget.x.plan,
-        _ => double.tryParse(_deger.text.trim().replaceAll('.', '').replaceAll(',', '.')),
-      };
+  double? get _girilen => double.tryParse(_deger.text.trim().replaceAll('.', '').replaceAll(',', '.'));
+
+  bool get _gecerli => _secim != _ozel || _girilen != null;
+
+  double? get _sonDeger => _secim == _ozel ? _girilen : widget.secenekler.firstWhere((e) => e.$1 == _secim).$2;
 
   @override
   Widget build(BuildContext context) {
-    final x = widget.x;
     Widget secenek(String s, String alt) => RadioListTile<String>(
           contentPadding: EdgeInsets.zero,
           dense: true,
@@ -837,15 +905,14 @@ class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
           subtitle: alt.isEmpty ? null : Text(alt),
         );
     return AlertDialog(
-      title: Text('${x.ciftlik} · ${x.urun}'),
+      title: Text(widget.baslik),
       content: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Kaynak dosyalar değişmez; düzeltme rapor tablosuna kaydedilir ve istediğiniz zaman geri alınabilir.',
               style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
-          secenek('Harita doğru', _da(x.harita)),
-          if (x.plan != null) secenek('Plan doğru', _da(x.plan)),
-          secenek('Doğru değer', ''),
-          if (_secim == 'Doğru değer')
+          for (final (e, d) in widget.secenekler) secenek(e, d == null ? '' : _da(d)),
+          if (widget.ozelDeger) secenek(_ozel, ''),
+          if (_secim == _ozel)
             TextField(
               controller: _deger,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -855,7 +922,7 @@ class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
           TextField(
             controller: _aciklama,
             maxLength: 300,
-            decoration: const InputDecoration(labelText: 'Açıklama (isteğe bağlı)', hintText: 'Örn. 30 da pancar 5. pivota kaydırıldı'),
+            decoration: const InputDecoration(labelText: 'Açıklama (isteğe bağlı)'),
           ),
           const Text('KVKK: açıklamaya kişi adı yazmayın.', style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
         ]),
@@ -863,7 +930,7 @@ class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
         FilledButton(
-          onPressed: _sonDeger == null ? null : () => Navigator.pop(context, (_secim, _sonDeger!, _aciklama.text.trim())),
+          onPressed: _gecerli ? () => Navigator.pop(context, (_secim, _sonDeger, _aciklama.text.trim())) : null,
           child: const Text('Kaydet'),
         ),
       ],

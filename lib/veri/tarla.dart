@@ -226,7 +226,7 @@ EkimDuzeltme? aktifDuzeltme(List<EkimDuzeltme> l, String sezon, String ciftlik, 
     if (x.aktif &&
         (x.sezon.isEmpty || x.sezon == sezon) &&
         ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(ciftlik) &&
-        urunAnahtari(x.urun) == urunAnahtari(urun)) {
+        (x.urun.contains(':') || urun.contains(':') ? x.urun == urun : urunAnahtari(x.urun) == urunAnahtari(urun))) {
       d = x;
     }
   }

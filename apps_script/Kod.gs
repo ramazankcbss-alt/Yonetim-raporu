@@ -1104,7 +1104,7 @@ function ekimDuzelt_(g) {
     sh.setFrozenRows(1);
   }
   var sezon = String(g.sezon || '').slice(0, 20), cf = String(g.ciftlik || '').slice(0, 60),
-    urun = String(g.urun || '').slice(0, 60);
+    urun = String(g.urun || '').slice(0, 120);
   if (!cf || !urun) return { ok: false, hata: 'Çiftlik ya da ürün eksik.' };
   var son = sh.getLastRow();
   if (son >= 2) {
@@ -1115,10 +1115,10 @@ function ekimDuzelt_(g) {
     if (deg) rg.setValues(v);
   }
   if (g.tur === 'ekimDuzeltGeriAl') return { ok: true, mesaj: 'Düzeltme geri alındı.' };
-  var secim = String(g.secim || '');
-  if (['Harita doğru', 'Plan doğru', 'Doğru değer'].indexOf(secim) < 0) return { ok: false, hata: 'Geçersiz seçim.' };
+  var secim = String(g.secim || '').slice(0, 80);
+  if (!secim) return { ok: false, hata: 'Seçim eksik.' };
   var deger = sayi_(g.deger);
-  if (deger === '' || deger < 0) return { ok: false, hata: 'Doğru değer okunamadı.' };
+  if (deger !== '' && deger < 0) return { ok: false, hata: 'Doğru değer okunamadı.' };
   var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
   sh.appendRow([sezon, cf, urun, secim, deger, String(g.aciklama || '').slice(0, 300),
     Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
