@@ -481,6 +481,15 @@ void tarlaSayfaAc(BuildContext context, RaporVerisi ilk, String baslik, String k
       ),
     ));
 
+Map<String, (double, int)> _cksOzet(List<CksParsel> l) {
+  final m = <String, (double, int)>{};
+  for (final x in l) {
+    final o = m[x.urun] ?? (0.0, 0);
+    m[x.urun] = (o.$1 + (x.alan ?? 0), o.$2 + 1);
+  }
+  return m;
+}
+
 class _ParselKarti extends StatelessWidget {
   const _ParselKarti({required this.c, required this.p, required this.s, required this.v, required this.ilk, this.ayrinti = false});
   final TarlaCiftlik c;
@@ -506,13 +515,16 @@ class _ParselKarti extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Wrap(spacing: 6, runSpacing: 4, children: [
-            for (final x in cks)
+            for (final e in _cksOzet(cks).entries)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: Renk.maviAcik, borderRadius: BorderRadius.circular(6)),
-                child: Text("ÇKS'de bildirildi: ${x.urun} ${_da(x.alan)}${x.adaParsel.isEmpty ? '' : ' · ${x.adaParsel}'}",
+                child: Text("ÇKS'de bildirildi: ${e.key} · çiftlikte ÇKS toplamı ${_da(e.value.$1)} (${e.value.$2} kayıt)",
                     style: const TextStyle(fontSize: 12, color: Renk.mavi, fontWeight: FontWeight.w700)),
               ),
+            if (ayrinti)
+              for (final x in cks)
+                Text('${x.adaParsel} · ${x.urun} ${_da(x.alan)} · ${x.mevki}', style: const TextStyle(fontSize: 12)),
           ]),
         ),
       if (p.not.isNotEmpty) Text(p.not, style: const TextStyle(fontSize: 12.5, color: Renk.amber)),
@@ -637,6 +649,18 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
       ],
       if (v.cks.isNotEmpty) ...[
         BolumBasligi('ÇKS ile harita', key: _kCks),
+        for (final (c, u, k, h) in cksUrunKarsilastir(s, v.cks))
+          Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              dense: true,
+              leading: Icon(_yakin(k, h) ? Icons.check_circle_outline : Icons.compare_arrows,
+                  color: _yakin(k, h) ? Renk.yesil : Renk.amber),
+              title: Text('$c · $u', style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('ÇKS: ${_da(k)} · Harita: ${_da(h)}'
+                  '${_yakin(k, h) ? '' : ' · Fark: ${h - k >= 0 ? '+' : ''}${sayi(h - k)} da'}'),
+            ),
+          ),
         for (final x in cksEslesmeyen)
           Card(
             margin: const EdgeInsets.only(bottom: 6),
@@ -644,7 +668,7 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
                 dense: true,
                 leading: const Icon(Icons.help_outline, color: Renk.mavi),
                 title: Text("${x.ciftlik} · ÇKS: ${x.urun} ${_da(x.alan)}", style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text('${[x.mevki, x.adaParsel].where((e) => e.isNotEmpty).join(' · ')}\nHaritadaki bir parselle eşleşmedi.')),
+                subtitle: Text('${[x.mevki, x.adaParsel].where((e) => e.isNotEmpty).join(' · ')}\nHaritada bu ürün için parsel yok.')),
           ),
         for (final (c, p) in cksYok)
           Card(
@@ -779,11 +803,12 @@ class _CksState extends State<_Cks> {
 
   @override
   Widget build(BuildContext context) {
-    final l = [for (final x in widget.v.cks) if (x.sezon.isEmpty || x.sezon == widget.s.sezon) x];
+    final l = widget.v.cks;
     final grup = <String, List<CksParsel>>{};
     for (final x in l) {
-      grup.putIfAbsent(x.ciftlik, () => []).add(x);
+      grup.putIfAbsent('${x.sezon.isEmpty ? 'Sezon belirtilmemiş' : '${x.sezon} sezonu'} · ${x.ciftlik}', () => []).add(x);
     }
+    final anahtarlar = grup.keys.toList()..sort((a, b) => b.compareTo(a));
     return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
       const BilgiKutusu(
           yazi: "ÇKS belgesini fotoğrafını çekerek ya da dosya (PDF, görüntü) olarak ekleyin. Belge Drive'daki "
@@ -811,9 +836,13 @@ class _CksState extends State<_Cks> {
       if (_yukleniyor) const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
       BolumBasligi("ÇKS'de bildirilen parseller (${l.length})"),
       if (l.isEmpty) const Text('Henüz işlenmiş ÇKS kaydı yok.'),
-      for (final e in grup.entries) ...[
-        Padding(padding: const EdgeInsets.only(top: 8, bottom: 4), child: Text(e.key, style: const TextStyle(fontWeight: FontWeight.w800))),
-        for (final x in e.value)
+      for (final k in anahtarlar) ...[
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Text('$k · ${sayi(grup[k]!.fold<double>(0, (a, x) => a + (x.alan ?? 0)))} da',
+              style: const TextStyle(fontWeight: FontWeight.w800)),
+        ),
+        for (final x in grup[k]!)
           Card(
             margin: const EdgeInsets.only(bottom: 6),
             child: ListTile(
@@ -824,7 +853,8 @@ class _CksState extends State<_Cks> {
               subtitle: Text([
                 if (x.mevki.isNotEmpty) x.mevki,
                 if (x.adaParsel.isNotEmpty) x.adaParsel,
-                x.eslesen.isEmpty ? 'Haritada eşleşen parsel yok' : 'Haritada: ${x.eslesen}',
+                if (x.sezon == widget.s.sezon) x.eslesen.isEmpty ? 'Haritada bu ürün yok' : 'Haritada: ${x.eslesen}',
+                if (x.belge.isNotEmpty) 'Belge: ${x.belge}',
               ].join('\n')),
             ),
           ),

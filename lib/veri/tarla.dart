@@ -172,7 +172,7 @@ List<CksParsel> parselCks(TarlaCiftlik c, TarlaParsel p, List<CksParsel> cks, St
       for (final x in cks)
         if ((x.sezon.isEmpty || x.sezon == sezon) &&
             ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(c.ad) &&
-            kucuk(x.eslesen).trim() == kucuk(p.ad).trim())
+            x.eslesen.split(',').any((e) => kucuk(e).trim() == kucuk(p.ad).trim()))
           x
     ];
 
@@ -197,3 +197,22 @@ List<(String ciftlik, String urun, double resmi, double harita)> resmiKarsilasti
 
 /// Ekim planı dosyasında verisi olan yıllar (küçükten büyüğe).
 List<String> planYillari(List<EkimPlanSatir> l) => ({for (final x in l) x.yil}.toList()..sort());
+
+
+/// ÇKS ile haritanın ürün bazında karşılaştırması (sezon, çiftlik, ürün, ÇKS da, harita da).
+List<(String ciftlik, String urun, double cks, double harita)> cksUrunKarsilastir(TarlaSezonu s, List<CksParsel> l) {
+  final out = <(String, String, double, double)>[];
+  for (final c in s.ciftlikler) {
+    final r = <String, double>{};
+    for (final x in l) {
+      if (x.sezon != s.sezon || ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(c.ad) || x.alan == null) continue;
+      r.update(urunAnahtari(x.urun), (v) => v + x.alan!, ifAbsent: () => x.alan!);
+    }
+    if (r.isEmpty) continue;
+    final h = c.urunToplami;
+    for (final u in {...r.keys, ...h.keys}) {
+      out.add((c.ad, u, r[u] ?? 0, h[u] ?? 0));
+    }
+  }
+  return out;
+}
