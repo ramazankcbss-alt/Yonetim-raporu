@@ -71,7 +71,7 @@ class _TarlaEkranState extends State<TarlaEkran> {
                     GonderAlani(konu: 'Tarla Haritası ${s.sezon} – Harita', child: _Harita(s: s, v: v)),
                     GonderAlani(konu: 'Tarla Haritası ${s.sezon} – Parseller', child: _Parseller(s: s, v: v, ilk: widget.veri)),
                     GonderAlani(konu: 'Tarla Haritası ${s.sezon} – Karşılaştırma', child: _Karsilastirma(s: s, v: v)),
-                    GonderAlani(konu: 'Tarla Haritası ${s.sezon} – ÇKS', child: _Cks(s: s, v: v)),
+                    GonderAlani(konu: 'Tarla Haritası ${s.sezon} – ÇKS', child: _Cks(s: s, v: v, ilk: widget.veri)),
                   ]),
                 ),
               );
@@ -761,11 +761,104 @@ class _Sayac extends StatelessWidget {
       );
 }
 
+double _toplam(List<CksParsel> l) => l.fold<double>(0, (a, x) => a + (x.alan ?? 0));
+
+String _uretimYili(String sezon) {
+  final m = RegExp(r'^\d{4}-(\d{4})$').firstMatch(sezon);
+  return m == null ? '' : '${m.group(1)} üretim yılı · ';
+}
+
+class _MenuKarti extends StatelessWidget {
+  const _MenuKarti({required this.baslik, required this.alt, required this.ikon, required this.dokun});
+  final String baslik, alt;
+  final IconData ikon;
+  final VoidCallback dokun;
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ListTile(
+          leading: CircleAvatar(backgroundColor: Renk.anaAcik, child: Icon(ikon, color: Renk.ana)),
+          title: Text(baslik, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(alt),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: dokun,
+        ),
+      );
+}
+
+/// ÇKS › sezon › çiftlikler.
+class _CksCiftlikler extends StatelessWidget {
+  const _CksCiftlikler({required this.sezon, required this.l, required this.s, required this.ilk});
+  final String sezon;
+  final List<CksParsel> l;
+  final TarlaSezonu s;
+  final RaporVerisi ilk;
+  @override
+  Widget build(BuildContext context) {
+    final g = <String, List<CksParsel>>{};
+    for (final x in l) {
+      g.putIfAbsent(x.ciftlik.isEmpty ? 'Çiftlik belirtilmemiş' : x.ciftlik, () => []).add(x);
+    }
+    return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+      BolumBasligi('$sezon sezonu · ${sayi(_toplam(l))} da'),
+      for (final e in g.entries)
+        _MenuKarti(
+          baslik: e.key,
+          alt: '${e.value.length} kayıt · ${sayi(_toplam(e.value))} da',
+          ikon: Icons.agriculture,
+          dokun: () => tarlaSayfaAc(context, ilk, '${e.key} · ÇKS $sezon', 'Tarla Haritası – ÇKS $sezon ${e.key}',
+              (v) => _CksListe(
+                  l: [
+                    for (final x in v.cks)
+                      if ((x.sezon.isEmpty ? 'Sezon belirtilmemiş' : x.sezon) == sezon &&
+                          (x.ciftlik.isEmpty ? 'Çiftlik belirtilmemiş' : x.ciftlik) == e.key)
+                        x
+                  ],
+                  haritaSezonu: s.sezon)),
+        ),
+    ]);
+  }
+}
+
+/// ÇKS › sezon › çiftlik › kayıtlar (ürüne göre gruplu).
+class _CksListe extends StatelessWidget {
+  const _CksListe({required this.l, required this.haritaSezonu});
+  final List<CksParsel> l;
+  final String haritaSezonu;
+  @override
+  Widget build(BuildContext context) {
+    final g = <String, List<CksParsel>>{};
+    for (final x in l) {
+      g.putIfAbsent(x.urun, () => []).add(x);
+    }
+    return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+      for (final e in g.entries) ...[
+        BolumBasligi('${e.key} · ${sayi(_toplam(e.value))} da'),
+        if (e.value.first.sezon == haritaSezonu)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(e.value.first.eslesen.isEmpty ? 'Haritada bu ürün için parsel yok.' : 'Haritada: ${e.value.first.eslesen}',
+                style: TextStyle(fontSize: 12.5, color: e.value.first.eslesen.isEmpty ? Renk.amber : Renk.yesil)),
+          ),
+        for (final x in e.value)
+          Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              dense: true,
+              title: Text('${x.adaParsel} · ${_da(x.alan)}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text([if (x.mevki.isNotEmpty) x.mevki, if (x.belge.isNotEmpty) 'Belge: ${x.belge}'].join('\n')),
+            ),
+          ),
+      ],
+    ]);
+  }
+}
+
 /// ÇKS: belge yükleme (kamera ya da dosya) ve bildirilen parseller.
 class _Cks extends StatefulWidget {
-  const _Cks({required this.s, required this.v});
+  const _Cks({required this.s, required this.v, required this.ilk});
   final TarlaSezonu s;
-  final RaporVerisi v;
+  final RaporVerisi v, ilk;
   @override
   State<_Cks> createState() => _CksState();
 }
@@ -804,11 +897,11 @@ class _CksState extends State<_Cks> {
   @override
   Widget build(BuildContext context) {
     final l = widget.v.cks;
-    final grup = <String, List<CksParsel>>{};
+    final yillar = <String, List<CksParsel>>{};
     for (final x in l) {
-      grup.putIfAbsent('${x.sezon.isEmpty ? 'Sezon belirtilmemiş' : '${x.sezon} sezonu'} · ${x.ciftlik}', () => []).add(x);
+      yillar.putIfAbsent(x.sezon.isEmpty ? 'Sezon belirtilmemiş' : x.sezon, () => []).add(x);
     }
-    final anahtarlar = grup.keys.toList()..sort((a, b) => b.compareTo(a));
+    final sirali = yillar.keys.toList()..sort((a, b) => b.compareTo(a));
     return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
       const BilgiKutusu(
           yazi: "ÇKS belgesini fotoğrafını çekerek ya da dosya (PDF, görüntü) olarak ekleyin. Belge Drive'daki "
@@ -834,31 +927,16 @@ class _CksState extends State<_Cks> {
         ),
       ]),
       if (_yukleniyor) const Padding(padding: EdgeInsets.all(12), child: LinearProgressIndicator()),
-      BolumBasligi("ÇKS'de bildirilen parseller (${l.length})"),
+      BolumBasligi("ÇKS'de bildirilen parseller (${l.length} kayıt)"),
       if (l.isEmpty) const Text('Henüz işlenmiş ÇKS kaydı yok.'),
-      for (final k in anahtarlar) ...[
-        Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
-          child: Text('$k · ${sayi(grup[k]!.fold<double>(0, (a, x) => a + (x.alan ?? 0)))} da',
-              style: const TextStyle(fontWeight: FontWeight.w800)),
+      for (final y in sirali)
+        _MenuKarti(
+          baslik: '$y sezonu',
+          alt: '${_uretimYili(y)}${yillar[y]!.length} kayıt · ${sayi(_toplam(yillar[y]!))} da',
+          ikon: Icons.event_note,
+          dokun: () => tarlaSayfaAc(context, widget.ilk, 'ÇKS · $y', 'Tarla Haritası – ÇKS $y',
+              (v) => _CksCiftlikler(sezon: y, l: [for (final x in v.cks) if ((x.sezon.isEmpty ? 'Sezon belirtilmemiş' : x.sezon) == y) x], s: widget.s, ilk: widget.ilk)),
         ),
-        for (final x in grup[k]!)
-          Card(
-            margin: const EdgeInsets.only(bottom: 6),
-            child: ListTile(
-              dense: true,
-              leading: Icon(x.eslesen.isEmpty ? Icons.help_outline : Icons.check_circle_outline,
-                  color: x.eslesen.isEmpty ? Renk.amber : Renk.yesil),
-              title: Text('${x.urun} · ${_da(x.alan)}', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text([
-                if (x.mevki.isNotEmpty) x.mevki,
-                if (x.adaParsel.isNotEmpty) x.adaParsel,
-                if (x.sezon == widget.s.sezon) x.eslesen.isEmpty ? 'Haritada bu ürün yok' : 'Haritada: ${x.eslesen}',
-                if (x.belge.isNotEmpty) 'Belge: ${x.belge}',
-              ].join('\n')),
-            ),
-          ),
-      ],
     ]);
   }
 }

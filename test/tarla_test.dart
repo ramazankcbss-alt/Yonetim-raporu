@@ -87,5 +87,10 @@ void main() {
     await t.tap(find.text('ÇKS'));
     await t.pumpAndSettle();
     expect(find.text('Fotoğraf çek'), findsOneWidget);
+    await t.tap(find.text('2025-2026 sezonu'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Şekersüt'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Ada 101 / Parsel 5'), findsOneWidget);
   });
 }
