@@ -12,6 +12,7 @@ import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
 import 'mali.dart';
+import 'tarla.dart';
 import 'toplanti.dart';
 import 'veteriner.dart';
 
@@ -61,6 +62,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.ana,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => GecmisEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.map_outlined,
+          baslik: 'Tarla Haritası',
+          aciklama: '2025-2026 sezonu parseller, ekiliş ve tarım icmaliyle karşılaştırma',
+          renk: Renk.yesil,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => TarlaEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.agriculture_outlined,

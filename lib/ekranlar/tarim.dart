@@ -6,6 +6,7 @@ import '../veri/detay.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
+import 'tarla.dart';
 
 /// Tarım panosu: ekim alanları, hasat/verim, besi planı ve faaliyet akışı.
 class TarimEkran extends StatefulWidget {
@@ -86,6 +87,16 @@ class _TarimEkranState extends State<TarimEkran> {
             ),
           ]),
           const SizedBox(height: 12),
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              leading: const Icon(Icons.map_outlined, color: Renk.ana),
+              title: const Text('Tarla Haritası', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('Parseller, haritadaki ekiliş ve tarım icmaliyle karşılaştırma'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => TarlaEkran(veri: v))),
+            ),
+          ),
           Panel(
             baslik: 'Ekim Alanları (dekar)',
             child: v.ekim.isEmpty

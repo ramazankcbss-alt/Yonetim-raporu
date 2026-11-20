@@ -704,14 +704,21 @@ function tarimEsitle_(ss, tz) {
     if (!sh) return;
     var sonK = sh.getLastRow();
     if (sonK < 4) return;
-    var bas = Math.max(4, sonK - 300);
-    var v = sh.getRange(bas, 1, sonK - bas + 1, Math.min(sh.getLastColumn(), 10)).getValues();
+    var bas = Math.max(5, sonK - 300);
+    var gen = Math.min(sh.getLastColumn(), 10);
+    // KVKK: 4. satırdaki başlıkta OPERATÖR / PERSONEL / ŞOFÖR geçen sütun okunmaz.
+    var atla = {};
+    sh.getRange(4, 1, 1, gen).getValues()[0].forEach(function (h, i) {
+      if (/OPERAT|PERSONEL|ŞOFÖR|SÜRÜCÜ/i.test(String(h))) atla[i] = true;
+    });
+    var v = sh.getRange(bas, 1, sonK - bas + 1, gen).getValues();
     var gunler = {};
     v.forEach(function (r) {
       var d = tarihCoz_(r[0]);
       if (!d || d < sinir || d > bugun) return;
       var parca = [];
       for (var k = 1; k < r.length; k++) {
+        if (atla[k]) continue;
         var x = r[k];
         if (x instanceof Date) continue;
         var s = String(x === null || x === undefined ? '' : x).trim();
