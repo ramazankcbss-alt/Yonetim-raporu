@@ -12,7 +12,7 @@ import '../veri/tarla.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 
-/// Tarla Haritası: Google Earth (KMZ) ekiliş haritası; parseller, ölçülen
+/// Tarla Haritası: Google Earth (KMZ) ekiliş haritası; parseller,
 /// alanlar ve tarım icmaliyle (ekim alanları, hasat, günlük faaliyet)
 /// karşılaştırma.
 class TarlaEkran extends StatefulWidget {
@@ -299,8 +299,6 @@ class _ParselKarti extends StatelessWidget {
   Widget build(BuildContext context) {
     final kayitlar = parselKayitlari(c, p, v.tarim);
     final cks = parselCks(c, p, v.cks, s.sezon);
-    final f = p.olcumFarki;
-    final uyari = f != null && f.abs() > 5 && ((p.olculen ?? 0) - (p.beyan ?? 0)).abs() > 10;
     final icerik = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Container(width: 12, height: 12, color: urunRengi(p)),
@@ -323,10 +321,6 @@ class _ParselKarti extends StatelessWidget {
               ),
           ]),
         ),
-      if (p.olculen != null)
-        Text(
-            'Haritada ölçülen: ${_da(p.olculen)}${f == null ? '' : ' (beyana göre ${f >= 0 ? '+' : ''}${sayi(f, ondalik: 1)}%)'}',
-            style: TextStyle(fontSize: 12.5, color: uyari ? Renk.amber : Renk.soluk, fontWeight: uyari ? FontWeight.w700 : null)),
       if (p.not.isNotEmpty) Text(p.not, style: const TextStyle(fontSize: 12.5, color: Renk.amber)),
       if (kayitlar.isNotEmpty) ...[
         const SizedBox(height: 4),
@@ -370,11 +364,6 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
     final k = ekimKarsilastir(s, v.ekim);
     final uyumlu = k.where((x) => x.durum == 'Uyumlu').toList();
     final fark = k.where((x) => x.durum != 'Uyumlu').toList();
-    final olcum = [
-      for (final c in s.ciftlikler)
-        for (final p in c.parseller)
-          if (p.olcumFarki != null && p.olcumFarki!.abs() > 5 && ((p.olculen ?? 0) - (p.beyan ?? 0)).abs() > 10) (c, p)
-    ];
     final etiket = [for (final c in s.ciftlikler) for (final p in c.parseller) if (p.not.contains('yazıyor')) (c, p)];
     final hasat = <(HasatSatir, double)>[];
     for (final h in v.hasat) {
@@ -407,8 +396,6 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
         Expanded(child: _Sayac('Uyumlu', uyumlu.length, Renk.yesil, () => _git(_kUyumlu))),
         const SizedBox(width: 8),
         Expanded(child: _Sayac('Farklı / eksik', fark.length, Renk.amber, () => _git(_kFark))),
-        const SizedBox(width: 8),
-        Expanded(child: _Sayac('Ölçüm farkı', olcum.length, Renk.kirmizi, () => _git(_kOlcum))),
       ]),
       if (v.cks.isNotEmpty) ...[
         const SizedBox(height: 8),
@@ -428,7 +415,7 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
             isThreeLine: x.fark != null,
           ),
         ),
-      BolumBasligi('Harita içi tutarsızlıklar', key: _kOlcum),
+      BolumBasligi('Haritadaki etiket tutarsızlıkları', key: _kOlcum),
       for (final (c, p) in etiket)
         Card(
           margin: const EdgeInsets.only(bottom: 6),
@@ -437,16 +424,6 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
               leading: const Icon(Icons.label_important_outline, color: Renk.amber),
               title: Text('${c.ad} · ${p.ad}', style: const TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Text(p.not)),
-        ),
-      for (final (c, p) in olcum)
-        Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          child: ListTile(
-              dense: true,
-              leading: const Icon(Icons.straighten, color: Renk.kirmizi),
-              title: Text('${c.ad} · ${p.ad}', style: const TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('Etiket ${_da(p.beyan)}, haritada ölçülen ${_da(p.olculen)} '
-                  '(${p.olcumFarki! >= 0 ? '+' : ''}${sayi(p.olcumFarki!, ondalik: 1)}%)')),
         ),
       for (final c in s.ciftlikler)
         for (final n in c.notlar.where((n) => n.contains('uyuşmuyor')))

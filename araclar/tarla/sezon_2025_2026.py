@@ -23,7 +23,7 @@ def sade(c, n=48):
 def p(ad, tip, urunler, beyan, kaynak, not_='', i=0):
     k = poly(*kaynak, i=i) if kaynak else None
     return dict(ad=ad, tip=tip, urunler=[[u, d] for u, d in urunler], beyan=beyan,
-                olculen=round(k['olcu'] / 1000, 1) if k else None,
+                # Haritadan ölçülen alan kullanılmaz (çizimler resmî ölçüm değildir).
                 etiket=k['ad'] if k else '', not_=not_, koord=sade(k['koord']) if k else [])
 
 S, A, T, F = 'ŞEKERSÜT', 'ASLIM', 'TAŞAĞIL', 'FİDANLIK'
@@ -70,7 +70,7 @@ ciftlikler = [
    p('Tarım alanı (400 da)', 'parsel', [('Patates', 400)], 400, (T, 'TARIM ALANI 400 DEKAR')),
    p('Tarım alanı (50 da)', 'parsel', [('Patates', 50)], 50, (T, 'TARIM ALANI 50 DEKAR')),
    p('Pancar parseli', 'parsel', [('Şeker pancarı', 300)], 300, (T, 'Pancar 300 DA.')),
-  ], tesis={}, notlar=['Çiftlik sınırı haritada 1.001 da olarak ölçülüyor (tarım alanları dahil).']),
+  ], tesis={}, notlar=[]),
  dict(ad='Fidanlık', parseller=[
    p('1. parsel', 'parsel', [('Buğday', 80)], 80, (F, '1. Mısır silajı 80 da.'),
      'İşaret "Buğday 80 da", alan çizimleri "Mısır silajı 80 da" yazıyor (iki üst üste çizim).'),
