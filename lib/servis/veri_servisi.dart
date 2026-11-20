@@ -380,6 +380,18 @@ class VeriDeposu extends ChangeNotifier {
     return (j['mesaj'] ?? 'ÇKS belgesi Drive\'a kaydedildi.').toString();
   }
 
+  /// Tarla Haritası karşılaştırmasındaki bir farkı düzeltir (ya da geri alır)
+  /// ve veriyi yeniler.
+  Future<String> ekimDuzelt({required String sezon, required String ciftlik, required String urun,
+      String secim = '', double? deger, String aciklama = '', bool geriAl = false}) async {
+    final j = await _islem(geriAl ? 'ekimDuzeltGeriAl' : 'ekimDuzelt', {
+      'sezon': sezon, 'ciftlik': ciftlik, 'urun': urun, 'secim': secim,
+      'deger': deger == null ? '' : '$deger'.replaceAll('.', ','), 'aciklama': aciklama,
+    });
+    await yenile();
+    return (j['mesaj'] ?? 'Kaydedildi.').toString();
+  }
+
   /// Kişiler sayfasındaki kişiye uygulamanın sahibi adına e-posta gönderir.
   Future<void> epostaGonder(String ad, String konu, String metin) async {
     await _islem('mesaj', {'ad': ad, 'konu': konu, 'metin': metin});

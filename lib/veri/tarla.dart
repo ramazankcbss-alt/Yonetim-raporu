@@ -216,3 +216,18 @@ List<(String ciftlik, String urun, double cks, double harita)> cksUrunKarsilasti
   }
   return out;
 }
+
+
+/// Karşılaştırma satırı için geçerli (aktif) düzeltme.
+EkimDuzeltme? aktifDuzeltme(List<EkimDuzeltme> l, String sezon, String ciftlik, String urun) {
+  EkimDuzeltme? d;
+  for (final x in l) {
+    if (x.aktif &&
+        (x.sezon.isEmpty || x.sezon == sezon) &&
+        ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(ciftlik) &&
+        urunAnahtari(x.urun) == urunAnahtari(urun)) {
+      d = x;
+    }
+  }
+  return d;
+}

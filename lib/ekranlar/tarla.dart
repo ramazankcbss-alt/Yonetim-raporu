@@ -559,6 +559,27 @@ class _Karsilastirma extends StatefulWidget {
 class _KarsilastirmaState extends State<_Karsilastirma> {
   final _kFark = GlobalKey(), _kOlcum = GlobalKey(), _kUyumlu = GlobalKey(), _kCks = GlobalKey();
 
+  Future<void> _geriAl(BuildContext context, EkimKarsilastirma x) async {
+    try {
+      final m = await VeriDeposu.ben.ekimDuzelt(sezon: widget.s.sezon, ciftlik: x.ciftlik, urun: x.urun, geriAl: true);
+      if (context.mounted) bildir(context, m);
+    } catch (e) {
+      if (context.mounted) bildir(context, '$e');
+    }
+  }
+
+  Future<void> _duzelt(BuildContext context, EkimKarsilastirma x) async {
+    final sonuc = await showDialog<(String, double, String)>(context: context, builder: (_) => _DuzeltDiyalog(x: x));
+    if (sonuc == null || !context.mounted) return;
+    try {
+      final m = await VeriDeposu.ben.ekimDuzelt(
+          sezon: widget.s.sezon, ciftlik: x.ciftlik, urun: x.urun, secim: sonuc.$1, deger: sonuc.$2, aciklama: sonuc.$3);
+      if (context.mounted) bildir(context, m);
+    } catch (e) {
+      if (context.mounted) bildir(context, '$e');
+    }
+  }
+
   void _git(GlobalKey k) {
     final c = k.currentContext;
     if (c != null) Scrollable.ensureVisible(c, duration: const Duration(milliseconds: 350), alignment: 0.02);
@@ -569,7 +590,12 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
     final s = widget.s, v = widget.v;
     final k = ekimKarsilastir(s, v.ekim);
     final uyumlu = k.where((x) => x.durum == 'Uyumlu').toList();
-    final fark = k.where((x) => x.durum != 'Uyumlu').toList();
+    final farkTum = k.where((x) => x.durum != 'Uyumlu').toList();
+    final duzeltilen = [
+      for (final x in farkTum)
+        if (aktifDuzeltme(v.ekimDuzeltme, s.sezon, x.ciftlik, x.urun) case final d?) (x, d)
+    ];
+    final fark = [for (final x in farkTum) if (aktifDuzeltme(v.ekimDuzeltme, s.sezon, x.ciftlik, x.urun) == null) x];
     final etiket = [for (final c in s.ciftlikler) for (final p in c.parseller) if (p.not.contains('yazıyor')) (c, p)];
     final hasat = <(HasatSatir, double)>[];
     for (final h in v.hasat) {
@@ -603,6 +629,12 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
         const SizedBox(width: 8),
         Expanded(child: _Sayac('Farklı / eksik', fark.length, Renk.amber, () => _git(_kFark))),
       ]),
+      if (duzeltilen.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text('${duzeltilen.length} fark uygulamada düzeltildi (Düzeltilenler bölümü).',
+              style: const TextStyle(fontSize: 12, color: Renk.yesil)),
+        ),
       if (v.cks.isNotEmpty) ...[
         const SizedBox(height: 8),
         _Sayac("ÇKS ile eşleşmeyen", cksEslesmeyen.length + cksYok.length, Renk.mavi, () => _git(_kCks)),
@@ -612,15 +644,46 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
       for (final x in fark)
         Card(
           margin: const EdgeInsets.only(bottom: 6),
-          child: ListTile(
-            dense: true,
-            leading: const Icon(Icons.warning_amber_rounded, color: Renk.amber),
-            title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('Harita ${_da(x.harita)} · İcmal planı ${_da(x.plan)}${x.ekilen == null ? '' : ' · ekilen ${_da(x.ekilen)}'}'
-                '${x.fark == null ? '' : '\nFark: ${x.fark! >= 0 ? '+' : ''}${sayi(x.fark!)} da'} · ${x.durum}'),
-            isThreeLine: x.fark != null,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.warning_amber_rounded, color: Renk.amber),
+                title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text('Harita ${_da(x.harita)} · İcmal planı ${_da(x.plan)}${x.ekilen == null ? '' : ' · ekilen ${_da(x.ekilen)}'}'
+                    '${x.fark == null ? '' : '\nFark: ${x.fark! >= 0 ? '+' : ''}${sayi(x.fark!)} da'} · ${x.durum}'),
+                isThreeLine: x.fark != null,
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: Key('duzelt_${x.ciftlik}_${x.urun}'),
+                  onPressed: () => _duzelt(context, x),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Düzelt'),
+                ),
+              ),
+            ]),
           ),
         ),
+      if (duzeltilen.isNotEmpty) ...[
+        const BolumBasligi('Düzeltilenler'),
+        for (final (x, d) in duzeltilen)
+          Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              dense: true,
+              leading: const Icon(Icons.task_alt, color: Renk.yesil),
+              title: Text('${x.ciftlik} · ${x.urun}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Düzeltildi: ${d.secim} · ${_da(d.deger)}'
+                  '${d.aciklama.isEmpty ? '' : '\n${d.aciklama}'}'
+                  '\nKaynakta: harita ${_da(x.harita)} · icmal planı ${_da(x.plan)}${d.tarih.isEmpty ? '' : ' · ${d.tarih}'}'),
+              isThreeLine: true,
+              trailing: TextButton(onPressed: () => _geriAl(context, x), child: const Text('Geri al')),
+            ),
+          ),
+      ],
       BolumBasligi('Haritadaki etiket tutarsızlıkları', key: _kOlcum),
       for (final (c, p) in etiket)
         Card(
@@ -731,6 +794,77 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
           ),
         ),
     ]));
+  }
+}
+
+class _DuzeltDiyalog extends StatefulWidget {
+  const _DuzeltDiyalog({required this.x});
+  final EkimKarsilastirma x;
+  @override
+  State<_DuzeltDiyalog> createState() => _DuzeltDiyalogState();
+}
+
+class _DuzeltDiyalogState extends State<_DuzeltDiyalog> {
+  String _secim = 'Harita doğru';
+  final _deger = TextEditingController(), _aciklama = TextEditingController();
+
+  @override
+  void dispose() {
+    _deger.dispose();
+    _aciklama.dispose();
+    super.dispose();
+  }
+
+  double? get _sonDeger => switch (_secim) {
+        'Harita doğru' => widget.x.harita,
+        'Plan doğru' => widget.x.plan,
+        _ => double.tryParse(_deger.text.trim().replaceAll('.', '').replaceAll(',', '.')),
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final x = widget.x;
+    Widget secenek(String s, String alt) => RadioListTile<String>(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          value: s,
+          groupValue: _secim,
+          onChanged: (v) => setState(() => _secim = v!),
+          title: Text(s),
+          subtitle: alt.isEmpty ? null : Text(alt),
+        );
+    return AlertDialog(
+      title: Text('${x.ciftlik} · ${x.urun}'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Kaynak dosyalar değişmez; düzeltme rapor tablosuna kaydedilir ve istediğiniz zaman geri alınabilir.',
+              style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+          secenek('Harita doğru', _da(x.harita)),
+          if (x.plan != null) secenek('Plan doğru', _da(x.plan)),
+          secenek('Doğru değer', ''),
+          if (_secim == 'Doğru değer')
+            TextField(
+              controller: _deger,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Doğru alan (da)'),
+              onChanged: (_) => setState(() {}),
+            ),
+          TextField(
+            controller: _aciklama,
+            maxLength: 300,
+            decoration: const InputDecoration(labelText: 'Açıklama (isteğe bağlı)', hintText: 'Örn. 30 da pancar 5. pivota kaydırıldı'),
+          ),
+          const Text('KVKK: açıklamaya kişi adı yazmayın.', style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+        FilledButton(
+          onPressed: _sonDeger == null ? null : () => Navigator.pop(context, (_secim, _sonDeger!, _aciklama.text.trim())),
+          child: const Text('Kaydet'),
+        ),
+      ],
+    );
   }
 }
 

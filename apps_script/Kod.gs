@@ -206,6 +206,8 @@ function veriTopla_(gun) {
     // ÇKS'de bildirilen parseller (Sezon, Çiftlik, Mevki, Ada, Parsel, Ürün,
     // Alan, Eşleşen tarla parseli, Belge, İşlenme tarihi)
     cks: basitOku_('ÇKS_Parseller', 10, tz),
+    // Tarla Haritası karşılaştırma düzeltmeleri: Sezon, Çiftlik, Ürün, Seçim, Doğru değer, Açıklama, Tarih, Durum
+    ekimDuzeltme: basitOku_('Ekim_Düzeltmeleri', 8, tz),
     // Ekim Planı dosyası: Yıl, Çiftlik, Ürün, Plan (da) — münavebe için tüm yıllar
     ekimPlani: (function () { try { return ekimPlaniOku_(); } catch (err) { return []; } })(),
     // Tarımsal Faaliyet › PARSEL: Çiftlik, İlçe, Köy, Ada, Parsel, Alan (da), Ürün
@@ -345,6 +347,7 @@ function doPost(e) {
     }
     if (govde.tur === 'raporKaydet') return json_(raporKaydet_(govde));
     if (govde.tur === 'cksYukle') return json_(cksYukle_(govde));
+    if (govde.tur === 'ekimDuzelt' || govde.tur === 'ekimDuzeltGeriAl') return json_(ekimDuzelt_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
@@ -1087,6 +1090,39 @@ function ekimAlanlariEsitle_(ss, notlar) {
   });
   if (say) rg.setValues(v);
   return say;
+}
+
+/** Tarla Haritası karşılaştırmasındaki bir farkı uygulamadan düzeltir ya da
+ * düzeltmeyi geri alır. Kaynak dosyalara dokunmaz; kişi adı tutulmaz. */
+function ekimDuzelt_(g) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ad = 'Ekim_Düzeltmeleri';
+  var sh = ss.getSheetByName(ad);
+  if (!sh) {
+    sh = ss.insertSheet(ad);
+    sh.appendRow(['Sezon', 'Çiftlik', 'Ürün', 'Seçim', 'Doğru değer (da)', 'Açıklama', 'Tarih', 'Durum']);
+    sh.setFrozenRows(1);
+  }
+  var sezon = String(g.sezon || '').slice(0, 20), cf = String(g.ciftlik || '').slice(0, 60),
+    urun = String(g.urun || '').slice(0, 60);
+  if (!cf || !urun) return { ok: false, hata: 'Çiftlik ya da ürün eksik.' };
+  var son = sh.getLastRow();
+  if (son >= 2) {
+    var rg = sh.getRange(2, 1, son - 1, 8), v = rg.getValues(), deg = false;
+    v.forEach(function (r) {
+      if (String(r[0]) === sezon && String(r[1]) === cf && String(r[2]) === urun && r[7] === 'Aktif') { r[7] = 'Geri alındı'; deg = true; }
+    });
+    if (deg) rg.setValues(v);
+  }
+  if (g.tur === 'ekimDuzeltGeriAl') return { ok: true, mesaj: 'Düzeltme geri alındı.' };
+  var secim = String(g.secim || '');
+  if (['Harita doğru', 'Plan doğru', 'Doğru değer'].indexOf(secim) < 0) return { ok: false, hata: 'Geçersiz seçim.' };
+  var deger = sayi_(g.deger);
+  if (deger === '' || deger < 0) return { ok: false, hata: 'Doğru değer okunamadı.' };
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  sh.appendRow([sezon, cf, urun, secim, deger, String(g.aciklama || '').slice(0, 300),
+    Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
+  return { ok: true, mesaj: 'Düzeltme kaydedildi.' };
 }
 
 function cksYukle_(g) {

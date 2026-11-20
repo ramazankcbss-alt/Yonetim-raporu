@@ -20,6 +20,9 @@ void main() {
       ['Aslım', 'Arpa', '1340', '1340'],
       ['Taşağıl', 'Patates', '400', '400'],
     ],
+    'ekimDuzeltme': [
+      ['2025-2026', 'Aslım', 'Arpa', 'Harita doğru', '1105', 'Test', '20.11.2026', 'Aktif'],
+    ],
     'ekimPlani': [
       ['2026', 'Şekersüt', 'Buğday', '1700'],
       ['2027', 'Şekersüt', 'Buğday', '900'],
@@ -51,6 +54,8 @@ void main() {
     expect(parselCks(sk, sk.parseller.first, v.cks, s.sezon).length, 1);
     expect(s.ciftlikler.any((c) => c.ad.startsWith('Pangev')), isFalse);
     expect(planYillari(v.ekimPlani), ['2026', '2027']);
+    expect(aktifDuzeltme(v.ekimDuzeltme, s.sezon, 'Aslım', 'Arpa')?.deger, 1105);
+    expect(aktifDuzeltme(v.ekimDuzeltme, s.sezon, 'Aslım', 'Buğday'), isNull);
     expect(resmiKarsilastir(s, v.resmiParsel).any((e) => e.$2 == 'Buğday' && e.$3 == 721), isTrue);
   });
 
@@ -69,6 +74,8 @@ void main() {
     await t.tap(find.text('Uyumlu'));
     await t.pumpAndSettle();
     expect(find.text('Olumlu: uyumlu olanlar'), findsOneWidget);
+    expect(find.text('Düzeltilenler'), findsOneWidget);
+    expect(find.text('Düzelt'), findsWidgets);
     await t.tap(find.text('Parseller'));
     await t.pumpAndSettle();
     expect(find.text('Çiftlikler'), findsOneWidget);

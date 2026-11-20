@@ -386,6 +386,24 @@ class CksParsel {
   }
 }
 
+/// Tarla Haritası karşılaştırmasında uygulamadan yapılan düzeltme.
+class EkimDuzeltme {
+  const EkimDuzeltme({this.sezon = '', required this.ciftlik, required this.urun, required this.secim, this.deger,
+      this.aciklama = '', this.tarih = '', this.durum = ''});
+  final String sezon, ciftlik, urun, secim, aciklama, tarih, durum;
+  final double? deger;
+  bool get aktif => durum == 'Aktif';
+
+  static EkimDuzeltme? oku(Object? v) {
+    final r = _liste(v);
+    String m(int i) => i < r.length ? _metin(r[i]) : '';
+    if (r.length < 4 || m(1).isEmpty) return null;
+    return EkimDuzeltme(
+        sezon: m(0), ciftlik: m(1), urun: m(2), secim: m(3), deger: r.length > 4 ? sayiOku(r[4]) : null,
+        aciklama: m(5), tarih: m(6), durum: m(7));
+  }
+}
+
 /// Ekim Planı dosyası: bir yılın çiftlik/ürün planı.
 class EkimPlanSatir {
   const EkimPlanSatir({required this.yil, required this.ciftlik, required this.urun, required this.plan});
@@ -992,6 +1010,7 @@ class RaporVerisi {
     this.hasat = const [],
     this.cks = const [],
     this.ekimPlani = const [],
+    this.ekimDuzeltme = const [],
     this.resmiParsel = const [],
     this.besi = const [],
     this.isler = const [],
@@ -1032,6 +1051,7 @@ class RaporVerisi {
   /// ÇKS'de bildirilen parseller.
   final List<CksParsel> cks;
   final List<EkimPlanSatir> ekimPlani;
+  final List<EkimDuzeltme> ekimDuzeltme;
   final List<ResmiParsel> resmiParsel;
   final List<BesiSatir> besi;
   final List<Is> isler;
@@ -1089,6 +1109,7 @@ class RaporVerisi {
       hasat: oku('hasat', HasatSatir.oku),
       cks: oku('cks', CksParsel.oku),
       ekimPlani: oku('ekimPlani', EkimPlanSatir.oku),
+      ekimDuzeltme: oku('ekimDuzeltme', EkimDuzeltme.oku),
       resmiParsel: oku('resmiParsel', ResmiParsel.oku),
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
