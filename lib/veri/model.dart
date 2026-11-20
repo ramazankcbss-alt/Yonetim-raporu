@@ -386,6 +386,38 @@ class CksParsel {
   }
 }
 
+/// Ekim Planı dosyası: bir yılın çiftlik/ürün planı.
+class EkimPlanSatir {
+  const EkimPlanSatir({required this.yil, required this.ciftlik, required this.urun, required this.plan});
+  final String yil, ciftlik, urun;
+  final double plan;
+
+  static EkimPlanSatir? oku(Object? v) {
+    final r = _liste(v);
+    if (r.length < 4) return null;
+    final p = sayiOku(r[3]);
+    if (p == null || _metin(r[0]).isEmpty) return null;
+    return EkimPlanSatir(yil: _metin(r[0]), ciftlik: _metin(r[1]), urun: _metin(r[2]), plan: p);
+  }
+}
+
+/// Tarımsal Faaliyet › PARSEL: resmî (tapu/kayıt) parsel ve ekili ürün.
+class ResmiParsel {
+  const ResmiParsel({required this.ciftlik, this.ilce = '', this.koy = '', this.ada = '', this.parsel = '', this.alan, this.urun = ''});
+  final String ciftlik, ilce, koy, ada, parsel, urun;
+  final double? alan;
+
+  String get adaParsel => 'Ada $ada / Parsel $parsel';
+
+  static ResmiParsel? oku(Object? v) {
+    final r = _liste(v);
+    String m(int i) => i < r.length ? _metin(r[i]) : '';
+    if (r.length < 5 || m(0).isEmpty) return null;
+    return ResmiParsel(
+        ciftlik: m(0), ilce: m(1), koy: m(2), ada: m(3), parsel: m(4), alan: r.length > 5 ? sayiOku(r[5]) : null, urun: m(6));
+  }
+}
+
 class EkimSatir {
   const EkimSatir(
       {required this.ciftlik, required this.urun, this.plan, this.ekilen});
@@ -959,6 +991,8 @@ class RaporVerisi {
     this.ekim = const [],
     this.hasat = const [],
     this.cks = const [],
+    this.ekimPlani = const [],
+    this.resmiParsel = const [],
     this.besi = const [],
     this.isler = const [],
     this.akis = const [],
@@ -997,6 +1031,8 @@ class RaporVerisi {
 
   /// ÇKS'de bildirilen parseller.
   final List<CksParsel> cks;
+  final List<EkimPlanSatir> ekimPlani;
+  final List<ResmiParsel> resmiParsel;
   final List<BesiSatir> besi;
   final List<Is> isler;
   final List<AkisKaydi> akis;
@@ -1052,6 +1088,8 @@ class RaporVerisi {
       ekim: oku('ekim', EkimSatir.oku),
       hasat: oku('hasat', HasatSatir.oku),
       cks: oku('cks', CksParsel.oku),
+      ekimPlani: oku('ekimPlani', EkimPlanSatir.oku),
+      resmiParsel: oku('resmiParsel', ResmiParsel.oku),
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
       akis: oku('isakisi', AkisKaydi.oku),

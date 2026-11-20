@@ -206,6 +206,10 @@ function veriTopla_(gun) {
     // ÇKS'de bildirilen parseller (Sezon, Çiftlik, Mevki, Ada, Parsel, Ürün,
     // Alan, Eşleşen tarla parseli, Belge, İşlenme tarihi)
     cks: basitOku_('ÇKS_Parseller', 10, tz),
+    // Ekim Planı dosyası: Yıl, Çiftlik, Ürün, Plan (da) — münavebe için tüm yıllar
+    ekimPlani: (function () { try { return ekimPlaniOku_(); } catch (err) { return []; } })(),
+    // Tarımsal Faaliyet › PARSEL: Çiftlik, İlçe, Köy, Ada, Parsel, Alan (da), Ürün
+    resmiParsel: (function () { try { return resmiParsellerOku_(); } catch (err) { return []; } })(),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
     // ve veterinerlerin bildirimleri (Veteriner.gs)
     veteriner: (function () {
@@ -463,6 +467,13 @@ function esitle_() {
       sonuc.tarim = tarimEsitle_(ss, tz);
     } catch (err) {
       sonuc.notlar.push('Tarım okunamadı: ' + err);
+    }
+    try {
+      CacheService.getScriptCache().removeAll(['ekimPlani', 'resmiParsel']);
+      var ek = ekimAlanlariEsitle_(ss, sonuc.notlar);
+      if (ek) sonuc.notlar.push('Ekim planından güncellenen plan alanı: ' + ek);
+    } catch (err) {
+      sonuc.notlar.push('Ekim planı okunamadı: ' + err);
     }
     try {
       sonuc.detay = detayEsitle_(ss, 2, sonuc.notlar);
@@ -976,6 +987,106 @@ function bakimOnarimOku_(tz) {
 // yüklenir; "ÇKS Belgeleri" klasörüne konur. Belgedeki parseller ayrı bir
 // görevle okunup 'ÇKS_Parseller' sayfasına yazılır (kişisel bilgi alınmaz).
 var CKS_KLASOR_ID = '1ghie0n4Hr8-_ANfo-v-9M0m8qNTr2zkD';
+
+// Ekim planı ve resmî parsel kaynakları (salt okunur; yalnızca alan/ürün/ada-parsel okunur).
+var EKIM_PLANI_ID = '1uNlVzsbJOh8n9-8g_0NwBsSioPapVGeBRWlp5niY00c';
+var TARIM_FAALIYET_ID = '1jeeLe8VF06l_a_JdcS1eF8n8yDGsgEPlIcjO4Y5T7u8';
+
+function onbellekli_(anahtar, sure, uret) {
+  var c = CacheService.getScriptCache();
+  var v = c.get(anahtar);
+  if (v) { try { return JSON.parse(v); } catch (e) {} }
+  var sonuc = uret();
+  try { c.put(anahtar, JSON.stringify(sonuc), sure); } catch (e) {}
+  return sonuc;
+}
+
+function ciftlikAdi_(x) {
+  var t = String(x).replace(/çiftliği/ig, '').replace(/\s+/g, ' ').trim();
+  var k = t.toLocaleLowerCase('tr');
+  if (k.indexOf('şeker') === 0 || k.indexOf('fethiye') >= 0) return 'Şekersüt';
+  if (k.indexOf('aslım') >= 0) return 'Aslım';
+  if (k.indexOf('taşağıl') >= 0 || k.indexOf('camili') >= 0) return 'Taşağıl';
+  if (k.indexOf('fidanlık') >= 0) return 'Fidanlık';
+  return t;
+}
+
+/** Ekim Planı dosyasındaki "YYYY TARIM PLANI" tabloları: [Yıl, Çiftlik, Ürün, Plan (da)]. */
+function ekimPlaniOku_() {
+  return onbellekli_('ekimPlani', 3600, function () {
+    var ss = SpreadsheetApp.openById(EKIM_PLANI_ID);
+    var sh = ss.getSheets()[0];
+    var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 200), Math.min(sh.getLastColumn(), 27)).getDisplayValues();
+    var yil = '', urunler = null, cikti = [];
+    v.forEach(function (r) {
+      var metin = r.join(' ');
+      var m = metin.match(/(\d{4})\s+TARIM PLANI/i);
+      if (m) { yil = m[1]; urunler = null; return; }
+      if (!yil) return;
+      var i = r.findIndex(function (h) { return /toplam dekar/i.test(h); });
+      if (i >= 0) { urunler = r; return; }
+      if (!urunler) return;
+      var ad = r.filter(function (x) { return String(x).trim() !== ''; })[0] || '';
+      if (!ad || /toplam/i.test(ad)) { if (/toplam/i.test(ad)) urunler = null; return; }
+      urunler.forEach(function (u, j) {
+        u = String(u).trim();
+        if (!u || /toplam/i.test(u)) return;
+        var n = sayi_(r[j]);
+        if (n === '' || n === 0) return;
+        cikti.push([yil, ciftlikAdi_(ad), /boş|ıslah/i.test(u) ? 'Boş / ıslah edilen' : u, n]);
+      });
+    });
+    return cikti;
+  });
+}
+
+/** Tarımsal Faaliyet › PARSEL: [Çiftlik, İlçe, Köy, Ada, Parsel, Alan (da), Ürün]. */
+function resmiParsellerOku_() {
+  return onbellekli_('resmiParsel', 3600, function () {
+    var sh = SpreadsheetApp.openById(TARIM_FAALIYET_ID).getSheetByName('PARSEL');
+    if (!sh) return [];
+    var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 400), 6).getDisplayValues();
+    var cikti = [];
+    v.forEach(function (r) {
+      if (!r[0] || !r[1] || /^(İLÇESİ|TOPLAM)/i.test(r[0]) || !r[3]) return;
+      var alan = sayi_(r[4]);
+      cikti.push([ciftlikAdi_(r[1]), r[0].trim(), r[1].trim(), r[2].trim(), r[3].trim(),
+        alan === '' ? '' : alan, String(r[5]).replace(/\d+$/, '').trim()]);
+    });
+    return cikti;
+  });
+}
+
+function urunAnahtari_(u) {
+  var k = String(u).toLocaleLowerCase('tr').replace(/\(.*?\)/g, '').trim();
+  if (k.indexOf('pancar') >= 0) return 'pancar';
+  if (k.indexOf('mısır') >= 0) return 'mısır';
+  if (k.indexOf('buğday') >= 0) return 'buğday';
+  if (k.indexOf('arpa') >= 0) return 'arpa';
+  if (k.indexOf('yonca') >= 0) return 'yonca';
+  if (k.indexOf('patates') >= 0) return 'patates';
+  return k;
+}
+
+/** Ekim_Alanları "Plan (da)" sütununu bu yılın ekim planıyla günceller; Ekilen sütununa dokunmaz.
+ * Eşleşmeyen plan satırları eklenmez, nota yazılır. */
+function ekimAlanlariEsitle_(ss, notlar) {
+  var yil = String(new Date().getFullYear());
+  var plan = ekimPlaniOku_().filter(function (r) { return r[0] === yil && !/boş/i.test(r[2]); });
+  if (!plan.length) return 0;
+  var sh = ss.getSheetByName(SAYFALAR.ekim);
+  if (!sh || sh.getLastRow() < 2) return 0;
+  var rg = sh.getRange(2, 1, sh.getLastRow() - 1, 3), v = rg.getValues(), say = 0;
+  plan.forEach(function (p) {
+    var i = v.findIndex(function (r) {
+      return ciftlikAdi_(r[0]) === p[1] && urunAnahtari_(r[1]) === urunAnahtari_(p[2]);
+    });
+    if (i < 0) { notlar.push('Ekim planında olup Ekim_Alanları\'nda olmayan: ' + p[1] + ' / ' + p[2] + ' ' + p[3] + ' da'); return; }
+    if (Number(v[i][2]) !== Number(p[3])) { v[i][2] = p[3]; say++; }
+  });
+  if (say) rg.setValues(v);
+  return say;
+}
 
 function cksYukle_(g) {
   var mime = String(g.mime || '');

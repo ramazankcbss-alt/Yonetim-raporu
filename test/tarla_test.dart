@@ -20,6 +20,13 @@ void main() {
       ['Aslım', 'Arpa', '1340', '1340'],
       ['Taşağıl', 'Patates', '400', '400'],
     ],
+    'ekimPlani': [
+      ['2026', 'Şekersüt', 'Buğday', '1700'],
+      ['2027', 'Şekersüt', 'Buğday', '900'],
+    ],
+    'resmiParsel': [
+      ['Şekersüt', 'ÇUMRA', 'FETHİYE', '143', '7', '721', 'BUĞDAY'],
+    ],
     'cks': [
       ['2025-2026', 'Şekersüt', 'Çumra / Örnek', '101', '5', 'Buğday', '800', '1. pivot', 'CKS_x.pdf', '20.11.2026'],
     ],
@@ -43,6 +50,8 @@ void main() {
     expect(urunAnahtari('MISIR SİLAJI'), 'Silajlık mısır');
     expect(parselCks(sk, sk.parseller.first, v.cks, s.sezon).length, 1);
     expect(s.ciftlikler.any((c) => c.ad.startsWith('Pangev')), isFalse);
+    expect(planYillari(v.ekimPlani), ['2026', '2027']);
+    expect(resmiKarsilastir(s, v.resmiParsel).any((e) => e.$2 == 'Buğday' && e.$3 == 721), isTrue);
   });
 
   testWidgets('Tarla Haritası ekranı', (t) async {
@@ -66,6 +75,7 @@ void main() {
     await t.tap(find.text('Şekersüt'));
     await t.pumpAndSettle();
     expect(find.textContaining("ÇKS'de bildirildi"), findsWidgets);
+    expect(find.textContaining('Resmî parsel kayıtları'), findsOneWidget);
     expect(find.text('Bu bulguyu gönder'), findsOneWidget);
     await t.tap(find.text('4. pivot'));
     await t.pumpAndSettle();

@@ -232,6 +232,7 @@ class _Parseller extends StatelessWidget {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _ac(context, '${c.ad} parselleri', 'Tarla Haritası ${s.sezon} – ${c.ad} parselleri',
                   (v) => ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+                        _ResmiParselKarti(c: c, v: v),
                         for (final p in c.parseller) _ParselKarti(c: c, p: p, s: s, v: v, ilk: ilk),
                       ])),
             ),
@@ -242,6 +243,36 @@ class _Parseller extends StatelessWidget {
 
   void _ac(BuildContext context, String baslik, String konu, Widget Function(RaporVerisi) govde) =>
       tarlaSayfaAc(context, ilk, baslik, konu, govde);
+}
+
+/// Tarımsal Faaliyet › PARSEL sekmesindeki resmî parseller.
+class _ResmiParselKarti extends StatelessWidget {
+  const _ResmiParselKarti({required this.c, required this.v});
+  final TarlaCiftlik c;
+  final RaporVerisi v;
+  @override
+  Widget build(BuildContext context) {
+    final l = [for (final x in v.resmiParsel) if (ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(c.ad)) x];
+    if (l.isEmpty) return const SizedBox.shrink();
+    final toplam = l.fold<double>(0, (a, x) => a + (x.alan ?? 0));
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Resmî parsel kayıtları (${l.length} satır · ${sayi(toplam)} da)',
+              style: const TextStyle(fontWeight: FontWeight.w800, color: Renk.ana)),
+          const Text('Kaynak: 2026-2027 Tarımsal Faaliyet › PARSEL', style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+          const SizedBox(height: 6),
+          for (final x in l)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 3),
+              child: Text('${x.koy} · ${x.adaParsel} · ${_da(x.alan)} · ${urunAnahtari(x.urun)}', style: const TextStyle(fontSize: 12.5)),
+            ),
+        ]),
+      ),
+    );
+  }
 }
 
 /// Alt sayfa: başlık, "Bu bulguyu gönder" ve veri yenilenince güncellenen gövde.
@@ -360,6 +391,8 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
             !s.ciftlikler.any((c) => c.parseller.any((p) => parselCks(c, p, [x], s.sezon).isNotEmpty)))
           x
     ];
+    final resmi = resmiKarsilastir(s, v.resmiParsel);
+    final yillar = planYillari(v.ekimPlani);
     final cksYok = [
       for (final c in s.ciftlikler)
         for (final p in c.parseller)
@@ -453,6 +486,44 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
           ),
         if (cksEslesmeyen.isEmpty && cksYok.isEmpty) const Text("Tüm parseller ÇKS'de bildirilmiş."),
       ],
+      if (resmi.isNotEmpty) ...[
+        const BolumBasligi('Resmî parsel kayıtları ile harita'),
+        const Text('Kaynak: 2026-2027 Tarımsal Faaliyet › PARSEL', style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+        for (final (c, u, r, h) in resmi)
+          Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              dense: true,
+              leading: Icon(_yakin(r, h) ? Icons.check_circle_outline : Icons.compare_arrows,
+                  color: _yakin(r, h) ? Renk.yesil : Renk.amber),
+              title: Text('$c · $u', style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Resmî kayıt: ${_da(r)} · Harita: ${_da(h)}'
+                  '${_yakin(r, h) ? '' : ' · Fark: ${h - r >= 0 ? '+' : ''}${sayi(h - r)} da'}'),
+            ),
+          ),
+      ],
+      const BolumBasligi('Ekim planı yıllara göre (münavebe)'),
+      if (yillar.length < 2)
+        Text(yillar.isEmpty
+            ? 'Ekim planı dosyası okunamadı.'
+            : '${yillar.first} planı okundu. ${int.parse(yillar.first) + 1} planı dosyaya girildiğinde '
+                'çiftlik ve ürün bazında karşılaştırma burada görünecek.')
+      else
+        for (final c in {for (final x in v.ekimPlani) x.ciftlik})
+          Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(c, style: const TextStyle(fontWeight: FontWeight.w800)),
+                for (final u in {for (final x in v.ekimPlani) if (x.ciftlik == c) x.urun})
+                  Text('$u: ${[
+                    for (final y in yillar)
+                      '$y ${_da(v.ekimPlani.where((x) => x.ciftlik == c && x.urun == u && x.yil == y).fold<double>(0, (a, x) => a + x.plan))}'
+                  ].join(' → ')}', style: const TextStyle(fontSize: 12.5)),
+              ]),
+            ),
+          ),
       BolumBasligi('Olumlu: uyumlu olanlar', key: _kUyumlu),
       for (final x in uyumlu)
         Card(
@@ -467,6 +538,8 @@ class _KarsilastirmaState extends State<_Karsilastirma> {
     ]));
   }
 }
+
+bool _yakin(double a, double b) => (a - b).abs() <= 10 || (a > 0 && (a - b).abs() / a <= 0.03);
 
 class _Sayac extends StatelessWidget {
   const _Sayac(this.etiket, this.n, this.renk, this.dokun);
