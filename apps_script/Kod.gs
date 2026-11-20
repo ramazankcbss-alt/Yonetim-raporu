@@ -77,8 +77,9 @@ var OZEL_SAYFALAR = {
 /** Uygulamanın çağırdığı adres. */
 function doGet(e) {
   var p = (e && e.parameter) || {};
-  // Veteriner Kontrol Paneli: sayfa veri içermez, veri kodla gelir (Veteriner.gs).
-  if (p.panel === 'veteriner') return vetPanel_();
+  // Veteriner Kontrol Paneli: sayfa veri içermez, veri kodla gelir.
+  // Panel uygulamadan kapatılmışsa yalnızca "kapalı" sayfası gösterilir.
+  if (p.panel === 'veteriner') return vetPanelAcik_() ? vetPanel_() : vetPanelKapali_();
   var anahtar = PropertiesService.getScriptProperties().getProperty('ANAHTAR');
   if (!anahtar) {
     return json_({ ok: false, hata: 'Kurulum yapılmamış: Apps Script\'te "kurulum" fonksiyonunu çalıştırın.' });
@@ -217,7 +218,7 @@ function veriTopla_(gun) {
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
     // ve veterinerlerin bildirimleri (Veteriner.gs)
     veteriner: (function () {
-      try { return vetUygulamaVerisi_(); } catch (err) { return { kodlar: [], bildirimler: [] }; }
+      try { return vetUygulamaVerisi_(); } catch (err) { return { acik: false, kodlar: [], bildirimler: [] }; }
     })()
   };
 }
@@ -1411,6 +1412,23 @@ function detayGecmisiAl() {
 var VET_HTML_ID = '14izW3rxYQvhXV668iD_McdEcds4VvTs8';
 var VET_ARSIV_ID = '1t_4NvUHrQDjyX-TmLPEidP51hi8Zun8e';
 
+// Panel durumu (20.11.2026): Komut dosyası özelliği VET_PANEL = 'acik' ise
+// açıktır; tanımlı değilse kapalı kabul edilir. Uygulamadaki anahtarla
+// değiştirilir. Kapalıyken panel adresi veri göstermez, hiçbir kod çalışmaz,
+// yeni kod üretilemez; kodlar ve bildirimler saklanır, açılınca aynen döner.
+function vetPanelAcik_() {
+  return PropertiesService.getScriptProperties().getProperty('VET_PANEL') === 'acik';
+}
+
+/** Panel kapalıyken gösterilen sayfa (veri içermez). */
+function vetPanelKapali_() {
+  return HtmlService.createHtmlOutput(
+    '<meta charset="utf-8"><div style="font-family:sans-serif;padding:24px">' +
+    '<h2>Veteriner Kontrol Paneli</h2><p>Panel şu anda erişime kapalıdır.</p></div>')
+    .setTitle('Veteriner Kontrol Paneli')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
 var VET_KOD_SAYFA_ = 'Veteriner_Kodları';      // Kod, Etiket, Oluşturma, Durum, Son giriş
 var VET_BILDIRIM_SAYFA_ = 'Veteriner_Bildirimleri'; // Tarih, Etiket, Bölüm, Konu, Değerlendirme, Açıklama, Durum, Kod, Yanıt
 
@@ -1445,6 +1463,7 @@ function vetPanel_() {
 
 /** Kaba kuvvet denemelerine karşı: 15 dakikada 30 hatalı girişten sonra kilit. */
 function vetKodBul_(kod) {
+  if (!vetPanelAcik_()) throw new Error('Veteriner Kontrol Paneli şu anda erişime kapalıdır.');
   var cache = CacheService.getScriptCache();
   var hata = parseInt(cache.get('vet_hatali') || '0', 10);
   if (hata >= 30) throw new Error('Çok sayıda hatalı giriş denendi. 15 dakika sonra tekrar deneyin.');
@@ -1618,7 +1637,14 @@ function vetBildir(kod, b) {
 /** Uygulama sahibinin işlemleri (doPost, anahtar doğrulanmış). */
 function vetYonetim_(g) {
   var sh, son, v, i;
+  if (g.tur === 'vetPanelDurum') {
+    var props = PropertiesService.getScriptProperties();
+    if (g.acik === '1') props.setProperty('VET_PANEL', 'acik');
+    else props.deleteProperty('VET_PANEL');
+    return { ok: true, acik: vetPanelAcik_() };
+  }
   if (g.tur === 'vetKodEkle') {
+    if (!vetPanelAcik_()) return { ok: false, hata: 'Panel kapalıyken yeni kod üretilemez. Önce paneli açın.' };
     var etiket = vetMaskele_(g.etiket).trim().slice(0, 80);
     if (!etiket) return { ok: false, hata: 'Görev/rol yazın (ör. "Şekersüt veteriner hekimi").' };
     var harf = 'ABCDEFGHJKLMNPRSTUVYZ23456789';
@@ -1667,7 +1693,7 @@ function vetUygulamaVerisi_() {
       .filter(function (r) { return String(r[0]).trim() !== ''; })
       .map(function (r) { return [String(r[0]), String(r[1]), t(r[2]), String(r[3]), t(r[4])]; })
     : [];
-  return { kodlar: kodlar, bildirimler: vetBildirimleri_(null) };
+  return { acik: vetPanelAcik_(), kodlar: kodlar, bildirimler: vetBildirimleri_(null) };
 }
 
 

@@ -41,13 +41,16 @@ class VeterinerEkran extends StatelessWidget {
                 ],
               ),
             ),
-            body: TabBarView(children: [
+            body: Column(children: [
+              _PanelDurumu(acik: v.vetPanelAcik),
+              Expanded(child: TabBarView(children: [
               GonderAlani(
                   konu: 'Veteriner Kontrol Paneli – Bildirimler',
                   gizle: [for (final k in v.vetKodlari) k.etiket, for (final k in v.vetKodlari) k.kod],
                   child: _Bildirimler(liste: v.vetBildirimleri)),
               // Erişim kodları gizli bilgidir; gönderilmez.
               _Kodlar(kodlar: v.vetKodlari),
+            ])),
             ]),
           ),
         );
@@ -347,4 +350,52 @@ Future<void> _kodGoster(BuildContext context, String kod, String etiket) {
       ],
     ),
   );
+}
+
+/// Panelin erişim durumu: açıkken veteriner hekimler kodla girer; kapalıyken
+/// panel adresi veri göstermez ve hiçbir kod çalışmaz. Kodlar ve bildirimler
+/// saklanır, panel yeniden açılınca aynen kullanılır.
+class _PanelDurumu extends StatefulWidget {
+  const _PanelDurumu({required this.acik});
+  final bool acik;
+
+  @override
+  State<_PanelDurumu> createState() => _PanelDurumuState();
+}
+
+class _PanelDurumuState extends State<_PanelDurumu> {
+  bool _bekle = false;
+
+  Future<void> _degistir(bool acik) async {
+    setState(() => _bekle = true);
+    try {
+      await VeriDeposu.ben.vetPanelDurum(acik: acik);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Durum değiştirilemedi: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _bekle = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final acik = widget.acik;
+    return Material(
+      color: (acik ? Renk.yesil : Renk.kirmizi).withValues(alpha: 0.10),
+      child: SwitchListTile(
+        secondary: Icon(acik ? Icons.lock_open : Icons.lock_outline,
+            color: acik ? Renk.yesil : Renk.kirmizi),
+        title: Text(acik ? 'Panel erişime açık' : 'Panel erişime kapalı',
+            style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(acik
+            ? 'Aktif kodu olan veteriner hekimler giriş yapabilir.'
+            : 'Hiçbir kod çalışmaz; kodlar ve bildirimler saklanır.'),
+        value: acik,
+        onChanged: _bekle ? null : _degistir,
+      ),
+    );
+  }
 }

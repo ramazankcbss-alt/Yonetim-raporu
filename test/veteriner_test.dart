@@ -9,6 +9,7 @@ void main() {
     'hayvanGunluk': [],
     'tarim': [],
     'veteriner': {
+      'acik': true,
       'kodlar': [
         ['K7M2PRT4', 'Şekersüt veteriner hekimi', '18.11.2026 17:30', 'Aktif', ''],
         ['ZZ99AA22', 'Aslım veteriner hekimi', '18.11.2026 17:31', 'Kapalı', '18.11.2026 17:40'],
@@ -32,6 +33,7 @@ void main() {
 
   test('veteriner verisi okunur', () {
     final v = RaporVerisi.json(j);
+    expect(v.vetPanelAcik, isTrue);
     expect(v.vetKodlari, hasLength(2));
     expect(v.vetKodlari.first.aktif, isTrue);
     expect(v.vetKodlari.last.sonGiris, '18.11.2026 17:40');

@@ -230,6 +230,7 @@ String _maliOzet(RaporVerisi veri) {
 }
 
 String _vetOzet(RaporVerisi veri) {
+  if (!veri.vetPanelAcik) return 'Panel erişime kapalı · açmak için dokunun';
   final yeni = veri.vetBildirimleri.where((b) => b.yeni).length;
   final aktif = veri.vetKodlari.where((k) => k.aktif).length;
   if (veri.vetKodlari.isEmpty) {

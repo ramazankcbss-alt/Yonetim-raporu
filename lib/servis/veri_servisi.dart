@@ -333,6 +333,12 @@ class VeriDeposu extends ChangeNotifier {
     }
   }
 
+  /// Veteriner Kontrol Paneli'ni erişime açar ya da kapatır.
+  Future<void> vetPanelDurum({required bool acik}) async {
+    await _islem('vetPanelDurum', {'acik': acik ? '1' : '0'});
+    await yenile();
+  }
+
   /// Veteriner Kontrol Paneli: yeni erişim kodu üretir (etiket: görev/rol).
   Future<String> vetKodEkle(String etiket) async {
     final j = await _islem('vetKodEkle', {'etiket': etiket});

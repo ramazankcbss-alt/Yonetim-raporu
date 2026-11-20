@@ -1048,6 +1048,7 @@ class RaporVerisi {
     this.detay = const [],
     this.bulgular = const [],
     this.vetKodlari = const [],
+    this.vetPanelAcik = false,
     this.mali = const MaliVeri(),
     this.vetBildirimleri = const [],
     this.olusturma,
@@ -1097,6 +1098,9 @@ class RaporVerisi {
   /// Veteriner Kontrol Paneli: erişim kodları ve gelen değerlendirmeler.
   final List<VetKod> vetKodlari;
 
+  /// Veteriner Kontrol Paneli erişime açık mı (sunucudaki VET_PANEL özelliği).
+  final bool vetPanelAcik;
+
   /// Mali Raporlar: gelen faturalar, açık bakiyeler, kontrol bulguları.
   final MaliVeri mali;
   final List<VetBildirim> vetBildirimleri;
@@ -1117,6 +1121,7 @@ class RaporVerisi {
       detay: oku('hayvanDetay', DetaySatir.oku),
       bulgular: oku('driveBulgular', DriveBulgu.oku),
       mali: MaliVeri.json(j['mali']),
+      vetPanelAcik: j['veteriner'] is Map && (j['veteriner'] as Map)['acik'] == true,
       vetKodlari: _liste(j['veteriner'] is Map ? (j['veteriner'] as Map)['kodlar'] : null)
           .map(VetKod.oku)
           .whereType<VetKod>()
