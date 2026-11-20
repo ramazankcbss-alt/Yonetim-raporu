@@ -135,10 +135,7 @@ class _HaritaState extends State<_Harita> {
         child: Stack(children: [
           AspectRatio(
             aspectRatio: 0.82,
-            child: InteractiveViewer(
-              maxScale: 6,
-              child: CustomPaint(size: Size.infinite, painter: _HaritaCizer(cizili, cksAdlari)),
-            ),
+            child: _HaritaGorunum(p: cizili, cks: cksAdlari, maxOlcek: 6),
           ),
           Positioned(
             right: 6,
@@ -149,10 +146,7 @@ class _HaritaState extends State<_Harita> {
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => Scaffold(
                   appBar: AppBar(title: Text('${c.ad} · ${widget.s.sezon}')),
-                  body: InteractiveViewer(
-                    maxScale: 8,
-                    child: CustomPaint(size: Size.infinite, painter: _HaritaCizer(cizili, cksAdlari)),
-                  ),
+                  body: _HaritaGorunum(p: cizili, cks: cksAdlari, maxOlcek: 10, yazi: 13),
                 ),
               )),
             ),
@@ -200,45 +194,205 @@ class _HaritaState extends State<_Harita> {
   }
 }
 
-class _HaritaCizer extends CustomPainter {
-  _HaritaCizer(this.p, this.cks);
-  final List<TarlaParsel> p;
-  final Set<String> cks;
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (p.isEmpty) return;
+/// Düzlem koordinatı (boylam × cos(enlem), enlem).
+typedef _N = (double, double);
+
+double _alan(List<_N> k) {
+  var a = 0.0;
+  for (var i = 0; i < k.length; i++) {
+    final p = k[i], q = k[(i + 1) % k.length];
+    a += p.$1 * q.$2 - q.$1 * p.$2;
+  }
+  return a.abs() / 2;
+}
+
+bool _icinde(_N n, List<_N> k) {
+  var ic = false;
+  for (var i = 0, j = k.length - 1; i < k.length; j = i++) {
+    final a = k[i], b = k[j];
+    if ((a.$2 > n.$2) != (b.$2 > n.$2) && n.$1 < (b.$1 - a.$1) * (n.$2 - a.$2) / (b.$2 - a.$2) + a.$1) ic = !ic;
+  }
+  return ic;
+}
+
+double _kenarUzakligi(_N n, List<_N> k) {
+  var m = double.infinity;
+  for (var i = 0; i < k.length; i++) {
+    final a = k[i], b = k[(i + 1) % k.length];
+    final dx = b.$1 - a.$1, dy = b.$2 - a.$2;
+    final l2 = dx * dx + dy * dy;
+    final t = l2 == 0 ? 0.0 : (((n.$1 - a.$1) * dx + (n.$2 - a.$2) * dy) / l2).clamp(0.0, 1.0);
+    final x = a.$1 + t * dx - n.$1, y = a.$2 + t * dy - n.$2;
+    m = math.min(m, math.sqrt(x * x + y * y));
+  }
+  return m;
+}
+
+/// Haritanın düzlem geometrisi ve her parselin yazı noktası (üstteki
+/// küçük parsellerin dışında, kenarlardan en uzak iç nokta).
+class _Geometri {
+  _Geometri(List<TarlaParsel> p) {
     final tum = [for (final x in p) ...x.koord];
     final lat0 = tum.map((c) => c.$2).reduce((a, b) => a + b) / tum.length;
     final kx = math.cos(lat0 * math.pi / 180);
-    final xs = tum.map((c) => c.$1 * kx), ys = tum.map((c) => c.$2);
-    final minX = xs.reduce(math.min), maxX = xs.reduce(math.max), minY = ys.reduce(math.min), maxY = ys.reduce(math.max);
+    for (final x in p) {
+      poligon[x] = [for (final c in x.koord) (c.$1 * kx, c.$2)];
+      alan[x] = _alan(poligon[x]!);
+    }
+    sirali = [...p]..sort((a, b) => alan[b]!.compareTo(alan[a]!));
+    final xs = poligon.values.expand((e) => e).map((e) => e.$1), ys = poligon.values.expand((e) => e).map((e) => e.$2);
+    minX = xs.reduce(math.min);
+    maxX = xs.reduce(math.max);
+    minY = ys.reduce(math.min);
+    maxY = ys.reduce(math.max);
+    for (final x in p) {
+      yaziNoktasi[x] = _nokta(x);
+    }
+  }
+
+  final poligon = <TarlaParsel, List<_N>>{};
+  final alan = <TarlaParsel, double>{};
+  final yaziNoktasi = <TarlaParsel, _N>{};
+  late final List<TarlaParsel> sirali;
+  late final double minX, maxX, minY, maxY;
+
+  _N _nokta(TarlaParsel x) {
+    final k = poligon[x]!;
+    final ustteki = [
+      for (final y in sirali)
+        if (y != x && alan[y]! < alan[x]!) poligon[y]!
+    ];
+    final bx = k.map((e) => e.$1), by = k.map((e) => e.$2);
+    final x0 = bx.reduce(math.min), x1 = bx.reduce(math.max), y0 = by.reduce(math.min), y1 = by.reduce(math.max);
+    _N? en;
+    var skor = -1.0;
+    const n = 28;
+    for (var i = 0; i <= n; i++) {
+      for (var j = 0; j <= n; j++) {
+        final q = (x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * j / n);
+        if (!_icinde(q, k) || ustteki.any((u) => _icinde(q, u))) continue;
+        var d = _kenarUzakligi(q, k);
+        for (final u in ustteki) {
+          d = math.min(d, _kenarUzakligi(q, u));
+        }
+        if (d > skor) {
+          skor = d;
+          en = q;
+        }
+      }
+    }
+    if (en != null) return en;
+    return (k.map((e) => e.$1).reduce((a, b) => a + b) / k.length, k.map((e) => e.$2).reduce((a, b) => a + b) / k.length);
+  }
+
+  /// Düzlem → ekran (yakınlaştırma öncesi).
+  Offset Function(_N) donusum(Size size) {
     final olcek = 0.94 * math.min(size.width / (maxX - minX), size.height / (maxY - minY));
     final ox = (size.width - (maxX - minX) * olcek) / 2, oy = (size.height - (maxY - minY) * olcek) / 2;
-    Offset nok((double, double) c) => Offset(ox + (c.$1 * kx - minX) * olcek, size.height - (oy + (c.$2 - minY) * olcek));
-    for (final x in p) {
-      final yol = Path()..addPolygon([for (final c in x.koord) nok(c)], true);
-      canvas.drawPath(yol, Paint()..color = urunRengi(x).withValues(alpha: 0.55));
-      canvas.drawPath(yol, Paint()
-        ..color = cks.contains(x.ad) ? Renk.mavi : Colors.black54
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = cks.contains(x.ad) ? 3 : 1);
+    return (c) => Offset(ox + (c.$1 - minX) * olcek, size.height - (oy + (c.$2 - minY) * olcek));
+  }
+}
+
+/// Yakınlaştırılabilir harita: parseller yakınlaşır, yazılar sabit boyutta
+/// kalır; üst üste gelen yazılar gizlenir, yakınlaştırınca görünür.
+class _HaritaGorunum extends StatefulWidget {
+  const _HaritaGorunum({required this.p, required this.cks, this.maxOlcek = 6, this.yazi = 11.5});
+  final List<TarlaParsel> p;
+  final Set<String> cks;
+  final double maxOlcek, yazi;
+  @override
+  State<_HaritaGorunum> createState() => _HaritaGorunumState();
+}
+
+class _HaritaGorunumState extends State<_HaritaGorunum> {
+  final _ctl = TransformationController();
+  late _Geometri _g = _Geometri(widget.p);
+
+  @override
+  void didUpdateWidget(covariant _HaritaGorunum old) {
+    super.didUpdateWidget(old);
+    if (old.p != widget.p) {
+      _g = _Geometri(widget.p);
+      _ctl.value = Matrix4.identity();
     }
-    final yazi = (size.shortestSide / 34).clamp(9.0, 15.0);
-    for (final x in p) {
-      final pts = [for (final c in x.koord) nok(c)];
-      final m = Offset(pts.map((e) => e.dx).reduce((a, b) => a + b) / pts.length, pts.map((e) => e.dy).reduce((a, b) => a + b) / pts.length);
-      final urun = [for (final u in x.urunler) '${_kisaUrun(u.$1)} ${sayi(u.$2)} da'];
+  }
+
+  @override
+  void dispose() {
+    _ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+        child: Stack(fit: StackFit.expand, children: [
+          InteractiveViewer(
+            transformationController: _ctl,
+            maxScale: widget.maxOlcek,
+            child: CustomPaint(size: Size.infinite, painter: _PoligonCizer(_g, widget.cks)),
+          ),
+          IgnorePointer(
+            child: AnimatedBuilder(
+              animation: _ctl,
+              builder: (_, __) => CustomPaint(size: Size.infinite, painter: _YaziCizer(_g, _ctl.value.clone(), widget.yazi)),
+            ),
+          ),
+        ]),
+      );
+}
+
+class _PoligonCizer extends CustomPainter {
+  _PoligonCizer(this.g, this.cks);
+  final _Geometri g;
+  final Set<String> cks;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final d = g.donusum(size);
+    for (final x in g.sirali) {
+      final yol = Path()..addPolygon([for (final c in g.poligon[x]!) d(c)], true);
+      canvas.drawPath(yol, Paint()..color = urunRengi(x).withValues(alpha: 0.6));
+      canvas.drawPath(
+          yol,
+          Paint()
+            ..color = cks.contains(x.ad) ? Renk.mavi : Colors.black54
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = cks.contains(x.ad) ? 3 : 1);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PoligonCizer old) => old.g != g || old.cks.length != cks.length;
+}
+
+class _YaziCizer extends CustomPainter {
+  _YaziCizer(this.g, this.m, this.yazi);
+  final _Geometri g;
+  final Matrix4 m;
+  final double yazi;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final d = g.donusum(size);
+    final dolu = <Rect>[];
+    for (final x in g.sirali) {
+      final n = MatrixUtils.transformPoint(m, d(g.yaziNoktasi[x]!));
       final tp = TextPainter(
         text: TextSpan(children: [
           TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
-          for (final u in urun) TextSpan(text: '\n$u', style: TextStyle(fontSize: yazi * 0.9, color: Colors.black87, fontWeight: FontWeight.w600)),
+          for (final u in x.urunler)
+            TextSpan(
+                text: '\n${_kisaUrun(u.$1)} ${sayi(u.$2)} da',
+                style: TextStyle(fontSize: yazi * 0.92, color: Colors.black87, fontWeight: FontWeight.w600)),
         ]),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
-      )..layout(maxWidth: yazi * 9);
-      final r = Rect.fromCenter(center: m, width: tp.width + 6, height: tp.height + 4);
-      canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), Paint()..color = Colors.white.withValues(alpha: 0.72));
-      tp.paint(canvas, m - Offset(tp.width / 2, tp.height / 2));
+      )..layout(maxWidth: yazi * 11);
+      final r = Rect.fromCenter(center: n, width: tp.width + 8, height: tp.height + 4);
+      if (!(Offset.zero & size).contains(n)) continue;
+      if (dolu.any((o) => o.overlaps(r))) continue;
+      dolu.add(r);
+      canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), Paint()..color = Colors.white.withValues(alpha: 0.8));
+      tp.paint(canvas, n - Offset(tp.width / 2, tp.height / 2));
     }
   }
 
@@ -250,7 +404,7 @@ class _HaritaCizer extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _HaritaCizer old) => old.p != p || old.cks.length != cks.length;
+  bool shouldRepaint(covariant _YaziCizer old) => old.m != m || old.g != g;
 }
 
 class _Parseller extends StatelessWidget {
