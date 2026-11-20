@@ -203,6 +203,9 @@ function veriTopla_(gun) {
     // Mali Raporlar: "Mali Raporlar" klasöründeki en yeni mali_veri.json
     // (fatura özetleri; şahıs tedarikçi adı, fatura no ve plaka içermez)
     mali: maliVeri_(),
+    // ÇKS'de bildirilen parseller (Sezon, Çiftlik, Mevki, Ada, Parsel, Ürün,
+    // Alan, Eşleşen tarla parseli, Belge, İşlenme tarihi)
+    cks: basitOku_('ÇKS_Parseller', 10, tz),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
     // ve veterinerlerin bildirimleri (Veteriner.gs)
     veteriner: (function () {
@@ -337,6 +340,7 @@ function doPost(e) {
       return json_({ ok: false, hata: 'Bu bölüm KVKK kapsamında kaldırıldı.' });
     }
     if (govde.tur === 'raporKaydet') return json_(raporKaydet_(govde));
+    if (govde.tur === 'cksYukle') return json_(cksYukle_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
@@ -968,6 +972,29 @@ function bakimOnarimOku_(tz) {
  * Gerekli: Hizmetler → Drive API (gelişmiş hizmet).
  * KVKK: PDF'te kişi adı bulunmaz; klasör kimseyle paylaşılmaz.
  */
+// ÇKS belgeleri (Tarla Haritası): uygulamadan fotoğraf ya da dosya olarak
+// yüklenir; "ÇKS Belgeleri" klasörüne konur. Belgedeki parseller ayrı bir
+// görevle okunup 'ÇKS_Parseller' sayfasına yazılır (kişisel bilgi alınmaz).
+var CKS_KLASOR_ID = '1ghie0n4Hr8-_ANfo-v-9M0m8qNTr2zkD';
+
+function cksYukle_(g) {
+  var mime = String(g.mime || '');
+  if (['application/pdf', 'image/jpeg', 'image/png'].indexOf(mime) < 0) {
+    return { ok: false, hata: 'Yalnızca PDF, JPG ya da PNG yüklenebilir.' };
+  }
+  var bayt = Utilities.base64Decode(String(g.veri || ''));
+  if (bayt.length < 100 || bayt.length > 15 * 1024 * 1024) {
+    return { ok: false, hata: 'Dosya okunamadı ya da 15 MB\'tan büyük.' };
+  }
+  var uzanti = mime === 'application/pdf' ? 'pdf' : (mime === 'image/png' ? 'png' : 'jpg');
+  var sezon = String(g.sezon || '').replace(/[^0-9-]/g, '');
+  var ad = 'CKS_' + (sezon ? sezon + '_' : '') +
+      Utilities.formatDate(new Date(), 'Europe/Istanbul', 'yyyy-MM-dd_HHmmss') + '.' + uzanti;
+  DriveApp.getFolderById(CKS_KLASOR_ID).createFile(Utilities.newBlob(bayt, mime, ad));
+  return { ok: true, mesaj: 'ÇKS belgesi Drive\'a kaydedildi: ' + ad +
+      '. Belgedeki parseller işlendiğinde haritada görünecek.' };
+}
+
 function raporKaydet_(g) {
   var ad = String(g.ad || '');
   if (!/^Haftalik_Rapor_\d{1,2}_Hafta_\d{4}\.pdf$/.test(ad)) {

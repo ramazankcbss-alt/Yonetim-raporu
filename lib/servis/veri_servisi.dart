@@ -373,6 +373,13 @@ class VeriDeposu extends ChangeNotifier {
     return (j['mesaj'] ?? 'Rapor Drive\'a kaydedildi.').toString();
   }
 
+  /// ÇKS belgesini (PDF ya da fotoğraf) Drive'daki "ÇKS Belgeleri" klasörüne
+  /// yükler; sunucunun bilgi mesajını döner.
+  Future<String> cksYukle(List<int> bayt, String mime, {String sezon = ''}) async {
+    final j = await _islem('cksYukle', {'veri': base64Encode(bayt), 'mime': mime, 'sezon': sezon});
+    return (j['mesaj'] ?? 'ÇKS belgesi Drive\'a kaydedildi.').toString();
+  }
+
   /// Kişiler sayfasındaki kişiye uygulamanın sahibi adına e-posta gönderir.
   Future<void> epostaGonder(String ad, String konu, String metin) async {
     await _islem('mesaj', {'ad': ad, 'konu': konu, 'metin': metin});

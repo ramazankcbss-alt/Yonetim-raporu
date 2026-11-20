@@ -165,3 +165,12 @@ List<TarimKaydi> parselKayitlari(TarlaCiftlik c, TarlaParsel p, List<TarimKaydi>
       if (ciftlikAnahtari(t.ciftlik) == ciftlikAnahtari(c.ad) && re.hasMatch(kucuk(t.faaliyet))) t
   ]..sort((a, b) => b.tarih.compareTo(a.tarih));
 }
+
+/// ÇKS'de bu tarla parseline eşleştirilmiş kayıtlar.
+List<CksParsel> parselCks(TarlaCiftlik c, TarlaParsel p, List<CksParsel> cks, String sezon) => [
+      for (final x in cks)
+        if ((x.sezon.isEmpty || x.sezon == sezon) &&
+            ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(c.ad) &&
+            kucuk(x.eslesen).trim() == kucuk(p.ad).trim())
+          x
+    ];

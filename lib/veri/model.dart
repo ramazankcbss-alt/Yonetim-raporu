@@ -367,6 +367,25 @@ bool faaliyetHayvancilik(String faaliyet) {
   return anahtar.any(s.contains);
 }
 
+/// ÇKS'de bildirilen parsel ('ÇKS_Parseller' sayfası). Kişisel bilgi içermez.
+class CksParsel {
+  const CksParsel({this.sezon = '', required this.ciftlik, this.mevki = '', this.ada = '', this.parsel = '',
+      this.urun = '', this.alan, this.eslesen = '', this.belge = '', this.tarih = ''});
+  final String sezon, ciftlik, mevki, ada, parsel, urun, eslesen, belge, tarih;
+  final double? alan;
+
+  String get adaParsel => [if (ada.isNotEmpty) 'Ada $ada', if (parsel.isNotEmpty) 'Parsel $parsel'].join(' / ');
+
+  static CksParsel? oku(Object? v) {
+    final r = _liste(v);
+    String m(int i) => i < r.length ? _metin(r[i]) : '';
+    if (r.length < 2 || m(1).isEmpty) return null;
+    return CksParsel(
+      sezon: m(0), ciftlik: m(1), mevki: m(2), ada: m(3), parsel: m(4), urun: m(5),
+      alan: r.length > 6 ? sayiOku(r[6]) : null, eslesen: m(7), belge: m(8), tarih: m(9));
+  }
+}
+
 class EkimSatir {
   const EkimSatir(
       {required this.ciftlik, required this.urun, this.plan, this.ekilen});
@@ -939,6 +958,7 @@ class RaporVerisi {
     required List<TarimKaydi> tarim,
     this.ekim = const [],
     this.hasat = const [],
+    this.cks = const [],
     this.besi = const [],
     this.isler = const [],
     this.akis = const [],
@@ -974,6 +994,9 @@ class RaporVerisi {
   final List<TarimKaydi> tarim;
   final List<EkimSatir> ekim;
   final List<HasatSatir> hasat;
+
+  /// ÇKS'de bildirilen parseller.
+  final List<CksParsel> cks;
   final List<BesiSatir> besi;
   final List<Is> isler;
   final List<AkisKaydi> akis;
@@ -1028,6 +1051,7 @@ class RaporVerisi {
       tarim: oku('tarim', TarimKaydi.oku),
       ekim: oku('ekim', EkimSatir.oku),
       hasat: oku('hasat', HasatSatir.oku),
+      cks: oku('cks', CksParsel.oku),
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
       akis: oku('isakisi', AkisKaydi.oku),

@@ -20,6 +20,9 @@ void main() {
       ['Aslım', 'Arpa', '1340', '1340'],
       ['Taşağıl', 'Patates', '400', '400'],
     ],
+    'cks': [
+      ['2025-2026', 'Şekersüt', 'Çumra / Örnek', '101', '5', 'Buğday', '800', '1. pivot', 'CKS_x.pdf', '20.11.2026'],
+    ],
     'hasat': [
       ['Patates', 'Taşağıl', '400', '1954747', '4887', '22.10.2026'],
     ],
@@ -38,6 +41,8 @@ void main() {
     final p4 = sk.parseller.firstWhere((p) => p.ad == '4. pivot');
     expect(parselKayitlari(sk, p4, v.tarim).length, 1);
     expect(urunAnahtari('MISIR SİLAJI'), 'Silajlık mısır');
+    expect(parselCks(sk, sk.parseller.first, v.cks, s.sezon).length, 1);
+    expect(s.ciftlikler.any((c) => c.ad.startsWith('Pangev')), isFalse);
   });
 
   testWidgets('Tarla Haritası ekranı', (t) async {
@@ -52,8 +57,25 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Tutarsızlıklar: harita ve tarım icmali'), findsOneWidget);
     expect(find.textContaining('Şekersüt · Silajlık mısır'), findsWidgets);
+    await t.tap(find.text('Uyumlu'));
+    await t.pumpAndSettle();
+    expect(find.text('Olumlu: uyumlu olanlar'), findsOneWidget);
     await t.tap(find.text('Parseller'));
     await t.pumpAndSettle();
-    expect(find.text('Tarım icmali (son kayıtlar):'), findsWidgets);
+    expect(find.text('Çiftlikler'), findsOneWidget);
+    await t.tap(find.text('Şekersüt'));
+    await t.pumpAndSettle();
+    expect(find.textContaining("ÇKS'de bildirildi"), findsWidgets);
+    expect(find.text('Bu bulguyu gönder'), findsOneWidget);
+    await t.tap(find.text('4. pivot'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Tarım icmali kayıtları'), findsOneWidget);
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+    await t.tap(find.text('ÇKS'));
+    await t.pumpAndSettle();
+    expect(find.text('Fotoğraf çek'), findsOneWidget);
   });
 }

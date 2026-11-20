@@ -85,10 +85,6 @@ ciftlikler = [
    p('Ceviz ve üzüm', 'diger', [('Ceviz ve üzüm', 42)], 42, (F, 'Ceviz ve Üzüm yeri 42 da.')),
    p('Pancar toprağı döküm alanı', 'diger', [], 0, (F, 'pancar toprağı'), 'Tel örgü ile çevrili'),
   ], tesis=dict(kuyu=5), notlar=['Fidanlıkta parseller iki kez çizilmiş (farklı ürün adlarıyla); ürün olarak parsel işaretleri esas alındı.']),
- dict(ad='Pangev (Erentepe)', parseller=[p('Ahır alanı', 'diger', [], 80, ('PANGEV A.Ş', 'Pangev ahır alanı'))], tesis={}, notlar=[]),
- dict(ad='Pankent (Gevrekli)', parseller=[
-   p('Gevrekli parseli', 'parsel', [], 27, ('PANKENT A.Ş GEVREKLİ', 'Gevrekli Parsel 27 da.'), 'Ürün belirtilmemiş'),
-   p('Ahır alanı', 'diger', [], 47, ('PANKENT A.Ş GEVREKLİ', 'Gevrekli ahır alanı 47 da.'))], tesis={}, notlar=[]),
 ]
 out = dict(sezon='2025-2026', kaynak='Yerlerim Gücel 03.12.2025.kmz', tarih='2025-12-03', ciftlikler=ciftlikler)
 json.dump(out, open(sys.argv[2], 'w'), ensure_ascii=False, separators=(',', ':'))
