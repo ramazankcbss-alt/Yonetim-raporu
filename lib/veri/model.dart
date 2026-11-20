@@ -404,6 +404,25 @@ class EkimDuzeltme {
   }
 }
 
+/// Yeni sezon parsel girişi (Tarla Haritası'nda ürün/dekar değiştirme).
+/// Sezon_Parselleri: Sezon, Çiftlik, Parsel, Ürün, Alan (da), Tarih, Durum. KVKK: kişi adı yok.
+class SezonParsel {
+  const SezonParsel({required this.sezon, required this.ciftlik, required this.parsel, this.urun = '', this.alan,
+      this.tarih = '', this.durum = ''});
+  final String sezon, ciftlik, parsel, urun, tarih, durum;
+  final double? alan;
+  bool get aktif => durum == 'Aktif';
+
+  static SezonParsel? oku(Object? v) {
+    final r = _liste(v);
+    String m(int i) => i < r.length ? _metin(r[i]) : '';
+    if (r.length < 3 || m(0).isEmpty || m(2).isEmpty) return null;
+    return SezonParsel(
+        sezon: m(0), ciftlik: m(1), parsel: m(2), urun: m(3), alan: r.length > 4 ? sayiOku(r[4]) : null,
+        tarih: m(5), durum: m(6));
+  }
+}
+
 /// Ekim Planı dosyası: bir yılın çiftlik/ürün planı.
 class EkimPlanSatir {
   const EkimPlanSatir({required this.yil, required this.ciftlik, required this.urun, required this.plan});
@@ -1012,6 +1031,7 @@ class RaporVerisi {
     this.ekimPlani = const [],
     this.ekimDuzeltme = const [],
     this.resmiParsel = const [],
+    this.sezonParsel = const [],
     this.besi = const [],
     this.isler = const [],
     this.akis = const [],
@@ -1053,6 +1073,7 @@ class RaporVerisi {
   final List<EkimPlanSatir> ekimPlani;
   final List<EkimDuzeltme> ekimDuzeltme;
   final List<ResmiParsel> resmiParsel;
+  final List<SezonParsel> sezonParsel;
   final List<BesiSatir> besi;
   final List<Is> isler;
   final List<AkisKaydi> akis;
@@ -1111,6 +1132,7 @@ class RaporVerisi {
       ekimPlani: oku('ekimPlani', EkimPlanSatir.oku),
       ekimDuzeltme: oku('ekimDuzeltme', EkimDuzeltme.oku),
       resmiParsel: oku('resmiParsel', ResmiParsel.oku),
+      sezonParsel: oku('sezonParsel', SezonParsel.oku),
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
       akis: oku('isakisi', AkisKaydi.oku),

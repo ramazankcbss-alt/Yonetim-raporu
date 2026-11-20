@@ -208,6 +208,8 @@ function veriTopla_(gun) {
     cks: basitOku_('ÇKS_Parseller', 10, tz),
     // Tarla Haritası karşılaştırma düzeltmeleri: Sezon, Çiftlik, Ürün, Seçim, Doğru değer, Açıklama, Tarih, Durum
     ekimDuzeltme: basitOku_('Ekim_Düzeltmeleri', 8, tz),
+    // Tarla Haritası yeni sezon girişleri: Sezon, Çiftlik, Parsel, Ürün, Alan (da), Tarih, Durum
+    sezonParsel: basitOku_('Sezon_Parselleri', 7, tz),
     // Ekim Planı dosyası: Yıl, Çiftlik, Ürün, Plan (da) — münavebe için tüm yıllar
     ekimPlani: (function () { try { return ekimPlaniOku_(); } catch (err) { return []; } })(),
     // Tarımsal Faaliyet › PARSEL: Çiftlik, İlçe, Köy, Ada, Parsel, Alan (da), Ürün
@@ -348,6 +350,7 @@ function doPost(e) {
     if (govde.tur === 'raporKaydet') return json_(raporKaydet_(govde));
     if (govde.tur === 'cksYukle') return json_(cksYukle_(govde));
     if (govde.tur === 'ekimDuzelt' || govde.tur === 'ekimDuzeltGeriAl') return json_(ekimDuzelt_(govde));
+    if (govde.tur === 'sezonParsel' || govde.tur === 'sezonParselGeriAl') return json_(sezonParsel_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
@@ -1090,6 +1093,40 @@ function ekimAlanlariEsitle_(ss, notlar) {
   });
   if (say) rg.setValues(v);
   return say;
+}
+
+/** Tarla Haritası'nda bir parselin yeni sezon ürününü ve alanını kaydeder ya da
+ * girişi geri alır. Parsel başına tek aktif satır tutulur; kişi adı tutulmaz. */
+function sezonParsel_(g) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ad = 'Sezon_Parselleri';
+  var sh = ss.getSheetByName(ad);
+  if (!sh) {
+    sh = ss.insertSheet(ad);
+    sh.appendRow(['Sezon', 'Çiftlik', 'Parsel', 'Ürün', 'Alan (da)', 'Tarih', 'Durum']);
+    sh.setFrozenRows(1);
+  }
+  var sezon = String(g.sezon || '').slice(0, 20), cf = String(g.ciftlik || '').slice(0, 60),
+    parsel = String(g.parsel || '').slice(0, 80);
+  if (!sezon || !cf || !parsel) return { ok: false, hata: 'Sezon, çiftlik ya da parsel eksik.' };
+  var son = sh.getLastRow();
+  if (son >= 2) {
+    var rg = sh.getRange(2, 1, son - 1, 7), v = rg.getValues(), deg = false;
+    v.forEach(function (r) {
+      if (String(r[0]) === sezon && String(r[1]) === cf && String(r[2]) === parsel && r[6] === 'Aktif') {
+        r[6] = g.tur === 'sezonParselGeriAl' ? 'Geri alındı' : 'Güncellendi'; deg = true;
+      }
+    });
+    if (deg) rg.setValues(v);
+  }
+  if (g.tur === 'sezonParselGeriAl') return { ok: true, mesaj: 'Parsel girişi geri alındı.' };
+  var urun = String(g.urun || '').slice(0, 60);
+  if (!urun) return { ok: false, hata: 'Ürün eksik.' };
+  var alan = sayi_(g.alan);
+  if (alan !== '' && alan < 0) return { ok: false, hata: 'Alan okunamadı.' };
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  sh.appendRow([sezon, cf, parsel, urun, alan, Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
+  return { ok: true, mesaj: sezon + ' sezonuna kaydedildi: ' + parsel + ' · ' + urun + (alan === '' ? '' : ' ' + alan + ' da') };
 }
 
 /** Tarla Haritası karşılaştırmasındaki bir farkı uygulamadan düzeltir ya da

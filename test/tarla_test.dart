@@ -33,6 +33,11 @@ void main() {
     'cks': [
       ['2025-2026', 'Şekersüt', 'Çumra / Örnek', '101', '5', 'Buğday', '800', '1. pivot', 'CKS_x.pdf', '20.11.2026'],
     ],
+    'sezonParsel': [
+      ['2026-2027', 'Şekersüt', '1. pivot', 'Buğday', '450', '20.11.2026', 'Aktif'],
+      ['2026-2027', 'Şekersüt', '4. pivot', 'Arpa', '', '20.11.2026', 'Güncellendi'],
+      ['2026-2027', 'Şekersüt', '4. pivot', 'Buğday', '300', '20.11.2026', 'Aktif'],
+    ],
     'hasat': [
       ['Patates', 'Taşağıl', '400', '1954747', '4887', '22.10.2026'],
     ],
@@ -64,6 +69,21 @@ void main() {
     expect(aktifDuzeltme(v.ekimDuzeltme, s.sezon, 'Aslım', 'Buğday'), isNull);
   });
 
+  test('Haritadan yeni sezon girişi', () {
+    expect(sonrakiSezon('2025-2026'), '2026-2027');
+    final y = girisSezonu(s, v.sezonParsel);
+    expect(y.sezon, '2026-2027');
+    expect(y.giris, isTrue);
+    expect(y.uretimYili, '2027');
+    final sk = y.ciftlikler.firstWhere((c) => c.ad == 'Şekersüt');
+    expect(sk.urunToplami['Buğday'], 750);
+    expect(sk.parseller.firstWhere((p) => p.ad == '4. pivot').urunYazi, 'Buğday 300 da');
+    expect(sk.parseller.firstWhere((p) => p.ad == '2. pivot').girilmedi, isTrue);
+    expect(oncekiUrunler(y, 'Şekersüt', '1. pivot'), ['Buğday']);
+    expect(yilPlani(v.ekimPlani, '2027', 'Şekersüt')['Buğday'], 900);
+    expect(parselGirisi(v.sezonParsel, '2026-2027', 'Şekersüt', '4. pivot')?.alan, 300);
+  });
+
   testWidgets('Tarla Haritası ekranı', (t) async {
     t.view.physicalSize = const Size(1600, 3200);
     t.view.devicePixelRatio = 2;
@@ -73,6 +93,7 @@ void main() {
     expect(find.text('Tarla Haritası 2025-2026'), findsOneWidget);
     expect(find.text('Ekiliş özeti'), findsOneWidget);
     expect(find.text('1.700 da'), findsWidgets); // Excel alanı
+    expect(find.textContaining('Parsele dokunarak 2026-2027'), findsOneWidget);
     await t.tap(find.text('Karşılaştırma'));
     await t.pumpAndSettle();
     expect(find.text('Tutarsızlıklar: Excel esas alınarak'), findsOneWidget);
@@ -105,5 +126,21 @@ void main() {
     await t.tap(find.text('Şekersüt'));
     await t.pumpAndSettle();
     expect(find.textContaining('Ada 101 / Parsel 5'), findsOneWidget);
+  });
+
+  testWidgets('Yeni sezon haritası', (t) async {
+    t.view.physicalSize = const Size(1600, 3200);
+    t.view.devicePixelRatio = 2;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(MaterialApp(home: TarlaEkran(veri: v, sezonlar: [s])));
+    await t.pumpAndSettle();
+    await t.tap(find.text('2026-2027 sezonu haritasını aç'));
+    await t.pumpAndSettle();
+    expect(find.text('Tarla Haritası 2026-2027'), findsOneWidget);
+    expect(find.textContaining('Ürün girilmemiş parsel'), findsOneWidget);
+    await t.tap(find.text('Karşılaştırma'));
+    await t.pumpAndSettle();
+    expect(find.text('Girilen alanlar ve Excel planı (da)'), findsOneWidget);
+    expect(find.textContaining('Aynı ürün üst üste'), findsWidgets);
   });
 }

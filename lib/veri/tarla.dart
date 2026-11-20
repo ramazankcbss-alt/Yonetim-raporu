@@ -18,13 +18,16 @@ class TarlaParsel {
   final double? beyan, olculen;
   final List<(double, double)> koord;
 
+  /// Yeni sezonda henüz ürün girilmemiş parsel.
+  bool get girilmedi => tip == 'girilmedi';
+
   String get urunYazi => urunler.isEmpty
       ? (tip == 'bos' ? 'Boş alan' : 'Ürün belirtilmemiş')
-      : urunler.map((u) => '${u.$1} ${_s(u.$2)} da').join(' + ');
+      : urunler.map((u) => u.$2 > 0 ? '${u.$1} ${_s(u.$2)} da' : u.$1).join(' + ');
 
   /// Yalnızca ekili ürün cinsleri (haritadaki dekarlar esas alınmaz).
   String get urunCinsi => urunler.isEmpty
-      ? (tip == 'bos' ? 'Boş alan' : 'Ürün belirtilmemiş')
+      ? (tip == 'bos' ? 'Boş alan' : (girilmedi ? 'Girilmedi' : 'Ürün belirtilmemiş'))
       : {for (final u in urunler) u.$1}.join(' + ');
 
   /// Ölçülen alanın beyandan farkı (%), anlamlı değilse null.
@@ -65,9 +68,16 @@ class TarlaCiftlik {
 }
 
 class TarlaSezonu {
-  const TarlaSezonu({required this.sezon, required this.kaynak, required this.tarih, required this.ciftlikler});
+  const TarlaSezonu({required this.sezon, required this.kaynak, required this.tarih, required this.ciftlikler, this.onceki});
   final String sezon, kaynak, tarih;
   final List<TarlaCiftlik> ciftlikler;
+
+  /// Haritadan girilen yeni sezonda, çizimlerin alındığı önceki sezon.
+  final TarlaSezonu? onceki;
+  bool get giris => onceki != null;
+
+  /// Sezonun üretim yılı ("2026-2027" → "2027").
+  String get uretimYili => sezon.contains('-') ? sezon.split('-').last : sezon;
 
   static TarlaSezonu json(Map<String, dynamic> j) => TarlaSezonu(
         sezon: j['sezon'] ?? '',
@@ -242,3 +252,77 @@ List<UrunSatiri> excelKarsilastir(TarlaSezonu s, List<EkimSatir> ekim, List<Resm
   }
   return out;
 }
+
+
+// ---------------------------------------------------------------------------
+// Yeni sezon girişi: önceki sezonun parsel çizimleri üzerine, haritadan girilen
+// ürün ve alanlar (Sezon_Parselleri). Girilmemiş parseller "Girilmedi" görünür.
+
+/// "2025-2026" → "2026-2027".
+String sonrakiSezon(String s) {
+  final m = RegExp(r'^(\d{4})-(\d{4})$').firstMatch(s);
+  return m == null ? '$s (yeni)' : '${int.parse(m[1]!) + 1}-${int.parse(m[2]!) + 1}';
+}
+
+/// Bir parselin bir sezondaki geçerli girişi (yoksa null).
+SezonParsel? parselGirisi(List<SezonParsel> l, String sezon, String ciftlik, String parsel) {
+  SezonParsel? d;
+  for (final x in l) {
+    if (x.aktif && x.sezon == sezon && ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(ciftlik) &&
+        kucuk(x.parsel).trim() == kucuk(parsel).trim()) {
+      d = x;
+    }
+  }
+  return d;
+}
+
+/// Önceki sezonun çizimleriyle yeni sezon haritası.
+TarlaSezonu girisSezonu(TarlaSezonu onceki, List<SezonParsel> l) {
+  final sezon = sonrakiSezon(onceki.sezon);
+  return TarlaSezonu(
+    sezon: sezon,
+    kaynak: 'haritadan girilen bilgiler',
+    tarih: '',
+    onceki: onceki,
+    ciftlikler: [
+      for (final c in onceki.ciftlikler)
+        TarlaCiftlik(ad: c.ad, tesis: c.tesis, parseller: [
+          for (final p in c.parseller)
+            if (parselGirisi(l, sezon, c.ad, p.ad) case final g?)
+              TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(g.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord)
+            else
+              TarlaParsel(
+                  ad: p.ad, tip: p.tip == 'diger' || p.tip == 'bos' ? p.tip : 'girilmedi', urunler: const [], koord: p.koord),
+        ]),
+    ],
+  );
+}
+
+/// Önceki sezonda aynı parselde ekili ürünler (münavebe için).
+List<String> oncekiUrunler(TarlaSezonu s, String ciftlik, String parsel) {
+  final o = s.onceki;
+  if (o == null) return const [];
+  for (final c in o.ciftlikler) {
+    if (ciftlikAnahtari(c.ad) != ciftlikAnahtari(ciftlik)) continue;
+    for (final p in c.parseller) {
+      if (p.ad == parsel) return [for (final u in p.urunler) urunAnahtari(u.$1)];
+    }
+  }
+  return const [];
+}
+
+/// Excel ekim planında bir yılın çiftlik/ürün alanları.
+Map<String, double> yilPlani(List<EkimPlanSatir> l, String yil, String ciftlik) {
+  final m = <String, double>{};
+  for (final x in l) {
+    if (x.yil != yil || ciftlikAnahtari(x.ciftlik) != ciftlikAnahtari(ciftlik) || x.plan <= 0) continue;
+    m.update(urunAnahtari(x.urun), (v) => v + x.plan, ifAbsent: () => x.plan);
+  }
+  return m;
+}
+
+/// Haritadan seçilebilen ürünler.
+const secilebilirUrunler = [
+  'Buğday', 'Arpa', 'Şeker pancarı', 'Silajlık mısır', 'Silajlık mısır (2. ürün)', 'Yonca', 'Patates',
+  'Tritikale', 'Fiğ', 'Nadas',
+];

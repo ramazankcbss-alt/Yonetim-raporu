@@ -392,6 +392,18 @@ class VeriDeposu extends ChangeNotifier {
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
 
+  /// Tarla Haritası'nda bir parselin yeni sezon ürününü ve alanını kaydeder
+  /// (ya da girişi geri alır) ve veriyi yeniler.
+  Future<String> sezonParselKaydet({required String sezon, required String ciftlik, required String parsel,
+      String urun = '', double? alan, bool geriAl = false}) async {
+    final j = await _islem(geriAl ? 'sezonParselGeriAl' : 'sezonParsel', {
+      'sezon': sezon, 'ciftlik': ciftlik, 'parsel': parsel, 'urun': urun,
+      'alan': alan == null ? '' : '$alan'.replaceAll('.', ','),
+    });
+    await yenile();
+    return (j['mesaj'] ?? 'Kaydedildi.').toString();
+  }
+
   /// Kişiler sayfasındaki kişiye uygulamanın sahibi adına e-posta gönderir.
   Future<void> epostaGonder(String ad, String konu, String metin) async {
     await _islem('mesaj', {'ad': ad, 'konu': konu, 'metin': metin});
