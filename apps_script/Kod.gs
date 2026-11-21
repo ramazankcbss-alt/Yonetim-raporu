@@ -359,6 +359,7 @@ function doPost(e) {
     if (govde.tur === 'ybListe') return json_(ybListe_());
     if (govde.tur === 'ybHarita') return json_(ybHarita_());
     if (govde.tur === 'ybMaliyetPlani') return json_(ybMaliyetPlani_());
+    if (govde.tur === 'ybTarkop') return json_(ybTarkop_());
     if (govde.tur === 'ybYaz') return json_(ybYaz_(govde));
     if (govde.tur === 'ybBelgeKaydet') return json_(ybBelgeKaydet_(govde));
     if (govde.tur === 'ybBelge') return json_(ybBelge_(govde));
@@ -2003,4 +2004,111 @@ function ybMaliyetPlani_() {
   }
   return { ok: true, dosya: ss.getName(), sayfalar: out,
     ciftlikBazinda: oku('ÇİFTLİK BAZINDA'), urunBazinda: oku('ÜRÜN BAZINDA') };
+}
+
+// ---------------------------------------------------------------------------
+// TarKop Çiftçi Portalı pancar teslim (kantar) dosyaları → Yönetim Bereket.
+// Drive'da adında "TarKop" geçen .xlsx dosyaları okunur. KVKK: plaka ve satıcı
+// numarası sütunları okunmaz, uygulamaya gönderilmez; yalnızca tarih, tartım no,
+// miktar, polar, fire, kantar adı ve çiftlik kantarı değeri gönderilir.
+
+function ybXmlMetin_(x) {
+  return String(x).replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+}
+
+/** xlsx içindeki XML dosyalarından (ad → metin) tartım satırlarını çıkarır. */
+function ybTarkopCoz_(dosyalar) {
+  var paylasilan = [];
+  var ss = dosyalar['xl/sharedStrings.xml'];
+  if (ss) {
+    var m, re = /<si>([\s\S]*?)<\/si>/g;
+    while ((m = re.exec(ss))) {
+      var t = '', m2, re2 = /<t[^>]*>([\s\S]*?)<\/t>/g;
+      while ((m2 = re2.exec(m[1]))) t += m2[1];
+      paylasilan.push(ybXmlMetin_(t));
+    }
+  }
+  var sonuc = {};
+  Object.keys(dosyalar).sort().forEach(function (ad) {
+    if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(ad)) return;
+    var satirlar = [], mr, reR = /<row[^>]*>([\s\S]*?)<\/row>/g;
+    while ((mr = reR.exec(dosyalar[ad]))) {
+      var hucre = {}, mc, reC = /<c r="([A-Z]+)\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+      while ((mc = reC.exec(mr[1]))) {
+        var tip = (/t="(\w+)"/.exec(mc[2]) || [])[1], ic = mc[3] || '', v;
+        var vm = /<v>([\s\S]*?)<\/v>/.exec(ic);
+        if (tip === 's') v = vm ? paylasilan[Number(vm[1])] : '';
+        else if (tip === 'inlineStr') v = ybXmlMetin_((/<t[^>]*>([\s\S]*?)<\/t>/.exec(ic) || [])[1] || '');
+        else if (tip === 'str' || tip === 'b') v = vm ? ybXmlMetin_(vm[1]) : '';
+        else v = vm ? Number(vm[1]) : '';
+        hucre[mc[1]] = v;
+      }
+      satirlar.push(hucre);
+    }
+    // Başlık satırı: "Tarih" ve "Net Miktar" içeren satır.
+    var bi = -1, sut = {};
+    for (var i = 0; i < Math.min(satirlar.length, 10) && bi < 0; i++) {
+      var h = satirlar[i], tarih = null, net = null;
+      Object.keys(h).forEach(function (k) {
+        var x = String(h[k]).toLocaleLowerCase('tr');
+        if (x === 'tarih') tarih = k;
+        if (x.indexOf('net miktar') === 0) net = k;
+      });
+      if (tarih && net) {
+        bi = i;
+        Object.keys(h).forEach(function (k) {
+          var x = String(h[k]).toLocaleLowerCase('tr');
+          if (x === 'tarih') sut.tarih = k;
+          else if (x.indexOf('tartım no') === 0) sut.tartim = k;
+          else if (x.indexOf('net miktar') === 0) sut.net = k;
+          else if (x.indexOf('fabpolar') === 0) sut.polar = k;
+          else if (x.indexOf('fire(') === 0) sut.fire = k;
+          else if (x.indexOf('fireli miktar') === 0) sut.fireli = k;
+          else if (x.indexOf('brüt') === 0) sut.brut = k;
+          else if (x.indexOf('dara') === 0) sut.dara = k;
+          else if (x.indexOf('kantar adı') === 0) sut.kantar = k;
+        });
+        // Başlığın üstündeki "… KANTAR" sütunu: çiftliğin kendi kantar değeri.
+        for (var j = 0; j < i; j++) {
+          Object.keys(satirlar[j]).forEach(function (k) {
+            if (/kantar/i.test(String(satirlar[j][k])) && !/portal/i.test(String(satirlar[j][k]))) sut.ciftlikKantar = k;
+          });
+        }
+      }
+    }
+    if (bi < 0 || !sut.tartim) return;
+    for (var r = bi + 1; r < satirlar.length; r++) {
+      var x = satirlar[r], tn = x[sut.tartim], tr = x[sut.tarih];
+      if (typeof tn !== 'number' || typeof tr !== 'number' || sonuc[tn]) continue;
+      var g = new Date(Date.UTC(1899, 11, 30) + Math.round(tr) * 86400000);
+      function n(k) { return k && typeof x[k] === 'number' ? x[k] : null; }
+      sonuc[tn] = {
+        tarih: Utilities.formatDate(g, 'UTC', 'yyyy-MM-dd'), tartim: tn,
+        net: n(sut.net), polar: n(sut.polar), fire: n(sut.fire), fireli: n(sut.fireli),
+        brut: n(sut.brut), dara: n(sut.dara), kantar: sut.kantar ? String(x[sut.kantar] || '') : '',
+        ciftlikKantar: n(sut.ciftlikKantar)
+      };
+    }
+  });
+  return Object.keys(sonuc).map(function (k) { return sonuc[k]; });
+}
+
+function ybTarkop_() {
+  var it = DriveApp.searchFiles("title contains 'TarKop' and trashed = false"), out = [];
+  while (it.hasNext()) {
+    var f = it.next();
+    if (!/\.xlsx$/i.test(f.getName()) || f.getMimeType() === 'application/vnd.google-apps.shortcut') continue;
+    try {
+      var b = f.getBlob().setContentType('application/zip'), dosyalar = {};
+      Utilities.unzip(b).forEach(function (x) {
+        var a = x.getName();
+        if (a === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/.test(a)) dosyalar[a] = x.getDataAsString('UTF-8');
+      });
+      out.push({ ad: f.getName(), id: f.getId(), guncelleme: f.getLastUpdated().getTime(), satirlar: ybTarkopCoz_(dosyalar) });
+    } catch (e) {
+      out.push({ ad: f.getName(), id: f.getId(), hata: String(e) });
+    }
+  }
+  return { ok: true, dosyalar: out };
 }
