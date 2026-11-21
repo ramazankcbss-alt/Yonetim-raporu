@@ -351,6 +351,10 @@ function doPost(e) {
     if (govde.tur === 'raporKaydet') return json_(raporKaydet_(govde));
     if (govde.tur === 'cksYukle') return json_(cksYukle_(govde));
     if (govde.tur === 'ekimDuzelt' || govde.tur === 'ekimDuzeltGeriAl') return json_(ekimDuzelt_(govde));
+    // Yönetim Bereket uygulaması (dekar başı maliyet, satış-borsa, depo, kârlılık)
+    if (govde.tur === 'bereketVeri') return json_(bereketVeri_());
+    if (govde.tur === 'bereketKayit') return json_(bereketKayit_(govde));
+    if (govde.tur === 'bereketSil') return json_(bereketSil_(govde));
     if (govde.tur === 'sezonParsel' || govde.tur === 'sezonParselGeriAl') return json_(sezonParsel_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
@@ -1161,6 +1165,110 @@ function ekimDuzelt_(g) {
   sh.appendRow([sezon, cf, urun, secim, deger, String(g.aciklama || '').slice(0, 300),
     Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
   return { ok: true, mesaj: 'Düzeltme kaydedildi.' };
+}
+
+// ---------------------------------------------------------------------------
+// Yönetim Bereket. Satış, borsa ve depo kayıtları rapor tablosunda ayrı
+// sayfalarda tutulur. KVKK: alıcı/tedarikçi alanına yalnızca firma adı yazılır;
+// kişi adı, telefon, TC tutulmaz. Silme işlemi satırı "Silindi" olarak işaretler.
+var BEREKET = {
+  satis: { ad: 'Bereket_Satış', baslik: ['Tarih', 'Çiftlik', 'Ürün', 'Miktar (kg)', 'Birim fiyat (TL/kg)', 'Tutar (TL)', 'Alıcı (firma)', 'Not', 'Durum'] },
+  borsa: { ad: 'Bereket_Borsa', baslik: ['Tarih', 'Borsa', 'Ürün', 'Fiyat (TL/kg)', 'Not', 'Durum'] },
+  depo: { ad: 'Bereket_Depo', baslik: ['Tarih', 'Depo / çiftlik', 'Malzeme', 'Kategori', 'Hareket', 'Miktar', 'Birim', 'Not', 'Durum'] }
+};
+
+function bereketSayfa_(ss, tur) {
+  var t = BEREKET[tur];
+  var sh = ss.getSheetByName(t.ad);
+  if (!sh) {
+    sh = ss.insertSheet(t.ad);
+    sh.appendRow(t.baslik);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function bereketOku_(ss, tur, tz) {
+  var sh = ss.getSheetByName(BEREKET[tur].ad);
+  if (!sh || sh.getLastRow() < 2) return [];
+  var n = BEREKET[tur].baslik.length;
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, n).getValues(), out = [];
+  v.forEach(function (r, i) {
+    if (String(r[n - 1]) === 'Silindi' || r.join('') === '') return;
+    out.push([i + 2].concat(r.map(function (x) {
+      return x instanceof Date ? Utilities.formatDate(x, tz, 'dd.MM.yyyy') : x;
+    })));
+  });
+  return out;
+}
+
+/** Fatura özetinden kaynak sayfa ve kategori bazında TL toplamları. */
+function bereketMaliyet_() {
+  var m = maliVeri_();
+  if (!m || !m.fatura) return [];
+  var t = {};
+  m.fatura.forEach(function (r) {
+    if (String(r[6]) !== 'TRY') return;
+    var sayfa = String(r[11] || '').split(' ›')[0];
+    var k = sayfa + '|' + r[3];
+    if (!t[k]) t[k] = [sayfa, r[3], 0, 0];
+    t[k][2] += Number(r[5]) || 0;
+    t[k][3] += 1;
+  });
+  return Object.keys(t).map(function (k) { return t[k]; });
+}
+
+function bereketVeri_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  return {
+    ok: true,
+    olusturma: Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy HH:mm'),
+    ekim: basitOku_(SAYFALAR.ekim, 4, tz),
+    hasat: basitOku_(SAYFALAR.hasat, 6, tz),
+    maliyet: bereketMaliyet_(),
+    satis: bereketOku_(ss, 'satis', tz),
+    borsa: bereketOku_(ss, 'borsa', tz),
+    depo: bereketOku_(ss, 'depo', tz)
+  };
+}
+
+function bereketKayit_(g) {
+  var tur = String(g.sayfa || '');
+  if (!BEREKET[tur]) return { ok: false, hata: 'Bilinmeyen kayıt türü.' };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  var tarih = String(g.tarih || '').trim() || Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy');
+  if (!/^\d{2}\.\d{2}\.\d{4}$/.test(tarih)) return { ok: false, hata: 'Tarih GG.AA.YYYY biçiminde olmalı.' };
+  function m(x, n) { return String(x || '').trim().slice(0, n || 80); }
+  var satir;
+  if (tur === 'satis') {
+    var kg = sayi_(g.miktar), fiyat = sayi_(g.fiyat);
+    if (!m(g.ciftlik) || !m(g.urun) || kg === '' || kg <= 0 || fiyat === '' || fiyat <= 0) return { ok: false, hata: 'Çiftlik, ürün, miktar ve fiyat gerekli.' };
+    satir = [tarih, m(g.ciftlik), m(g.urun), kg, fiyat, Math.round(kg * fiyat * 100) / 100, m(g.alici), m(g.not, 200), ''];
+  } else if (tur === 'borsa') {
+    var f = sayi_(g.fiyat);
+    if (!m(g.borsa) || !m(g.urun) || f === '' || f <= 0) return { ok: false, hata: 'Borsa, ürün ve fiyat gerekli.' };
+    satir = [tarih, m(g.borsa), m(g.urun), f, m(g.not, 200), ''];
+  } else {
+    var mk = sayi_(g.miktar), h = m(g.hareket);
+    if (!m(g.depo) || !m(g.malzeme) || ['Giriş', 'Çıkış', 'Sayım'].indexOf(h) < 0 || mk === '' || mk < 0) return { ok: false, hata: 'Depo, malzeme, hareket ve miktar gerekli.' };
+    satir = [tarih, m(g.depo), m(g.malzeme), m(g.kategori), h, mk, m(g.birim, 20), m(g.not, 200), ''];
+  }
+  bereketSayfa_(ss, tur).appendRow(satir);
+  return { ok: true, mesaj: 'Kaydedildi.' };
+}
+
+function bereketSil_(g) {
+  var tur = String(g.sayfa || '');
+  if (!BEREKET[tur]) return { ok: false, hata: 'Bilinmeyen kayıt türü.' };
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(BEREKET[tur].ad), no = parseInt(g.satir, 10), n = BEREKET[tur].baslik.length;
+  if (!sh || !(no >= 2) || no > sh.getLastRow()) return { ok: false, hata: 'Kayıt bulunamadı; listeyi yenileyin.' };
+  var r = sh.getRange(no, 1, 1, n).getDisplayValues()[0];
+  if ([r[1], r[2]].join('|') !== String(g.kontrol || '')) return { ok: false, hata: 'Tablo bu arada değişmiş; listeyi yenileyip tekrar deneyin.' };
+  sh.getRange(no, n).setValue('Silindi');
+  return { ok: true, mesaj: 'Kayıt silindi.' };
 }
 
 function cksYukle_(g) {
