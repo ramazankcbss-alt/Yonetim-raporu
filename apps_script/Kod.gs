@@ -1994,5 +1994,13 @@ function ybMaliyetPlani_() {
       return r.map(function (x) { return x instanceof Date ? '' : x; });
     }) });
   });
-  return { ok: true, dosya: ss.getName(), sayfalar: out };
+  function oku(ad) {
+    var sh = ss.getSheetByName(ad);
+    if (!sh || sh.getLastRow() < 2) return [];
+    return sh.getRange(1, 1, Math.min(sh.getLastRow(), 150), 13).getValues().map(function (r) {
+      return r.map(function (x) { return x instanceof Date ? '' : x; });
+    });
+  }
+  return { ok: true, dosya: ss.getName(), sayfalar: out,
+    ciftlikBazinda: oku('ÇİFTLİK BAZINDA'), urunBazinda: oku('ÜRÜN BAZINDA') };
 }
