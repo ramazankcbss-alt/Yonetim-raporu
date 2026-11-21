@@ -357,6 +357,7 @@ function doPost(e) {
     if (govde.tur === 'bereketSil') return json_(bereketSil_(govde));
     // Yönetim Bereket – Tarla ve Üretim kayıtları (YB_Kayitlar sayfası)
     if (govde.tur === 'ybListe') return json_(ybListe_());
+    if (govde.tur === 'ybHarita') return json_(ybHarita_());
     if (govde.tur === 'ybYaz') return json_(ybYaz_(govde));
     if (govde.tur === 'ybBelgeKaydet') return json_(ybBelgeKaydet_(govde));
     if (govde.tur === 'ybBelge') return json_(ybBelge_(govde));
@@ -1963,4 +1964,18 @@ function ybBelgeler_(g) {
   while (it.hasNext()) l.push(it.next());
   l.sort(function (a, b) { return b.getDateCreated() - a.getDateCreated(); });
   return { ok: true, kayitlar: l.slice(0, sinir).map(function (f) { return [f.getId(), ybBelgeBilgi_(f, true)]; }) };
+}
+
+/** Tarla Haritası'nda parsele girilen sezon ürün/alan bilgileri (Yönetim Bereket'e aktarılır). */
+function ybHarita_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName('Sezon_Parselleri');
+  var out = [];
+  if (sh && sh.getLastRow() >= 2) {
+    sh.getRange(2, 1, sh.getLastRow() - 1, 7).getValues().forEach(function (r) {
+      if (String(r[6]) !== 'Aktif' || !r[0] || !r[2]) return;
+      out.push([String(r[0]), String(r[1]), String(r[2]), String(r[3]), r[4] === '' ? null : Number(r[4])]);
+    });
+  }
+  return { ok: true, sezonParsel: out };
 }
