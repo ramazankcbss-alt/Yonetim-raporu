@@ -355,6 +355,12 @@ function doPost(e) {
     if (govde.tur === 'bereketVeri') return json_(bereketVeri_());
     if (govde.tur === 'bereketKayit') return json_(bereketKayit_(govde));
     if (govde.tur === 'bereketSil') return json_(bereketSil_(govde));
+    // Yönetim Bereket – Tarla ve Üretim kayıtları (YB_Kayitlar sayfası)
+    if (govde.tur === 'ybListe') return json_(ybListe_());
+    if (govde.tur === 'ybYaz') return json_(ybYaz_(govde));
+    if (govde.tur === 'ybBelgeKaydet') return json_(ybBelgeKaydet_(govde));
+    if (govde.tur === 'ybBelge') return json_(ybBelge_(govde));
+    if (govde.tur === 'ybBelgeler') return json_(ybBelgeler_(govde));
     if (govde.tur === 'sezonParsel' || govde.tur === 'sezonParselGeriAl') return json_(sezonParsel_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
@@ -1824,4 +1830,137 @@ function maliVeri_() {
   } catch (err) {
     return null;
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Yönetim Bereket – Tarla ve Üretim (tarlalar, ekimler, giderler, satışlar...)
+// Her kayıt YB_Kayitlar sayfasında bir satırdır: Koleksiyon | ID | Veri (JSON).
+// KVKK: Yalnızca şirket tarım verisi; kişi adı yerine firma / çiftlik adı girilir.
+
+var YB_SAYFA = 'YB_Kayitlar';
+var YB_BASLIK = ['Koleksiyon', 'ID', 'Veri (JSON)', 'Güncelleme', 'Durum'];
+var YB_KOLEKSIYONLAR = ['tarlalar', 'ekimler', 'giderler', 'sayaclar', 'satislar', 'hesaplar',
+  'gelirler', 'isyerleri', 'varliklar', 'fiyatlar', 'isler', 'kotalar', 'ekipmanlar',
+  'aile_hareketler', 'stoklar', '_isletme'];
+
+function ybSayfa_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(YB_SAYFA);
+  if (!sh) {
+    sh = ss.insertSheet(YB_SAYFA);
+    sh.appendRow(YB_BASLIK);
+    sh.setFrozenRows(1);
+    sh.getRange('C:C').setNumberFormat('@');
+  }
+  return sh;
+}
+
+function ybListe_() {
+  var sh = ybSayfa_();
+  var n = sh.getLastRow();
+  if (n < 2) return { ok: true, kayitlar: [] };
+  var v = sh.getRange(2, 1, n - 1, 5).getValues(), out = [];
+  v.forEach(function (r) {
+    if (!r[0] || String(r[4]) === 'Silindi') return;
+    out.push([String(r[0]), String(r[1]), String(r[2])]);
+  });
+  return { ok: true, kayitlar: out };
+}
+
+function ybYaz_(g) {
+  var l = g.islemler;
+  if (!l || !l.length) return { ok: false, hata: 'İşlem yok.' };
+  if (l.length > 300) return { ok: false, hata: 'Tek seferde en çok 300 kayıt gönderilebilir.' };
+  var kilit = LockService.getScriptLock();
+  kilit.waitLock(30000);
+  try {
+    var sh = ybSayfa_();
+    var n = sh.getLastRow();
+    var yer = {};
+    if (n >= 2) {
+      sh.getRange(2, 1, n - 1, 2).getValues().forEach(function (r, i) {
+        yer[r[0] + '|' + r[1]] = i + 2;
+      });
+    }
+    var simdi = new Date(), yeni = [], bekle = {};
+    l.forEach(function (x) {
+      var kol = String(x.kol || ''), id = String(x.id || '');
+      if (YB_KOLEKSIYONLAR.indexOf(kol) < 0) throw new Error('Geçersiz koleksiyon: ' + kol);
+      if (!/^[A-Za-z0-9_-]{1,40}$/.test(id)) throw new Error('Geçersiz kayıt kimliği.');
+      var satir = yer[kol + '|' + id];
+      if (x.op === 'sil') {
+        if (satir) sh.getRange(satir, 4, 1, 2).setValues([[simdi, 'Silindi']]);
+        if (bekle[kol + '|' + id] !== undefined) yeni[bekle[kol + '|' + id]][4] = 'Silindi';
+        return;
+      }
+      var veri = String(x.veri || '');
+      if (veri.length > 45000) throw new Error('Kayıt çok büyük.');
+      JSON.parse(veri);
+      var bekleyen = bekle[kol + '|' + id];
+      if (bekleyen !== undefined) {
+        yeni[bekleyen][2] = veri;
+      } else if (satir) {
+        sh.getRange(satir, 3, 1, 3).setValues([[veri, simdi, 'Aktif']]);
+      } else {
+        bekle[kol + '|' + id] = yeni.length;
+        yeni.push([kol, id, veri, simdi, 'Aktif']);
+      }
+    });
+    if (yeni.length) sh.getRange(sh.getLastRow() + 1, 1, yeni.length, 5).setValues(yeni);
+    return { ok: true };
+  } finally {
+    kilit.releaseLock();
+  }
+}
+
+/** Fiş / fatura fotoğrafları şirket Drive'ında ayrı klasörde tutulur. */
+function ybBelgeKlasoru_() {
+  var pr = PropertiesService.getScriptProperties();
+  var id = pr.getProperty('YB_BELGE_KLASOR_ID');
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch (e) {}
+  }
+  var k = DriveApp.createFolder('Yönetim Bereket – Belgeler');
+  pr.setProperty('YB_BELGE_KLASOR_ID', k.getId());
+  return k;
+}
+
+function ybBelgeKaydet_(g) {
+  var resim = String(g.resim || '');
+  if (!resim || resim.length > 1200000) return { ok: false, hata: 'Fotoğraf okunamadı ya da çok büyük.' };
+  var bilgi = g.bilgi || {};
+  var ad = Utilities.formatDate(new Date(), 'Europe/Istanbul', 'yyyy-MM-dd_HHmmss') + '.jpg';
+  var f = ybBelgeKlasoru_().createFile(Utilities.newBlob(Utilities.base64Decode(resim), 'image/jpeg', ad));
+  f.setDescription(JSON.stringify(bilgi).slice(0, 4000));
+  return { ok: true, id: f.getId() };
+}
+
+function ybBelgeBilgi_(f, resimli) {
+  var b = {};
+  try { b = JSON.parse(f.getDescription() || '{}'); } catch (e) {}
+  b.olusturma = f.getDateCreated().getTime();
+  if (resimli) b.resim = Utilities.base64Encode(f.getBlob().getBytes());
+  return b;
+}
+
+function ybBelge_(g) {
+  try {
+    var f = DriveApp.getFileById(String(g.id || ''));
+    var ust = f.getParents();
+    if (!ust.hasNext() || ust.next().getId() !== ybBelgeKlasoru_().getId() || f.isTrashed()) {
+      return { ok: true, veri: null };
+    }
+    return { ok: true, veri: ybBelgeBilgi_(f, true) };
+  } catch (e) {
+    return { ok: true, veri: null };
+  }
+}
+
+function ybBelgeler_(g) {
+  var sinir = Math.min(Number(g.sinir) || 12, 12);
+  var it = ybBelgeKlasoru_().getFiles(), l = [];
+  while (it.hasNext()) l.push(it.next());
+  l.sort(function (a, b) { return b.getDateCreated() - a.getDateCreated(); });
+  return { ok: true, kayitlar: l.slice(0, sinir).map(function (f) { return [f.getId(), ybBelgeBilgi_(f, true)]; }) };
 }
