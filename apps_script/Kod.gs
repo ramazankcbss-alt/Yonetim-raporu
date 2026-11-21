@@ -358,6 +358,7 @@ function doPost(e) {
     // Yönetim Bereket – Tarla ve Üretim kayıtları (YB_Kayitlar sayfası)
     if (govde.tur === 'ybListe') return json_(ybListe_());
     if (govde.tur === 'ybHarita') return json_(ybHarita_());
+    if (govde.tur === 'ybMaliyetPlani') return json_(ybMaliyetPlani_());
     if (govde.tur === 'ybYaz') return json_(ybYaz_(govde));
     if (govde.tur === 'ybBelgeKaydet') return json_(ybBelgeKaydet_(govde));
     if (govde.tur === 'ybBelge') return json_(ybBelge_(govde));
@@ -1978,4 +1979,20 @@ function ybHarita_() {
     });
   }
   return { ok: true, sezonParsel: out };
+}
+
+/** Tarımsal Faaliyet dosyasındaki çiftlik maliyet planı sayfaları ("Aslım 2026" gibi).
+ * Yalnızca A:D sütunları (kalem, miktar, birim fiyat, tutar) okunur; kişi bilgisi yoktur. */
+function ybMaliyetPlani_() {
+  var ss = SpreadsheetApp.openById(TARIM_FAALIYET_ID);
+  var out = [];
+  ss.getSheets().forEach(function (sh) {
+    var m = /^\s*(.+?)\s+(\d{4})\s*$/.exec(sh.getName());
+    if (!m || /özet|harita|gerçekleşen/i.test(m[1]) || sh.getLastRow() < 2) return;
+    var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 300), 4).getValues();
+    out.push({ sayfa: sh.getName(), ciftlik: m[1], yil: Number(m[2]), satirlar: v.map(function (r) {
+      return r.map(function (x) { return x instanceof Date ? '' : x; });
+    }) });
+  });
+  return { ok: true, dosya: ss.getName(), sayfalar: out };
 }
