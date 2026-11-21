@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../bicim.dart';
 import '../servis/guncelleme.dart';
@@ -124,18 +123,6 @@ class _AyarlarEkranState extends State<AyarlarEkran> {
                     renk: ButonRenk.ikincil,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => const KurulumEkrani(ilk: false))),
-                  ),
-                  const SizedBox(height: 10),
-                  Buton(
-                    yazi: 'Linki Yönetim Bereket için kopyala',
-                    ikon: Icons.copy,
-                    renk: ButonRenk.ikincil,
-                    onTap: () async {
-                      await Clipboard.setData(ClipboardData(text: d.link ?? ''));
-                      if (context.mounted) {
-                        bildir(context, 'Bağlantı linki kopyalandı. Yönetim Bereket\'te Bağlantı alanına yapıştırın.');
-                      }
-                    },
                   ),
                   const SizedBox(height: 10),
                   Buton(
