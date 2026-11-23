@@ -98,26 +98,44 @@ class _Is {
 
 // Sıra raporda görünme sırasıdır.
 const _isler = [
-  _Is('Hasat (kombine)', r'kombine|hasat|biçer'),
+  _Is('Hasat (biçerdöver)', r'hasat|biçerdöver|biçer\b'),
   _Is('Şeker pancarı sökümü', r'söküm|sökül'),
+  _Is('Pancar yükleme ve sevkiyat', r'yükleme|sevkiyat'),
+  _Is('Biçim', r'biçim|biçil'),
+  _Is('Balya yapımı', r'balya'),
   _Is('Tarla sürümü', r'sürüm|sürül'),
+  _Is('Patlatan çekimi', r'patlatan|dipkazan'),
+  _Is('Kombine (kürüm) çekimi', r'kombine|kombi\b'),
   _Is('Merdane çekimi', r'merdane'),
+  _Is('Kobra çekimi', r'kobra'),
+  _Is('Alabora çekimi', r'alabora'),
   _Is('Tırmık çekimi', r'tırmık'),
   _Is('Toprak tesviyesi', r'tesviye'),
-  _Is('Yağmurlama sistemi serimi', r'yağmurlama'),
-  _Is('Gübreleme', r'gübreleme|gübre atı'),
+  _Is('Sulama borularının toplanması', r'(boru|hat|damlama)\w*\s+(\w+\s+)?(toplan|çıkar)'),
+  _Is('Yağmurlama sistemi serimi', r'yağmurlama|boru serme|seril'),
+  _Is('Sulama', r'sulama|sulan'),
+  _Is('Gübreleme', r'gübreleme|gübre atı|gübre dağıt'),
   _Is('İlaçlama', r'ilaçlama'),
 ];
+// Ürüne göre ayrıştırılan işler: "Sulama (arpa)", "Biçim (yonca)".
+const _urunluIsler = {'Hasat (biçerdöver)', 'Biçim', 'Balya yapımı', 'Sulama'};
 const _urunler = [
   'buğday', 'arpa', 'yonca', 'mısır', 'ayçiçeği', 'tritikale', 'çavdar',
   'fiğ', 'yulaf', 'nohut', 'fasulye', 'patates', 'silajlık',
 ];
+const _teslimUrunleri = [
+  'şeker pancarı', 'pancar', 'yonca', 'buğday', 'arpa', 'patates', 'mısır', 'silaj', 'tritikale', 'saman', 'sap',
+];
 final _ekim = RegExp(r'(^|[^a-zçğıöşü])ek(im|il|iyor|me)');
-final _dekar = RegExp(r'(\d[\d.,]*)\s*dekar\b');
-final _tamam = RegExp(r'bitti|tamamland');
+final _dekar = RegExp(r'(\d[\d.,]*)\s*(?:dekar|da)(?![a-zçğıöşü])');
+final _tamam = RegExp(r'bitti|bitmiş|tamamland|tamamlan');
+final _basla = RegExp(r'başla');
 // Form kaydı: "Malzeme girişi: 15 ton Halis buğday tohumu (dış tedarik)"
 final _malzeme = RegExp(r'^Malzeme (girişi|çıkışı): ([\d.,]+) (\S+) (.+?) \((.+)\)$');
-final _tedarik = RegExp(r'\bton\b.*(teslim|tedarik|alındı|geldi)');
+// Gelen malzeme: "15 ton Halis buğday tohumu teslim alındı", "21250 kg amonyum sülfat geldi"
+final _tedarik = RegExp(r'\b(ton|kg)\b.*(teslim al|tedarik|alındı|alınmış|geldi|gelmiş)');
+// Giden ürün: "39900 kg yonca alıcıya teslim edildi", "10 ton … mağazasına teslim edildi"
+final _sevk = RegExp(r'(\d[\d.,]*)\s*(kg|ton)\b[^;]*?(teslim edil|sevk edil|satıl|verildi|gönderil)');
 
 String _kucuk(String s) =>
     s.replaceAll('İ', 'i').replaceAll('I', 'ı').toLowerCase();
@@ -139,76 +157,131 @@ class _Toplam {
   double toplam = 0;
   double? kumulatif; // "toplam X dekar" ifadesi: hafta sonu durumu
   bool tamam = false;
+  bool basladi = false;
+  final baslangic = <double>{}; // "… dekara başlandı" — aynı alan "bitti" ile tekrar sayılmaz
   double get deger =>
       kumulatif != null && kumulatif! > toplam ? kumulatif! : toplam;
+
+  /// Alan yazılmamış işler için durum.
+  String get durum => tamam ? 'tamamlandı' : (basladi ? 'başlandı' : 'devam ediyor');
 }
 
 class _Toplanan {
   final ciftlikler = <String, Map<String, _Toplam>>{};
   final malzemeler = <String, Map<String, double>>{};
   final tedarikler = <String, List<String>>{};
+  final sevkler = <String, Map<String, double>>{}; // çiftlik → "Yonca teslimatı" → kg
+}
+
+String? _urunBul(String s, List<String> l) {
+  for (final u in l) {
+    if (s.contains(u)) return u;
+  }
+  return null;
 }
 
 /// Kayıtları çiftlik ve iş türü bazında toplar (tek kaynak için).
+/// Metin cümleciklere bölünür; her cümlecikteki alan o cümleciğin işine yazılır
+/// ("serilen alan 100 dekar, bağlanan alan 60 dekar ve 30 dekarın sulaması yapıldı"
+/// → serim 100, sulama 30). "Kalan" ve "bağlanan" alanlar sayılmaz.
 _Toplanan _topla(List<TarimKaydi> kayitlar) {
   final t = _Toplanan();
   final sirali = [...kayitlar]..sort((a, b) => a.tarih.compareTo(b.tarih));
-  final ciftlikler = t.ciftlikler;
-  final malzemeler = t.malzemeler;
-  final tedarikler = t.tedarikler;
   final gorulen = <String, Set<String>>{};
 
   for (final k in sirali) {
-    final m = ciftlikler.putIfAbsent(k.ciftlik, () => {});
+    final m = t.ciftlikler.putIfAbsent(k.ciftlik, () => {});
+    final kayitUrunleri = {for (final u in _urunler) if (_kucuk(k.faaliyet).contains(u)) u};
     for (final madde in faaliyetMaddeleri(k.faaliyet)) {
-      final s = _kucuk(madde);
-      if (s.contains('kalan') || s.startsWith('belge no')) continue;
+      var s = _kucuk(madde);
+      if (s.startsWith('belge no')) continue;
+      s = s
+          .replaceAll(RegExp(r'\(\s*kalan[^)]*\)'), '')
+          .replaceAll(RegExp(r'kalan(\s+\S+){0,2}?\s*:?\s*\d[\d.,]*\s*(dekar|da)(?![a-zçğıöşü])'), '')
+          .trim();
+      if (s.isEmpty || s.startsWith('kalan')) continue;
       final mz = _malzeme.firstMatch(madde);
       if (mz != null) {
         final anahtar = '${mz[1]}|${mz[3]}|${mz[4]}|${mz[5]}';
-        final mm = malzemeler.putIfAbsent(k.ciftlik, () => {});
+        final mm = t.malzemeler.putIfAbsent(k.ciftlik, () => {});
         mm[anahtar] = (mm[anahtar] ?? 0) + _sayi(mz[2]!);
+        continue;
+      }
+      final sv = _sevk.firstMatch(s);
+      if (sv != null && !s.contains('teslim al')) {
+        final u = _urunBul(s, _teslimUrunleri);
+        final etiket = s.contains('tohum')
+            ? 'Tohum teslimatı${u == null ? '' : ' (${u == 'pancar' ? 'şeker pancarı' : u})'}'
+            : '${_buyuk(u == null ? 'ürün' : (u == 'pancar' ? 'şeker pancarı' : u))} teslimatı';
+        final kg = _sayi(sv[1]!) * (sv[2] == 'ton' ? 1000 : 1);
+        final sm = t.sevkler.putIfAbsent(k.ciftlik, () => {});
+        sm[etiket] = (sm[etiket] ?? 0) + kg;
         continue;
       }
       if (_tedarik.hasMatch(s)) {
         final g = gorulen.putIfAbsent(k.ciftlik, () => {});
         if (g.add(_anahtar(madde))) {
-          tedarikler.putIfAbsent(k.ciftlik, () => []).add(
+          t.tedarikler.putIfAbsent(k.ciftlik, () => []).add(
               madde.replaceAll(RegExp(r'\s*\(kantar fişleri?\)', caseSensitive: false), ''));
         }
         continue;
       }
-      final tamam = _tamam.hasMatch(s);
-      final kumulatif = s.contains('toplam');
 
-      // Hangi iş?
-      String? etiket;
-      for (final i in _isler) {
-        if (RegExp(i.desen).hasMatch(s)) {
-          etiket = i.etiket;
-          break;
+      String? onceki;
+      for (final c in s.split(RegExp(r',(?!\d)|(?<!\d)\.(?=[a-zçğıöşü])'))) {
+        final cc = c.trim();
+        if (cc.isEmpty) continue;
+        final tamam = _tamam.hasMatch(cc);
+        final basla = _basla.hasMatch(cc);
+        final kumulatif = cc.contains('toplam');
+        final alanlar = [
+          for (final e in _dekar.allMatches(cc))
+            if (!RegExp(r'(bağlanan|kalan)\s*(alan)?\s*:?\s*$').hasMatch(cc.substring(0, e.start))) _sayi(e[1]!)
+        ];
+
+        // Hangi iş?
+        String? etiket;
+        for (final i in _isler) {
+          if (RegExp(i.desen).hasMatch(cc)) {
+            etiket = i.etiket;
+            break;
+          }
         }
-      }
-      if (etiket == null && _ekim.hasMatch(s)) {
-        // Ürün–miktar eşleşmesi: "669 dekar arpa ve 150 dekar buğday"
-        final ciftler = RegExp(
-                r'(\d[\d.]*)\s*dekar\b\s+(?:[a-zçğıöşü]+\s+){0,2}?(' +
-                    _urunler.join('|') + r')')
-            .allMatches(s)
-            .toList();
-        if (ciftler.isNotEmpty) {
-          for (final c in ciftler) {
-            _ekle(m, '${_buyuk(c[2]!)} ekimi', _sayi(c[1]!), kumulatif, tamam);
+        if (etiket == null && _ekim.hasMatch(cc)) {
+          // Ürün–miktar eşleşmesi: "669 dekar arpa ve 150 dekar buğday"
+          final ciftler = RegExp(
+                  r'(\d[\d.]*)\s*dekar\b\s+(?:[a-zçğıöşü]+\s+){0,2}?(' +
+                      _urunler.join('|') + r')')
+              .allMatches(cc)
+              .toList();
+          if (ciftler.isNotEmpty) {
+            for (final e in ciftler) {
+              _ekle(m, '${_buyuk(e[2]!)} ekimi', _sayi(e[1]!), kumulatif, tamam, basla);
+            }
+            onceki = null;
+            continue;
+          }
+          final urun = _urunBul(cc, _urunler) ?? _urunBul(s, _urunler) ??
+              (kayitUrunleri.length == 1 ? kayitUrunleri.first : null);
+          etiket = urun == null ? 'Ekim' : '${_buyuk(urun)} ekimi';
+        }
+        if (etiket == null) {
+          // "serilen alan 100 dekar", "toplam 700 dekar": bir önceki cümleciğin işi.
+          if (onceki != null && alanlar.isNotEmpty) {
+            _ekle(m, onceki, alanlar.fold<double>(0, (a, b) => a + b), kumulatif, tamam, basla);
+          } else if (onceki != null && tamam) {
+            m[onceki]?.tamam = true;
           }
           continue;
         }
-        final urun = _urunler.firstWhere(s.contains, orElse: () => '');
-        etiket = urun.isEmpty ? 'Ekim' : '${_buyuk(urun)} ekimi';
+        if (_urunluIsler.contains(etiket)) {
+          final u = _urunBul(cc, _urunler) ?? _urunBul(s, _urunler) ??
+              (kayitUrunleri.length == 1 ? kayitUrunleri.first : null);
+          if (u != null) etiket = '$etiket ($u)';
+        }
+        onceki = etiket;
+        _ekle(m, etiket, alanlar.fold<double>(0, (a, b) => a + b), kumulatif, tamam, basla);
       }
-      if (etiket == null) continue;
-      final miktar =
-          _dekar.allMatches(s).fold<double>(0, (t, e) => t + _sayi(e[1]!));
-      _ekle(m, etiket, miktar, kumulatif, tamam);
     }
   }
 
@@ -268,7 +341,10 @@ List<TeyitSatiri> teyitDurumu(List<TarimKaydi> tumKayitlar) {
 /// Genel Müdürlük raporu için çiftlik bazında kısa özet.
 /// İcmal ve formen formu karşılaştırılır: ikisi de varsa icmal esas alınır,
 /// yalnızca formda olan iş de rapora girer (uygulamada "icmalde yok" işaretli).
-List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> tumKayitlar) {
+/// [teslimatlar]: dönemdeki ürün teslimat satırları (örn. TarKop pancar sevkiyatı),
+/// çiftlik bazında "Şeker pancarı teslimatı (Konya Şeker): … ton net" olarak eklenir.
+List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> tumKayitlar,
+    {List<DonemTeslimati> teslimatlar = const []}) {
   // Kontrol bekleyen formen kayıtları rapora girmez.
   final kayitlar = [for (final k in tumKayitlar) if (!k.kontrolBekliyor) k];
   final ic = _topla([for (final k in kayitlar) if (!k.formdan) k]);
@@ -278,6 +354,7 @@ List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> tumKayitlar) {
   final adlar = {
     ...ic.ciftlikler.keys, ...ic.tedarikler.keys, ...ic.malzemeler.keys,
     ...fo.ciftlikler.keys, ...fo.tedarikler.keys, ...fo.malzemeler.keys,
+    ...ic.sevkler.keys, ...fo.sevkler.keys, for (final t in teslimatlar) t.ciftlik,
   }.toList()
     ..sort();
   for (final c in adlar) {
@@ -294,7 +371,13 @@ List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> tumKayitlar) {
       for (final e in etiketler)
         if ((a[e]?.deger ?? 0) > 0 || (b[e]?.deger ?? 0) > 0)
           '$e: ${_dk((a[e]?.deger ?? 0) > 0 ? a[e]!.deger : b[e]!.deger)}'
-              '${(a[e]?.tamam ?? false) || (b[e]?.tamam ?? false) ? ' (tamamlandı)' : ''}',
+              '${(a[e]?.tamam ?? false) || (b[e]?.tamam ?? false) ? ' (tamamlandı)' : ''}'
+        else
+          // Alan yazılmamış iş: durumuyla (başlandı / devam ediyor / tamamlandı).
+          '$e: ${(a[e]?.tamam ?? false) || (b[e]?.tamam ?? false) ? 'tamamlandı' : (a[e] ?? b[e])!.durum}',
+      for (final e in {...?ic.sevkler[c], ...?fo.sevkler[c]}.entries) '${e.key}: ${_kg(e.value)}',
+      for (final t in teslimatlar)
+        if (t.ciftlik == c) t.metin,
       // Formda malzeme hareketi varsa icmaldeki serbest tedarik notu tekrar yazılmaz.
       if (formMalzeme.isEmpty)
         for (final t in ic.tedarikler[c] ?? const <String>[]) t,
@@ -308,18 +391,27 @@ List<FaaliyetOzeti> yoneticiOzeti(List<TarimKaydi> tumKayitlar) {
 }
 
 void _ekle(Map<String, _Toplam> m, String etiket, double miktar,
-    bool kumulatif, bool tamam) {
+    bool kumulatif, bool tamam, [bool basla = false]) {
   final t = m.putIfAbsent(etiket, () => _Toplam());
+  if (basla) t.basladi = true;
   if (kumulatif && miktar > 0) {
     t.kumulatif = (t.kumulatif ?? 0) < miktar ? miktar : t.kumulatif;
-  } else {
-    t.toplam += miktar;
+  } else if (miktar > 0) {
+    if (basla && !tamam) {
+      // "100 dekar ekime başlandı" … "100 dekar ekim bitti": alan bir kez sayılır.
+      t.baslangic.add(miktar);
+      t.toplam += miktar;
+    } else if (tamam && t.baslangic.remove(miktar)) {
+      // aynı alan zaten sayıldı
+    } else {
+      t.toplam += miktar;
+    }
   }
   if (tamam) t.tamam = true;
 }
 
 int _sira(String etiket) {
-  final i = _isler.indexWhere((e) => e.etiket == etiket);
+  final i = _isler.indexWhere((e) => e.etiket == etiket || etiket.startsWith('${e.etiket} ('));
   if (i >= 0) return i;
   return etiket.endsWith(' ekimi') || etiket == 'Ekim' ? -1 : 99;
 }
@@ -347,3 +439,25 @@ String _binlik(int n) {
 /// Kontrol bekleyen formen kaydı sayısı.
 int kontrolBekleyen(List<TarimKaydi> kayitlar) =>
     kayitlar.where((k) => k.kontrolBekliyor).length;
+
+
+String _kg(double kg) => kg >= 100000
+    ? '${(kg / 1000).toStringAsFixed(1).replaceAll('.', ',')} ton'
+    : '${_binlik(kg.round())} kg';
+
+/// Bir ürünün dönem içindeki teslimat toplamı (Ürün Takibi kayıtlarından).
+class DonemTeslimati {
+  const DonemTeslimati({required this.ciftlik, required this.urun, this.alici = '',
+      required this.net, this.teslim = 0, this.sefer = 0});
+  final String ciftlik, urun, alici;
+  final double net, teslim;
+  final int sefer;
+
+  String get metin {
+    final kesinti = teslim > net ? (teslim - net) / teslim * 100 : 0;
+    final u = urun.isEmpty ? urun : '${urun[0]}${_kucuk(urun.substring(1))}';
+    return '$u teslimatı${alici.isEmpty ? '' : ' ($alici)'}: ${_kg(net)} net'
+        '${sefer > 0 ? ', $sefer sefer' : ''}'
+        '${kesinti > 0 ? ', fire %${kesinti.toStringAsFixed(1).replaceAll('.', ',')}' : ''}';
+  }
+}

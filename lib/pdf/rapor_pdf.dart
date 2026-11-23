@@ -10,6 +10,7 @@ import '../veri/detay.dart';
 import '../veri/faaliyet_ozet.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
+import '../veri/urun_takip.dart';
 
 const _ana = PdfColor.fromInt(0xFF1F7A4D);
 const _anaKoyu = PdfColor.fromInt(0xFF14593A);
@@ -132,6 +133,8 @@ Future<Uint8List> haftalikRaporPdf(
   final tarim = [
     for (final f in v.tarimDonem(pazartesi, son)) if (!f.kontrolBekliyor) f
   ];
+  final faaliyetler = yoneticiOzeti(tarim,
+      teslimatlar: donemTeslimatlari(v.urunTeslimat, pazartesi, son));
 
   final doc = pw.Document(
       title: '${a.baslik} — ${isoHafta(pazartesi)}. Hafta',
@@ -178,11 +181,11 @@ Future<Uint8List> haftalikRaporPdf(
             suruSatirlari(gunler.first, gunler.last),
             genislik: _suruGenislik),
       _bolum('Tarımsal Faaliyetler'),
-      if (yoneticiOzeti(tarim).isEmpty)
+      if (faaliyetler.isEmpty)
         _not('Bu hafta için raporlanacak tarımsal faaliyet bulunmuyor.')
       else
         _tablo(const ['Çiftlik', 'Haftalık Özet'], [
-          for (final o in yoneticiOzeti(tarim))
+          for (final o in faaliyetler)
             [o.ciftlik, _maddeler(o.maddeler)]
         ],
             genislik: const {

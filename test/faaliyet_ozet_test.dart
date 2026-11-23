@@ -71,11 +71,16 @@ void main() {
     final m = {for (final x in o) x.ciftlik: x.maddeler};
     expect(m['Taşağıl'], [
       'Buğday ekimi: 420 dekar',
+      'Şeker pancarı sökümü: tamamlandı',
       'Merdane çekimi: 270 dekar',
       '15 ton Halis buğday tohumu teslim alındı',
     ]);
     expect(m['Fidanlık'], ['Arpa ekimi: 669 dekar (tamamlandı)', 'Buğday ekimi: 150 dekar (tamamlandı)']);
-    expect(m['Aslım'], ['Hasat (kombine): 350 dekar (tamamlandı)']);
+    expect(m['Aslım'], [
+      'Arpa ekimi: başlandı',
+      'Şeker pancarı sökümü: devam ediyor',
+      'Kombine (kürüm) çekimi: 350 dekar (tamamlandı)',
+    ]);
     expect(m['Şekersüt'], ['Şeker pancarı sökümü: 700 dekar (tamamlandı)']);
   });
 
@@ -128,5 +133,36 @@ void main() {
     expect(yoneticiOzeti(kayitlar).single.maddeler, ['Tarla sürümü: 150 dekar']);
     expect(faaliyetOzeti(kayitlar).single.maddeler.first, 'Arpa ekimi: 200 dekar (kontrol bekliyor)');
     expect(kontrolBekleyen(kayitlar), 1);
+  });
+
+  // Örnek (test amaçlı) metin ve değerler; gerçek veriler Drive'dan okunur.
+  test('Haftalık özet: alanı olmayan işler, teslimatlar, bağlanan/sulanan alan ayrımı', () {
+    final o = yoneticiOzeti([
+      k(16, 'A', 'Şeker pancarı sökümü bitti; yükleme makinesi geldi, pancar yükleme işine başlandı'),
+      k(17, 'A', 'Yonca – 12500 kg yonca alıcıya teslim edildi. – 3.pivot'),
+      k(18, 'A', 'Sevkiyat öğlen başlayacaktır.'),
+      k(16, 'B', 'Arpa: sulama başladı (10 dekar)'),
+      k(17, 'B', 'Yağmurlama hatları seriliyor.serilen alan 40 dekar, bağlanan alan 20 dekar ve 10 dekarın sulaması yapıldı. – arpa – 40 dekar'),
+      k(18, 'B', 'Yağmurlama hatları seriliyor.serilen alan 30 dekar, bağlanan alan 25 dekar ve 15 dekarın sulaması yapıldı. – arpa'),
+      k(17, 'C', "50 dekar alana 5'li patlatan çekiliyor. – 4.pivot"),
+      k(18, 'C', 'Arpa – sulama başlamıştır. – 5.pivot'),
+      k(12, 'C', 'Arpa – 40 dekar – ekime başlandı'),
+      k(13, 'C', 'Arpa: 40 dekar ekim bitti'),
+    ], teslimatlar: const [
+      DonemTeslimati(ciftlik: 'A', urun: 'Şeker Pancarı', alici: 'Fabrika', net: 1000000, teslim: 1100000, sefer: 40),
+    ]);
+    final m = {for (final x in o) x.ciftlik: x.maddeler};
+    expect(m['A'], [
+      'Şeker pancarı sökümü: tamamlandı',
+      'Pancar yükleme ve sevkiyat: başlandı',
+      'Yonca teslimatı: 12.500 kg',
+      'Şeker pancarı teslimatı (Fabrika): 1.000,0 ton net, 40 sefer, fire %9,1',
+    ]);
+    expect(m['B'], ['Yağmurlama sistemi serimi: 70 dekar', 'Sulama (arpa): 35 dekar']);
+    expect(m['C'], [
+      'Arpa ekimi: 40 dekar (tamamlandı)',
+      'Patlatan çekimi: 50 dekar',
+      'Sulama (arpa): başlandı',
+    ]);
   });
 }

@@ -4,6 +4,7 @@
 // patates fire listesi ve uygulamadan girilen Ürün_Teslimatları kayıtları.
 // Sunucudan günlük toplamlar gelir; plaka, satıcı numarası ve kişi adı gelmez.
 
+import 'faaliyet_ozet.dart';
 import 'model.dart';
 import 'uretim_karlilik.dart';
 
@@ -255,4 +256,26 @@ class _ToplamDurum extends UrunDurumu {
   double get beklenenGelir => parcalar.fold<double>(0, (a, d) => a + d.beklenenGelir);
   @override
   bool get fiyatTahmini => parcalar.any((d) => d.teslimatVar && d.fiyatTahmini);
+}
+
+/// Dönem (ör. rapor haftası) içindeki teslimatlar: çiftlik + ürün + alıcı bazında toplam.
+List<DonemTeslimati> donemTeslimatlari(UrunTeslimat t, DateTime bas, DateTime son) {
+  String g(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  final a = g(bas), b = g(son);
+  final m = <String, List<TeslimatGunu>>{};
+  for (final x in t.gunler) {
+    if (x.tarih.compareTo(a) < 0 || x.tarih.compareTo(b) > 0) continue;
+    m.putIfAbsent('${x.ciftlik}|${x.urun}|${x.alici}', () => []).add(x);
+  }
+  return [
+    for (final l in m.values)
+      DonemTeslimati(
+        ciftlik: l.first.ciftlik,
+        urun: l.first.urun,
+        alici: l.first.alici,
+        net: l.fold<double>(0, (s, x) => s + x.net),
+        teslim: l.fold<double>(0, (s, x) => s + x.teslim),
+        sefer: l.fold<int>(0, (s, x) => s + x.sefer),
+      ),
+  ]..sort((x, y) => x.ciftlik.compareTo(y.ciftlik));
 }
