@@ -444,7 +444,35 @@ List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l) {
   if (paket.isEmpty) return const [];
   final kmz = paket.first;
   final eski = girisSezonu(kmz, l, sezon: oncekiSezon(kmz.sezon), ilkSezon: true, sonraki: kmz);
-  return [eski, ...paket, girisSezonu(kmz, l, onceki: kmz)];
+  return [eski, for (final k in paket) kmzUzerine(k, l), girisSezonu(kmz, l, onceki: kmz)];
+}
+
+/// KMZ sezonunda haritadan yapılan bölme / ayırma çizgisi kayıtları (aynı sezon için)
+/// KMZ parselinin üzerine uygulanır; kaydı olmayan parsel KMZ'deki gibi kalır.
+TarlaSezonu kmzUzerine(TarlaSezonu kmz, List<SezonParsel> l) {
+  if (!l.any((x) => x.sezon == kmz.sezon)) return kmz;
+  return TarlaSezonu(
+    sezon: kmz.sezon,
+    kaynak: kmz.kaynak,
+    tarih: kmz.tarih,
+    onceki: kmz.onceki,
+    sonraki: kmz.sonraki,
+    giris: kmz.giris,
+    ciftlikler: [
+      for (final c in kmz.ciftlikler)
+        TarlaCiftlik(ad: c.ad, tesis: c.tesis, notlar: c.notlar, gorseller: c.gorseller, parseller: [
+          for (final p in c.parseller)
+            if (parselGirisi(l, kmz.sezon, c.ad, p.ad) case final g? when ParselIcerik.oku(g.urun).bolunmus)
+              () {
+                final y = _girisParseli(p, g, const []);
+                return TarlaParsel(ad: p.ad, tip: p.tip, urunler: y.urunler, beyan: p.beyan ?? y.beyan, olculen: p.olculen,
+                    etiket: p.etiket, not: p.not, koord: p.koord, bolme: y.bolme);
+              }()
+            else
+              p,
+        ]),
+    ],
+  );
 }
 
 /// 2025 üretim yılı (2024-2025 sezonu) ekilen alanları. Kaynak: 2026-2027 Tarımsal Faaliyet

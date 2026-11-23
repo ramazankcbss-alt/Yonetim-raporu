@@ -303,7 +303,8 @@ class _HaritaState extends State<_Harita> {
             aspectRatio: 0.82,
             child: _HaritaGorunum(
                 p: cizili, g: c.gorseller, cks: cksAdlari, maxOlcek: 6, dekar: giris, onDokun: dokun,
-                cizgiKaydet: giris ? (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz) : null),
+                cizgiKaydet: (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz),
+                cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, widget.s, c, p, cz, oran)),
           ),
           Positioned(
             right: 6,
@@ -327,7 +328,8 @@ class _HaritaState extends State<_Harita> {
                           yazi: 13,
                           dekar: s2.giris,
                           onDokun: (p) => _parselIslem(context, s2, c2, p),
-                          cizgiKaydet: s2.giris ? (p, cz) => _cizgiKaydet(context, s2, c2, p, cz) : null),
+                          cizgiKaydet: (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
+                          cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran)),
                     );
                   },
                 ),
@@ -476,6 +478,21 @@ double _kenarUzakligi(_N n, List<_N> k) {
     mx = math.max(mx, v);
   }
   return (nx, ny, mn + (mx - mn) * cz.$2.clamp(0, 100) / 100);
+}
+
+/// İki noktadan geçen çizgi → (açı°, konum %) bu çokgene göre.
+(double, double) _cizgiAl(List<_N> k, _N p, _N q) {
+  final aci = math.atan2(q.$2 - p.$2, q.$1 - p.$1) * 180 / math.pi;
+  final r = aci * math.pi / 180;
+  final nx = -math.sin(r), ny = math.cos(r);
+  var mn = double.infinity, mx = -double.infinity;
+  for (final x in k) {
+    final v = nx * x.$1 + ny * x.$2;
+    mn = math.min(mn, v);
+    mx = math.max(mx, v);
+  }
+  final m = ((p.$1 + q.$1) / 2, (p.$2 + q.$2) / 2);
+  return (aci, ((nx * m.$1 + ny * m.$2 - mn) / (mx - mn) * 100).clamp(1.0, 99.0));
 }
 
 /// Çokgeni bir çizginin bir yanına kırpar (Sutherland–Hodgman).
@@ -629,7 +646,7 @@ class _Geometri {
 /// Yakınlaştırılabilir harita: parseller yakınlaşır, yazılar sabit boyutta
 /// kalır; üst üste gelen yazılar gizlenir, yakınlaştırınca görünür.
 class _HaritaGorunum extends StatefulWidget {
-  const _HaritaGorunum({required this.p, this.g = const [], required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun, this.cizgiKaydet});
+  const _HaritaGorunum({required this.p, this.g = const [], required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun, this.cizgiKaydet, this.cizgiIleBol});
   final List<TarlaParsel> p;
   final List<TarlaGorsel> g;
   final Set<String> cks;
@@ -641,6 +658,10 @@ class _HaritaGorunum extends StatefulWidget {
 
   /// Bölünmüş parsellerde ayırma çizgisini doğrudan haritada çizip kaydetme.
   final Future<void> Function(TarlaParsel p, List<(double, double)> cizgiler)? cizgiKaydet;
+
+  /// Bölünmemiş parselin üzerinden çizgi çekilince: parseli bu çizgiyle iki parçaya böler.
+  /// [oran]: çizginin 1. yanındaki alanın parsele oranı.
+  final Future<void> Function(TarlaParsel p, (double, double) cizgi, double oran)? cizgiIleBol;
   @override
   State<_HaritaGorunum> createState() => _HaritaGorunumState();
 }
@@ -670,7 +691,7 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
       ? x.bolme
       : _otomatikCizgiler(_g.poligon[x]!, [for (final u in x.urunler) u.$2]);
 
-  void _cizgiBitir(Size size) {
+  Future<void> _cizgiBitir(Size size) async {
     final a = _bas, b = _son;
     setState(() => _bas = _son = null);
     if (a == null || b == null || (a - b).distance < 12) return;
@@ -692,8 +713,32 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
       }
     }
     if (hedef == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Çizgiyi parçalara bölünmüş bir parselin (iki renkli) üzerinden çekin.')));
+      // Bölünmemiş bir parselden geçiyorsa o parseli bu çizgiyle iki parçaya bölmeyi öner.
+      TarlaParsel? duz;
+      var enIc = 0;
+      for (final x in _g.sirali.reversed) {
+        if (x.tip == 'diger') continue;
+        final k = _g.poligon[x]!;
+        var n = 0;
+        for (var i = 0; i <= 20; i++) {
+          final f = i / 20;
+          if (_icinde((p.$1 + (q.$1 - p.$1) * f, p.$2 + (q.$2 - p.$2) * f), k)) n++;
+        }
+        if (n > enIc) {
+          enIc = n;
+          duz = x;
+        }
+      }
+      if (duz == null || widget.cizgiIleBol == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Çizgiyi bir parselin üzerinden, ayırmak istediğiniz yere çekin.')));
+        return;
+      }
+      final k = _g.poligon[duz]!;
+      final cz = _cizgiAl(k, p, q);
+      final yan = _kirp(k, _cizgiDenklemi(k, cz), true);
+      final oran = yan.length < 3 ? 0.5 : _alan(yan) / _alan(k);
+      await widget.cizgiIleBol!(duz, cz, oran);
       return;
     }
     final k = _g.poligon[hedef]!;
@@ -792,7 +837,7 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
   Widget build(BuildContext context) => ListenableBuilder(listenable: UrunRenkleri.ben, builder: (context, _) => _yap(context));
 
   Widget _yap(BuildContext context) {
-    final cizilebilir = widget.cizgiKaydet != null && _g.parca.isNotEmpty;
+    final cizilebilir = widget.cizgiKaydet != null;
     return ClipRect(
         child: Stack(fit: StackFit.expand, children: [
           InteractiveViewer(
@@ -869,7 +914,8 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                   padding: const EdgeInsets.all(10),
                   child: _bekleyen == null
                       ? const Text(
-                          'İki renkli (bölünmüş) parselin üzerinden, ayırmak istediğiniz yere parmağınızla bir çizgi çekin. '
+                          'Ayırmak istediğiniz parselin üzerinden parmağınızla bir çizgi çekin. İki renkli parselde çizgi yer '
+                          'değiştirir; tek ürünlü parselde parsel iki parçaya bölünür. '
                           'Yakınlaştırma gerekiyorsa önce "Çizimi bitir" deyip yakınlaştırın, sonra kalemle tekrar başlayın.',
                           style: TextStyle(fontSize: 12.5))
                       : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1955,8 +2001,9 @@ Future<void> _birlestir(BuildContext context, String sezon, TarlaCiftlik c, Tarl
 }
 
 /// Haritada çizilen ayırma çizgisini kaydeder (ürün ve dekarlar değişmez).
+/// Çizgi kayıtları her zaman haritası açık olan sezona yazılır (KMZ sezonunda da).
 Future<void> _cizgiKaydet(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, List<(double, double)> cz) async {
-  final hedef = s.giris ? s.sezon : sonrakiSezon(s.sezon);
+  final hedef = s.sezon;
   final l = [for (final u in p.urunler) (u.$1, u.$2)];
   final metin = ParselIcerik.bolunmusMetin(l, cz);
   if (metin.length > 60) {
@@ -1964,6 +2011,32 @@ Future<void> _cizgiKaydet(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
     return;
   }
   await _kaydet(context, hedef, c, p, metin, p.beyan ?? l.fold<double>(0, (a, x) => a + x.$2));
+}
+
+/// Tek ürünlü parsel haritada çizilen çizgiyle iki parçaya bölünür: parça ürünleri ve dekarları sorulur
+/// (dekar önerisi çizginin ayırdığı alan oranıyla).
+Future<void> _cizgiIleBol(
+    BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, (double, double) cz, double oran) async {
+  final toplam = p.beyan ?? p.olculen ?? p.urunler.fold<double>(0, (a, x) => a + x.$2);
+  final ilk = p.urunler.isEmpty ? null : p.urunler.first.$1;
+  double? yuvarla(double v) => toplam <= 0 ? null : (v * 10).round() / 10;
+  final l = await showDialog<List<(String, double)>>(
+      context: context,
+      builder: (_) => _ParcaGir(baslik: '${p.ad} (çizgiyle)', mevcut: [
+            (ilk != null && secilebilirUrunler.contains(urunAnahtari(ilk)) ? urunAnahtari(ilk) : secilebilirUrunler[1], yuvarla(toplam * oran)),
+            (secilebilirUrunler.first, yuvarla(toplam * (1 - oran))),
+          ]));
+  if (l == null || !context.mounted) return;
+  if (l.length != 2) {
+    bildir(context, 'Çizgiyle bölmede iki parça girin; üçüncü parça için ikinci çizgiyi sonra çekin.');
+    return;
+  }
+  final metin = ParselIcerik.bolunmusMetin(l, [cz]);
+  if (metin.length > 60) {
+    bildir(context, 'Kayıt çok uzun; ürün adlarını kısaltın.');
+    return;
+  }
+  await _kaydet(context, s.sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
 }
 
 Future<void> _kaydet(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, String urun, double? alan) async {
