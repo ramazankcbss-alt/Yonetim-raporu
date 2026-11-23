@@ -303,6 +303,36 @@ SezonParsel? parselGirisi(List<SezonParsel> l, String sezon, String ciftlik, Str
   return d;
 }
 
+/// Sezon_Parselleri "Ürün" sütununun içeriği.
+/// - "Arpa" → tek ürün (alan "Alan (da)" sütununda)
+/// - "Arpa:120+Buğday:120" → parsel parçalara bölünmüş
+/// - "Arpa@7. pivot" → bu parsel "7. pivot" ile birleştirilmiş (alan ana parselde)
+class ParselIcerik {
+  const ParselIcerik(this.parcalar, {this.birlesik});
+  final List<(String, double?)> parcalar;
+
+  /// Birleştirildiği ana parsel (bu parsel ona bağlı).
+  final String? birlesik;
+  bool get bolunmus => parcalar.length > 1;
+  String get urun => parcalar.isEmpty ? '' : parcalar.first.$1;
+
+  static ParselIcerik oku(String urun) {
+    final t = urun.trim();
+    final at = t.indexOf('@');
+    if (at > 0) return ParselIcerik([(t.substring(0, at).trim(), null)], birlesik: t.substring(at + 1).trim());
+    if (!t.contains(':')) return ParselIcerik([(t, null)]);
+    return ParselIcerik([
+      for (final x in t.split('+'))
+        if (x.trim().isNotEmpty)
+          (x.split(':').first.trim(), x.contains(':') ? double.tryParse(x.split(':').last.trim().replaceAll(',', '.')) : null),
+    ]);
+  }
+
+  /// Bölünmüş parsel için kayıt metni ("Arpa:120+Buğday:120").
+  static String bolunmusMetin(List<(String, double)> l) =>
+      l.map((x) => '${x.$1}:${x.$2 % 1 == 0 ? x.$2.toInt() : x.$2}').join('+');
+}
+
 /// "2025-2026" → "2024-2025".
 String oncekiSezon(String s) {
   final m = RegExp(r'^(\d{4})-(\d{4})$').firstMatch(s);
@@ -326,13 +356,33 @@ TarlaSezonu girisSezonu(TarlaSezonu taban, List<SezonParsel> l, {String? sezon, 
         TarlaCiftlik(ad: c.ad, tesis: c.tesis, gorseller: c.gorseller, parseller: [
           for (final p in c.parseller)
             if (parselGirisi(l, ad, c.ad, p.ad) case final g?)
-              TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(g.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord)
+              _girisParseli(p, g, [
+                for (final q in c.parseller)
+                  if (parselGirisi(l, ad, c.ad, q.ad) case final h?
+                      when q.ad != p.ad && ParselIcerik.oku(h.urun).birlesik == p.ad)
+                    q.ad
+              ])
             else
               TarlaParsel(
                   ad: p.ad, tip: p.tip == 'diger' || p.tip == 'bos' ? p.tip : 'girilmedi', urunler: const [], koord: p.koord),
         ]),
     ],
   );
+}
+
+TarlaParsel _girisParseli(TarlaParsel p, SezonParsel g, List<String> bagli) {
+  final ic = ParselIcerik.oku(g.urun);
+  if (ic.birlesik != null) {
+    // Alan ana parselde sayılır; burada yalnızca ürün cinsi görünür.
+    return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(ic.urun, 0)], koord: p.koord, not: '${ic.birlesik} ile birleştirildi');
+  }
+  if (ic.bolunmus) {
+    final l = [for (final x in ic.parcalar) (x.$1, x.$2 ?? 0.0)];
+    return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: l, beyan: g.alan ?? l.fold<double>(0, (a, x) => a + x.$2),
+        koord: p.koord, not: 'Parçalara bölündü');
+  }
+  return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(g.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord,
+      not: bagli.isEmpty ? '' : '${bagli.join(', ')} ile birleştirildi (alan toplamdır)');
 }
 
 /// Önceki sezonda aynı parselde ekili ürünler (münavebe için).

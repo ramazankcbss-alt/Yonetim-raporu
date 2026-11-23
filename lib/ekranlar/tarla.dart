@@ -1376,9 +1376,17 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
       builder: (context, _) {
         final v = VeriDeposu.ben.veri;
         final g = v == null ? null : parselGirisi(v.sezonParsel, hedef, c.ad, p.ad);
+        final ic = g == null ? null : ParselIcerik.oku(g.urun);
+        final bagli = <String>[
+          if (v != null)
+            for (final x in c.parseller)
+              if (parselGirisi(v.sezonParsel, hedef, c.ad, x.ad) case final h?
+                  when x.ad != p.ad && ParselIcerik.oku(h.urun).birlesik == p.ad)
+                x.ad
+        ];
         final once = s.giris ? oncekiUrunler(s, c.ad, p.ad) : [for (final u in p.urunler) urunAnahtari(u.$1)];
         final onceSezon = s.giris ? s.onceki?.sezon : s.sezon;
-        final ayni = g != null && once.contains(urunAnahtari(g.urun));
+        final ayni = ic != null && ic.parcalar.any((x) => once.contains(urunAnahtari(x.$1)));
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1387,7 +1395,7 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
               const SizedBox(height: 6),
               if (onceSezon != null)
                 Text('$onceSezon: ${once.isEmpty ? 'ürün yok' : once.join(' + ')}', style: const TextStyle(color: Renk.soluk)),
-              Text('$hedef: ${g == null ? 'girilmedi' : '${g.urun}${g.alan == null ? '' : ' · ${_da(g.alan)}'}'}',
+              Text('$hedef: ${g == null ? 'girilmedi' : _girisYazi(g, ic!, bagli)}',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               if (ayni)
                 const Padding(
@@ -1408,31 +1416,67 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: () async {
-                  final urun = g?.urun ?? (once.length == 1 ? once.first : null);
-                  if (urun == null) {
-                    bildir(context, 'Önce "Ürün değiştir" ile ürünü seçin.');
+                  if (ic != null && ic.bolunmus) {
+                    await _bol(context, hedef, c, p, ic);
                     return;
                   }
-                  final a = await showDialog<double>(context: context, builder: (_) => _DekarGir(deger: g?.alan, urun: urun));
+                  // Ürün henüz belli değilse (girilmemiş ya da önceki sezonda birden çok ürün) önce ürün seçilir.
+                  var urun = ic?.urun ?? (once.length == 1 ? once.first : null);
+                  if (urun == null) {
+                    urun = await showDialog<String>(context: context, builder: (_) => const _UrunSec());
+                    if (urun == null || !context.mounted) return;
+                  }
+                  final a = await showDialog<double>(
+                      context: context, builder: (_) => _DekarGir(deger: ic?.birlesik == null ? g?.alan : null, urun: urun!));
                   if (a == null || !context.mounted) return;
                   await _kaydet(context, hedef, c, p, urun, a);
                 },
                 icon: const Icon(Icons.straighten),
                 label: const Text('Dekar değiştir'),
               ),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _bol(context, hedef, c, p, ic),
+                    icon: const Icon(Icons.call_split),
+                    label: const Text('Parçalara böl'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _birlestir(context, hedef, c, p, ic, bagli),
+                    icon: const Icon(Icons.merge),
+                    label: const Text('Birleştir'),
+                  ),
+                ),
+              ]),
               if (g != null) ...[
                 const SizedBox(height: 8),
                 TextButton.icon(
                   onPressed: () async {
                     try {
+                      // Birleşik grubun ana parseli geri alınırsa bağlı parseller de çözülür.
+                      for (final b in bagli) {
+                        await VeriDeposu.ben.sezonParselKaydet(
+                            sezon: hedef, ciftlik: c.ad, parsel: b, geriAl: true, yenilensin: false);
+                      }
                       final m = await VeriDeposu.ben.sezonParselKaydet(sezon: hedef, ciftlik: c.ad, parsel: p.ad, geriAl: true);
-                      if (context.mounted) bildir(context, m);
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                        bildir(context, m);
+                      }
                     } catch (e) {
                       if (context.mounted) bildir(context, '$e');
                     }
                   },
                   icon: const Icon(Icons.undo),
-                  label: const Text('Girişi geri al'),
+                  label: Text(ic?.birlesik != null
+                      ? 'Birleşimden ayır'
+                      : bagli.isNotEmpty
+                          ? 'Girişi ve birleştirmeyi geri al'
+                          : 'Girişi geri al'),
                 ),
               ],
               const SizedBox(height: 6),
@@ -1444,6 +1488,58 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
       },
     ),
   );
+}
+
+String _girisYazi(SezonParsel g, ParselIcerik ic, List<String> bagli) {
+  if (ic.birlesik != null) return '${ic.urun} · ${ic.birlesik} ile birleştirildi';
+  if (ic.bolunmus) {
+    return ic.parcalar.map((x) => '${x.$1}${x.$2 == null ? '' : ' ${_da(x.$2)}'}').join(' + ');
+  }
+  return '${g.urun}${g.alan == null ? '' : ' · ${_da(g.alan)}'}'
+      '${bagli.isEmpty ? '' : ' (${bagli.join(', ')} ile birlikte)'}';
+}
+
+/// Parseli 2–3 parçaya böler (her parçaya ürün ve dekar). Kayıt: "Arpa:120+Buğday:120".
+Future<void> _bol(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, ParselIcerik? ic) async {
+  final l = await showDialog<List<(String, double)>>(
+      context: context, builder: (_) => _ParcaGir(baslik: p.ad, mevcut: ic != null && ic.bolunmus ? ic.parcalar : const []));
+  if (l == null || !context.mounted) return;
+  final metin = ParselIcerik.bolunmusMetin(l);
+  if (metin.length > 60) {
+    bildir(context, 'Ürün adları çok uzun; en fazla 3 parça girin ya da "Diğer" ürün adını kısaltın.');
+    return;
+  }
+  await _kaydet(context, sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
+}
+
+/// Bu parseli seçilen komşu parsellerle birleştirir: tek ürün, toplam dekar bu parselde tutulur,
+/// diğerleri "Ürün@bu parsel" olarak bağlanır.
+Future<void> _birlestir(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, ParselIcerik? ic,
+    List<String> bagli) async {
+  final adaylar = [for (final x in c.parseller) if (x.ad != p.ad && x.tip != 'diger') x.ad];
+  final r = await showDialog<(Set<String>, String, double?)>(
+      context: context,
+      builder: (_) => _BirlestirGir(
+          ana: p.ad, adaylar: adaylar, secili: bagli.toSet(), urun: ic?.bolunmus == false ? ic?.urun : null));
+  if (r == null || !context.mounted) return;
+  final (secilen, urun, alan) = r;
+  final mesaj = ScaffoldMessenger.of(context);
+  try {
+    for (final b in bagli) {
+      if (!secilen.contains(b)) {
+        await VeriDeposu.ben.sezonParselKaydet(sezon: sezon, ciftlik: c.ad, parsel: b, geriAl: true, yenilensin: false);
+      }
+    }
+    for (final b in secilen) {
+      await VeriDeposu.ben.sezonParselKaydet(
+          sezon: sezon, ciftlik: c.ad, parsel: b, urun: '$urun@${p.ad}', yenilensin: false);
+    }
+    await VeriDeposu.ben.sezonParselKaydet(sezon: sezon, ciftlik: c.ad, parsel: p.ad, urun: urun, alan: alan);
+    mesaj.showSnackBar(SnackBar(content: Text('${p.ad} ile ${secilen.join(', ')} birleştirildi: $urun'
+        '${alan == null ? '' : ' · ${_da(alan)}'}')));
+  } catch (e) {
+    mesaj.showSnackBar(SnackBar(content: Text('$e')));
+  }
 }
 
 Future<void> _kaydet(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, String urun, double? alan) async {
@@ -1525,7 +1621,7 @@ class _DekarGirState extends State<_DekarGir> {
   }
 
   double? get _d {
-    final x = double.tryParse(_t.text.trim().replaceAll('.', '').replaceAll(',', '.'));
+    final x = _dekarOku(_t.text);
     return x == null || x <= 0 ? null : x;
   }
 
@@ -1542,6 +1638,170 @@ class _DekarGirState extends State<_DekarGir> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
           FilledButton(onPressed: _d == null ? null : () => Navigator.pop(context, _d), child: const Text('Kaydet')),
+        ],
+      );
+}
+
+/// "120", "120,5", "120.5" (telefon klavyesi), "1.250" → dekar.
+double? _dekarOku(String t) {
+  final s = t.trim().replaceAll(' ', '');
+  if (s.isEmpty) return null;
+  if (s.contains(',')) return double.tryParse(s.replaceAll('.', '').replaceAll(',', '.'));
+  if (RegExp(r'^\d+\.\d{1,2}$').hasMatch(s)) return double.tryParse(s);
+  return double.tryParse(s.replaceAll('.', ''));
+}
+
+/// Parçalara bölme: 2–3 satır, her satırda ürün ve dekar.
+class _ParcaGir extends StatefulWidget {
+  const _ParcaGir({required this.baslik, this.mevcut = const []});
+  final String baslik;
+  final List<(String, double?)> mevcut;
+  @override
+  State<_ParcaGir> createState() => _ParcaGirState();
+}
+
+class _ParcaGirState extends State<_ParcaGir> {
+  late final List<String> _urun = [
+    for (var i = 0; i < 3; i++)
+      i < widget.mevcut.length && secilebilirUrunler.contains(widget.mevcut[i].$1)
+          ? widget.mevcut[i].$1
+          : secilebilirUrunler[i == 0 ? 1 : 0],
+  ];
+  late final List<TextEditingController> _da = [
+    for (var i = 0; i < 3; i++)
+      TextEditingController(
+          text: i < widget.mevcut.length && widget.mevcut[i].$2 != null ? sayi(widget.mevcut[i].$2, ondalik: widget.mevcut[i].$2! % 1 == 0 ? 0 : 1) : ''),
+  ];
+  late int _adet = widget.mevcut.length == 3 ? 3 : 2;
+
+  @override
+  void dispose() {
+    for (final t in _da) {
+      t.dispose();
+    }
+    super.dispose();
+  }
+
+  List<(String, double)>? get _sonuc {
+    final l = <(String, double)>[];
+    for (var i = 0; i < _adet; i++) {
+      final d = _dekarOku(_da[i].text);
+      if (d == null || d <= 0) return null;
+      l.add((_urun[i], d));
+    }
+    return l;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = _sonuc;
+    return AlertDialog(
+      title: Text('${widget.baslik} · parçalara böl'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (var i = 0; i < _adet; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Expanded(
+                  flex: 3,
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _urun[i],
+                    isExpanded: true,
+                    decoration: InputDecoration(labelText: '${i + 1}. parça'),
+                    items: [for (final u in secilebilirUrunler) DropdownMenuItem(value: u, child: Text(u))],
+                    onChanged: (x) => setState(() => _urun[i] = x ?? _urun[i]),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _da[i],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Dekar'),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ]),
+            ),
+          Row(children: [
+            if (_adet < 3)
+              TextButton.icon(
+                  onPressed: () => setState(() => _adet = 3), icon: const Icon(Icons.add), label: const Text('3. parça')),
+            if (_adet == 3)
+              TextButton.icon(
+                  onPressed: () => setState(() => _adet = 2), icon: const Icon(Icons.remove), label: const Text('2 parça')),
+          ]),
+          if (s != null)
+            Text('Toplam ${_da0(s.fold<double>(0, (a, x) => a + x.$2))}',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+        FilledButton(onPressed: s == null ? null : () => Navigator.pop(context, s), child: const Text('Kaydet')),
+      ],
+    );
+  }
+}
+
+String _da0(double d) => '${sayi(d, ondalik: d % 1 == 0 ? 0 : 1)} da';
+
+/// Birleştirme: aynı ürünle ekilecek komşu parseller ve toplam dekar.
+class _BirlestirGir extends StatefulWidget {
+  const _BirlestirGir({required this.ana, required this.adaylar, this.secili = const {}, this.urun});
+  final String ana;
+  final List<String> adaylar;
+  final Set<String> secili;
+  final String? urun;
+  @override
+  State<_BirlestirGir> createState() => _BirlestirGirState();
+}
+
+class _BirlestirGirState extends State<_BirlestirGir> {
+  late final Set<String> _sec = {...widget.secili};
+  late String _urun = widget.urun != null && secilebilirUrunler.contains(widget.urun) ? widget.urun! : secilebilirUrunler.first;
+  final _da = TextEditingController();
+
+  @override
+  void dispose() {
+    _da.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text('${widget.ana} · birleştir'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('Bu parselle birlikte aynı ürünle ekilecek parselleri seçin:', style: TextStyle(fontSize: 13)),
+            for (final a in widget.adaylar)
+              CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                value: _sec.contains(a),
+                title: Text(a),
+                onChanged: (x) => setState(() => x == true ? _sec.add(a) : _sec.remove(a)),
+              ),
+            DropdownButtonFormField<String>(
+              initialValue: _urun,
+              decoration: const InputDecoration(labelText: 'Ürün'),
+              items: [for (final u in secilebilirUrunler) DropdownMenuItem(value: u, child: Text(u))],
+              onChanged: (x) => setState(() => _urun = x ?? _urun),
+            ),
+            TextField(
+              controller: _da,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Birleşik alanın toplam dekarı', hintText: 'bilinmiyorsa boş bırakın'),
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+          FilledButton(
+              onPressed: _sec.isEmpty ? null : () => Navigator.pop(context, (_sec, _urun, _dekarOku(_da.text))),
+              child: const Text('Birleştir')),
         ],
       );
 }

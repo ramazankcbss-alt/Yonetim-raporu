@@ -401,12 +401,12 @@ class VeriDeposu extends ChangeNotifier {
   /// Tarla Haritası'nda bir parselin yeni sezon ürününü ve alanını kaydeder
   /// (ya da girişi geri alır) ve veriyi yeniler.
   Future<String> sezonParselKaydet({required String sezon, required String ciftlik, required String parsel,
-      String urun = '', double? alan, bool geriAl = false}) async {
+      String urun = '', double? alan, bool geriAl = false, bool yenilensin = true}) async {
     final j = await _islem(geriAl ? 'sezonParselGeriAl' : 'sezonParsel', {
       'sezon': sezon, 'ciftlik': ciftlik, 'parsel': parsel, 'urun': urun,
       'alan': alan == null ? '' : '$alan'.replaceAll('.', ','),
     });
-    await yenile();
+    if (yenilensin) await yenile();
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
 
