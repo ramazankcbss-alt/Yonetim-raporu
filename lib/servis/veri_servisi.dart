@@ -444,7 +444,7 @@ class VeriDeposu extends ChangeNotifier {
         .post(adres,
             body: govde,
             headers: {'Content-Type': 'text/plain;charset=utf-8'})
-        .timeout(const Duration(seconds: 120));
+        .timeout(const Duration(seconds: 330)); // eşitleme uzun sürebilir (Apps Script en çok 6 dk)
     // Apps Script, POST cevabını bir yönlendirme (302) ile verir; cevabı
     // yönlendirilen adresten GET ile okuruz.
     final yer = r.headers['location'];
