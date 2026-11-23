@@ -101,7 +101,7 @@ class _Ciftlikler extends StatelessWidget {
       m.putIfAbsent(d.ciftlik, () => []).add(d);
     }
     final l = m.entries.toList()
-      ..sort((a, b) => b.value.fold(0.0, (x, d) => x + d.planSatis).compareTo(a.value.fold(0.0, (x, d) => x + d.planSatis)));
+      ..sort((a, b) => b.value.fold<double>(0, (x, d) => x + d.planSatis).compareTo(a.value.fold<double>(0, (x, d) => x + d.planSatis)));
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
       children: [
@@ -194,7 +194,7 @@ class _UrunKarti extends StatelessWidget {
         child: Text(durum.$1, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: durum.$2)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _Baslik('Ekim ve plan'),
+        const _Baslik('Ekim ve plan'),
         _Satir('Ekim alanı', '${sayi(d.dekar)} da'
             '${parcalar.length > 1 ? ' (${parcalar.map((p) => '${p.ciftlik} ${sayi(p.dekar)}').join(', ')})' : parcalar.isNotEmpty ? ' · ${parcalar.first.ciftlik}' : ''}'),
         if (d.cesitler.isNotEmpty) _Satir('Çeşit', d.cesitler.join(', ')),
@@ -203,7 +203,7 @@ class _UrunKarti extends StatelessWidget {
         _Satir('Toplam maliyet', '${_tl(d.maliyet)}${d.dekar > 0 ? ' (${sayi(d.maliyet / d.dekar)} ₺/da)' : ''}'),
         _Satir('Planlanan net kazanç', _tl(d.planNet), renk: planKar ? Renk.yesil : Renk.kirmizi),
         const SizedBox(height: 8),
-        _Baslik('Teslimat ve satış'),
+        const _Baslik('Teslimat ve satış'),
         if (!d.teslimatVar)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 4),
