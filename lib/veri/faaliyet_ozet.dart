@@ -441,9 +441,11 @@ int kontrolBekleyen(List<TarimKaydi> kayitlar) =>
     kayitlar.where((k) => k.kontrolBekliyor).length;
 
 
-String _kg(double kg) => kg >= 100000
-    ? '${(kg / 1000).toStringAsFixed(1).replaceAll('.', ',')} ton'
-    : '${_binlik(kg.round())} kg';
+String _kg(double kg) {
+  if (kg < 100000) return '${_binlik(kg.round())} kg';
+  final t = (kg / 100).round(); // 0,1 ton hassasiyet
+  return '${_binlik(t ~/ 10)},${t % 10} ton';
+}
 
 /// Bir ürünün dönem içindeki teslimat toplamı (Ürün Takibi kayıtlarından).
 class DonemTeslimati {
