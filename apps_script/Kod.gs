@@ -468,6 +468,8 @@ function esitle_() {
     try {
       var ch = canliHayvanDosyasi_();
       sonuc.ozet = ozetEsitle_(ss, ch, tz, sonuc.notlar);
+      // Kaçırılan günler (ör. hafta sonu raporları pazartesi art arda girildiğinde)
+      sonuc.ozet += ozetEksikGunler_(ss, ch, sonuc.notlar);
       sonuc.gunluk = gunlukEsitle_(ss, ch, tz, sonuc.notlar);
     } catch (err) {
       sonuc.notlar.push('Canlı hayvan okunamadı: ' + err);
@@ -650,6 +652,91 @@ function ozetEsitle_(ss, ch, tz, notlar) {
   }
   yaz_(hedef, son + 1, satirlar, 18);
   return 1;
+}
+
+/**
+ * "ozet" sayfası her gün aynı yere yazıldığı için (üzerine yazılır), eşitleme o günü
+ * yakalayamazsa gün kaybolur. Eksik günler, "ozet"teki formüllerin (=isletme!W19 gibi)
+ * sütunu o güne kaydırılarak "isletme" sayfasından yeniden hesaplanır: hayvan sayısı,
+ * sağılan, süt, personel/taşeron. Elle yazılan olay sütunları (doğum, ölüm, kesim…)
+ * o gün için bilinmediğinden boş bırakılır; gerçek özet sonradan yakalanırsa üzerine yazılır.
+ */
+function ozetEksikGunler_(ss, ch, notlar) {
+  var oz = ch.getSheetByName('ozet'), isl = ch.getSheetByName('isletme');
+  if (!oz || !isl) return 0;
+  var ozTarih = tarihCoz_(oz.getRange(2, 2).getValue());
+  if (!ozTarih) return 0;
+  var gun0 = Number(ozTarih.slice(8, 10));
+  var formul = oz.getRange(1, 1, 27, 18).getFormulas();
+  var deger = oz.getRange(1, 1, 27, 18).getValues();
+  var iv = isl.getRange(1, 1, Math.min(isl.getLastRow(), 150), Math.min(isl.getLastColumn(), 45)).getValues();
+  var hedef = ss.getSheetByName(SAYFALAR.ozet);
+  var var_ = mevcutGunler_(hedef);
+  function sutunNo(h) { var n = 0; for (var i = 0; i < h.length; i++) n = n * 26 + (h.charCodeAt(i) - 64); return n; }
+  // Yalnızca "=isletme!X12 + isletme!Y13 …" biçimindeki formüller hesaplanır.
+  var re = /^=\s*isletme!\$?[A-Z]+\$?\d+(\s*\+\s*isletme!\$?[A-Z]+\$?\d+)*\s*$/i;
+  function hesapla(f, kayma) {
+    if (!f || !re.test(f)) return '';
+    var top = 0, dolu = false, m, r2 = /isletme!\$?([A-Z]+)\$?(\d+)/gi;
+    while ((m = r2.exec(f))) {
+      var c = sutunNo(m[1].toUpperCase()) + kayma, r = Number(m[2]);
+      if (c < 1 || r > iv.length || c > iv[0].length) return '';
+      var n = sayi_(iv[r - 1][c - 1]);
+      if (n === '') continue;
+      top += n; dolu = true;
+    }
+    return dolu ? top : '';
+  }
+  var eklenen = 0, satirlar = [];
+  for (var gun = 1; gun < gun0; gun++) {
+    var tarih = ozTarih.slice(0, 8) + ('0' + gun).slice(-2);
+    if (var_[tarih]) continue;
+    var kayma = gun - gun0, gunSatir = [];
+    for (var i = 3; i < 16; i++) {
+      var ad = String(deger[i][0]).trim();
+      if (!ad || /TOPLAM/i.test(ad)) continue;
+      if (ad.toLocaleUpperCase('tr-TR') === 'YÖNETİCİ - MÜDÜR') ad = 'Yönetici - Müdür';
+      var b = [1, 2, 3, 4, 5].map(function (k) { return hesapla(formul[i][k], kayma); });
+      if (b[2] === '' && b[3] === '' && b[4] === '') continue; // hayvan/sağılan/süt yoksa alma
+      // Olay sütunları bilinmiyor: boş.
+      gunSatir.push([yazTarih_(tarih)].concat([ad], b, ['', '', '', '', '', '', '', '', '', '', '']));
+    }
+    if (gunSatir.length) {
+      satirlar = satirlar.concat(gunSatir);
+      eklenen++;
+      notlar.push(yazTarih_(tarih) + ' özeti işletme tablosundan tamamlandı (olay sayıları girilmemiş)');
+    }
+  }
+  if (!satirlar.length) return 0;
+  yaz_(hedef, sonSatirA_(hedef) + 1, satirlar, 18);
+  return eklenen;
+}
+
+/**
+ * Özet takibi: "ozet" sayfası değiştikçe (her gün üzerine yazıldığı için) o günü
+ * kaçırmamak için 07:00–21:00 arasında dakikada bir yalnızca özeti okur.
+ */
+function ozetTakip() {
+  var saat = Number(Utilities.formatDate(new Date(), TZ_, 'H'));
+  if (saat < 7 || saat >= 21) return;
+  var kilit = LockService.getScriptLock();
+  if (!kilit.tryLock(5000)) return;
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var notlar = [];
+    ozetEsitle_(ss, canliHayvanDosyasi_(), ss.getSpreadsheetTimeZone() || TZ_, notlar);
+  } finally {
+    kilit.releaseLock();
+  }
+}
+
+/** Bir kez editörden çalıştırın: özet takibini (dakikada bir) kurar. */
+function ozetTakipKur() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'ozetTakip') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('ozetTakip').timeBased().everyMinutes(1).create();
+  Logger.log('Özet takibi kuruldu: 07:00–21:00 arası dakikada bir.');
 }
 
 function gunlukEsitle_(ss, ch, tz, notlar) {
