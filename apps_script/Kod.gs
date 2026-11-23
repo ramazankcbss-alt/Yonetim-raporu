@@ -213,6 +213,8 @@ function veriTopla_(gun) {
     sezonParsel: basitOku_('Sezon_Parselleri', 7, tz),
     // Ekim Planı dosyası: Yıl, Çiftlik, Ürün, Plan (da) — münavebe için tüm yıllar
     ekimPlani: (function () { try { return ekimPlaniOku_(); } catch (err) { return []; } })(),
+    // Tarımsal Faaliyet › ÇİFTLİK BAZINDA: ekim alanı, verim, satış, maliyet, net kazanç
+    tarimsalUretim: (function () { try { return tarimsalUretimOku_(); } catch (err) { return null; } })(),
     // Tarımsal Faaliyet › PARSEL: Çiftlik, İlçe, Köy, Ada, Parsel, Alan (da), Ürün
     resmiParsel: (function () { try { return resmiParsellerOku_(); } catch (err) { return []; } })(),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
@@ -998,6 +1000,21 @@ var CKS_KLASOR_ID = '1ghie0n4Hr8-_ANfo-v-9M0m8qNTr2zkD';
 // Ekim planı ve resmî parsel kaynakları (salt okunur; yalnızca alan/ürün/ada-parsel okunur).
 var EKIM_PLANI_ID = '1uNlVzsbJOh8n9-8g_0NwBsSioPapVGeBRWlp5niY00c';
 var TARIM_FAALIYET_ID = '1jeeLe8VF06l_a_JdcS1eF8n8yDGsgEPlIcjO4Y5T7u8';
+
+/** Tarımsal Faaliyet dosyası › "ÇİFTLİK BAZINDA" sayfası (A:M) ve "ÜRÜN BAZINDA" başlığı.
+ * Kişi bilgisi içermez; 30 dakika önbellekte tutulur. */
+function tarimsalUretimOku_() {
+  return onbellekli_('tarimsalUretim_v1', 1800, function () {
+    var ss = SpreadsheetApp.openById(TARIM_FAALIYET_ID);
+    var sh = ss.getSheetByName('ÇİFTLİK BAZINDA');
+    if (!sh || sh.getLastRow() < 3) return null;
+    var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 80), 13).getValues().map(function (r) {
+      return r.map(function (x) { return x instanceof Date ? '' : x; });
+    });
+    var ub = ss.getSheetByName('ÜRÜN BAZINDA');
+    return { dosya: ss.getName(), urunBasligi: ub ? String(ub.getRange(1, 1).getValue()) : '', satirlar: v };
+  });
+}
 
 function onbellekli_(anahtar, sure, uret) {
   var c = CacheService.getScriptCache();

@@ -12,6 +12,7 @@
 import 'mali.dart';
 import 'arac.dart';
 import 'bakim_onarim.dart';
+import 'uretim_karlilik.dart';
 
 export 'arac.dart';
 export 'bakim_onarim.dart';
@@ -1050,6 +1051,7 @@ class RaporVerisi {
     this.vetKodlari = const [],
     this.vetPanelAcik = false,
     this.mali = const MaliVeri(),
+    this.tarimsalUretim = const TarimsalUretim(),
     this.vetBildirimleri = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
@@ -1103,6 +1105,9 @@ class RaporVerisi {
 
   /// Mali Raporlar: gelen faturalar, açık bakiyeler, kontrol bulguları.
   final MaliVeri mali;
+
+  /// Tarımsal Faaliyet › ÇİFTLİK BAZINDA: üretim, satış, maliyet, net kazanç.
+  final TarimsalUretim tarimsalUretim;
   final List<VetBildirim> vetBildirimleri;
 
   /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
@@ -1121,6 +1126,7 @@ class RaporVerisi {
       detay: oku('hayvanDetay', DetaySatir.oku),
       bulgular: oku('driveBulgular', DriveBulgu.oku),
       mali: MaliVeri.json(j['mali']),
+      tarimsalUretim: TarimsalUretim.json(j['tarimsalUretim']),
       vetPanelAcik: j['veteriner'] is Map && (j['veteriner'] as Map)['acik'] == true,
       vetKodlari: _liste(j['veteriner'] is Map ? (j['veteriner'] as Map)['kodlar'] : null)
           .map(VetKod.oku)

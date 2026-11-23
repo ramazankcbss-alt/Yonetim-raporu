@@ -14,6 +14,7 @@ import 'kilit.dart';
 import 'mali.dart';
 import 'tarla.dart';
 import 'toplanti.dart';
+import 'uretim_karlilik.dart';
 import 'veteriner.dart';
 
 /// Asistan sekmesi: sekreterlik, danışmanlık, toplantı notları, özel notlar
@@ -52,6 +53,17 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.amber,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => MaliEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.insights_outlined,
+          baslik: 'Üretim ve Kârlılık',
+          aciklama: veri.tarimsalUretim.bos
+              ? 'Tarımsal Faaliyet: ürün ve çiftlik bazında alan, verim, satış, maliyet, net kazanç'
+              : '${sayi(veri.tarimsalUretim.genelToplam.dekar)} da · net kazanç '
+                  '${sayi(veri.tarimsalUretim.genelToplam.netKazanc)} ₺',
+          renk: Renk.yesil,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => UretimKarlilikEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.history_edu_outlined,
