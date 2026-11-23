@@ -53,7 +53,7 @@ class _TarlaEkranState extends State<TarlaEkran> {
             listenable: VeriDeposu.ben,
             builder: (context, _) {
               final v = VeriDeposu.ben.veri ?? widget.veri;
-              final hepsi = tarlaSezonlari(l, v.sezonParsel);
+              final hepsi = tarlaSezonlari(l, VeriDeposu.ben.sezonParselleri(v));
               return Scaffold(
                 appBar: AppBar(title: const Text('Tarla Haritası')),
                 body: GonderAlani(
@@ -101,7 +101,7 @@ class _SezonEkrani extends StatelessWidget {
   final RaporVerisi ilk;
 
   TarlaSezonu _bul(RaporVerisi v) {
-    final l = tarlaSezonlari(paket, v.sezonParsel);
+    final l = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v));
     return l.firstWhere((x) => x.sezon == sezon, orElse: () => l.first);
   }
 
@@ -1692,12 +1692,12 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
       listenable: VeriDeposu.ben,
       builder: (context, _) {
         final v = VeriDeposu.ben.veri;
-        final g = v == null ? null : parselGirisi(v.sezonParsel, hedef, c.ad, p.ad);
+        final g = v == null ? null : parselGirisi(VeriDeposu.ben.sezonParselleri(v), hedef, c.ad, p.ad);
         final ic = g == null ? null : ParselIcerik.oku(g.urun);
         final bagli = <String>[
           if (v != null)
             for (final x in c.parseller)
-              if (parselGirisi(v.sezonParsel, hedef, c.ad, x.ad) case final h?
+              if (parselGirisi(VeriDeposu.ben.sezonParselleri(v), hedef, c.ad, x.ad) case final h?
                   when x.ad != p.ad && ParselIcerik.oku(h.urun).birlesik == p.ad)
                 x.ad
         ];

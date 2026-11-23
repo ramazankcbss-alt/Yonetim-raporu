@@ -64,6 +64,16 @@ class VeriDeposu extends ChangeNotifier {
 
   String? link;
   RaporVerisi? veri;
+
+  /// Haritadan yapılan, sunucudan henüz geri gelmemiş parsel girişleri (anında görünsün diye).
+  final List<(DateTime, SezonParsel)> _yerelParsel = [];
+
+  /// Yenileme sürerken gelen ikinci istek: bitince bir kez daha çekilir.
+  bool _tekrarYenile = false;
+
+  /// Sezon parsel girişleri: sunucudaki kayıtlar + henüz yansımamış yerel girişler (son giriş geçerlidir).
+  List<SezonParsel> sezonParselleri(RaporVerisi v) =>
+      _yerelParsel.isEmpty ? v.sezonParsel : [...v.sezonParsel, for (final e in _yerelParsel) e.$2];
   DateTime? sonAlinma;
   bool yukleniyor = false;
   String? hata;
@@ -136,7 +146,11 @@ class VeriDeposu extends ChangeNotifier {
   /// Güncel veriyi çeker. Hata olursa eldeki (önbellek) veri korunur.
   Future<void> yenile() async {
     final l = link;
-    if (l == null || yukleniyor) return;
+    if (l == null) return;
+    if (yukleniyor) {
+      _tekrarYenile = true;
+      return;
+    }
     yukleniyor = true;
     hata = null;
     notifyListeners();
@@ -152,9 +166,14 @@ class VeriDeposu extends ChangeNotifier {
       yukleniyor = false;
       notifyListeners();
     }
+    if (_tekrarYenile) {
+      _tekrarYenile = false;
+      await yenile();
+    }
   }
 
   Future<void> _getir(String l) async {
+    final baslangic = DateTime.now();
     final u = Uri.parse(l);
     final adres = u.replace(queryParameters: {
       ...u.queryParameters,
@@ -189,6 +208,8 @@ class VeriDeposu extends ChangeNotifier {
     veri = v;
     sonAlinma = simdi;
     hata = null;
+    // Bu çekim başlamadan önce kaydedilen yerel girişler artık sunucu verisinde.
+    _yerelParsel.removeWhere((e) => e.$1.isBefore(baslangic));
     final kanca = veriGeldi;
     if (kanca != null) unawaited(kanca(v, ham));
   }
@@ -406,7 +427,13 @@ class VeriDeposu extends ChangeNotifier {
       'sezon': sezon, 'ciftlik': ciftlik, 'parsel': parsel, 'urun': urun,
       'alan': alan == null ? '' : '$alan'.replaceAll('.', ','),
     });
-    if (yenilensin) await yenile();
+    // Harita hemen güncellensin: kayıt yerelde de tutulur; tam yenileme arkada sürer.
+    _yerelParsel.add((
+      DateTime.now(),
+      SezonParsel(sezon: sezon, ciftlik: ciftlik, parsel: parsel, urun: urun, alan: alan, durum: geriAl ? 'Geri alındı' : 'Aktif'),
+    ));
+    notifyListeners();
+    if (yenilensin) unawaited(yenile());
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
 

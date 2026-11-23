@@ -296,11 +296,16 @@ String sonrakiSezon(String s) {
 
 /// Bir parselin bir sezondaki geçerli girişi (yoksa null).
 SezonParsel? parselGirisi(List<SezonParsel> l, String sezon, String ciftlik, String parsel) {
+  // Sıradaki son kayıt geçerlidir: sonraki "Geri alındı" kaydı önceki girişi iptal eder.
   SezonParsel? d;
   for (final x in l) {
-    if (x.aktif && x.sezon == sezon && ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(ciftlik) &&
+    if (x.sezon == sezon && ciftlikAnahtari(x.ciftlik) == ciftlikAnahtari(ciftlik) &&
         kucuk(x.parsel).trim() == kucuk(parsel).trim()) {
-      d = x;
+      if (x.aktif) {
+        d = x;
+      } else if (x.durum == 'Geri alındı') {
+        d = null;
+      }
     }
   }
   return d;
