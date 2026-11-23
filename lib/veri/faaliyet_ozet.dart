@@ -127,7 +127,8 @@ const _teslimUrunleri = [
   'şeker pancarı', 'pancar', 'yonca', 'buğday', 'arpa', 'patates', 'mısır', 'silaj', 'tritikale', 'saman', 'sap',
 ];
 final _ekim = RegExp(r'(^|[^a-zçğıöşü])ek(im|il|iyor|me)');
-final _dekar = RegExp(r'(\d[\d.,]*)\s*(?:dekar|da)(?![a-zçğıöşü])');
+// "30 dekar", "30 dekarın", "30 da" — "dekara 25 kg" (dekar başına) alan değildir.
+final _dekar = RegExp(r'(\d[\d.,]*)\s*(?:dekar(?!a(?![a-zçğıöşü]))|da(?![a-zçğıöşü]))');
 final _tamam = RegExp(r'bitti|bitmiş|tamamland|tamamlan');
 final _basla = RegExp(r'başla');
 // Form kaydı: "Malzeme girişi: 15 ton Halis buğday tohumu (dış tedarik)"
