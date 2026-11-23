@@ -23,4 +23,14 @@ void main() {
     expect(ic.cizgiler, [(37.0, 52.0)]);
     expect(ParselIcerik.oku('Arpa:1+Buğday:2+Yonca:3/10,30;10,70').cizgiler.length, 2);
   });
+
+  test('Parça başka parsele bağlanır', () {
+    final m = ParselIcerik.bolunmusMetin([('Arpa', 12), ('Buğday', 90)], [(10, 20)], ['1. parsel', null]);
+    expect(m, 'Arpa>1. parsel:12+Buğday:90/10,20');
+    final ic = ParselIcerik.oku(m);
+    expect(ic.parcalar, [('Arpa', 12.0), ('Buğday', 90.0)]);
+    expect(ic.bag(0), '1. parsel');
+    expect(ic.bag(1), isNull);
+    expect(ic.cizgiler, [(10.0, 20.0)]);
+  });
 }

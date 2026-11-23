@@ -1903,6 +1903,14 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
                   ),
                 ),
               ]),
+              if (ic != null && ic.bolunmus) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _parcaBagla(context, hedef, c, p, ic),
+                  icon: const Icon(Icons.link),
+                  label: Text(ic.baglar.isEmpty ? 'Parçayı başka parsele bağla' : 'Parça bağlantısını değiştir'),
+                ),
+              ],
               if (ic != null && ic.bolunmus)
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
@@ -1962,7 +1970,7 @@ Future<void> _bol(BuildContext context, String sezon, TarlaCiftlik c, TarlaParse
       context: context, builder: (_) => _ParcaGir(baslik: p.ad, mevcut: ic != null && ic.bolunmus ? ic.parcalar : const []));
   if (l == null || !context.mounted) return;
   final eski = ic != null && ic.bolunmus && ic.cizgiler.length == l.length - 1 ? ic.cizgiler : const <(double, double)>[];
-  final metin = ParselIcerik.bolunmusMetin(l, eski);
+  final metin = ParselIcerik.bolunmusMetin(l, eski, ic != null && ic.parcalar.length == l.length ? ic.baglar : const []);
   if (metin.length > 60) {
     bildir(context, 'Ürün adları çok uzun; en fazla 3 parça girin ya da "Diğer" ürün adını kısaltın.');
     return;
@@ -2005,7 +2013,7 @@ Future<void> _birlestir(BuildContext context, String sezon, TarlaCiftlik c, Tarl
 Future<void> _cizgiKaydet(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, List<(double, double)> cz) async {
   final hedef = s.sezon;
   final l = [for (final u in p.urunler) (u.$1, u.$2)];
-  final metin = ParselIcerik.bolunmusMetin(l, cz);
+  final metin = ParselIcerik.bolunmusMetin(l, cz, p.baglar);
   if (metin.length > 60) {
     bildir(context, 'Kayıt çok uzun; ürün adlarını kısaltın ya da parça sayısını azaltın.');
     return;
@@ -2037,6 +2045,83 @@ Future<void> _cizgiIleBol(
     return;
   }
   await _kaydet(context, s.sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
+}
+
+/// Bölünmüş parselin bir parçasını başka bir parsele bağlar: parça o parselin ürününü alır,
+/// dekarı o parselde sayılır. Kayıt: "Arpa>1. parsel:12+Buğday:90/…".
+Future<void> _parcaBagla(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, ParselIcerik ic) async {
+  final adaylar = [for (final x in c.parseller) if (x.ad != p.ad && x.tip != 'diger') x.ad];
+  final r = await showDialog<(int, String?)>(
+      context: context, builder: (_) => _ParcaBaglaGir(ic: ic, adaylar: adaylar));
+  if (r == null || !context.mounted) return;
+  final (i, hedefParsel) = r;
+  final v = VeriDeposu.ben.veri;
+  final urunler = [for (final x in ic.parcalar) (x.$1, x.$2 ?? 0.0)];
+  if (hedefParsel != null && v != null) {
+    // Parça, bağlandığı parselin ürününü alır (o parselde tek ürün girilmişse).
+    final h = parselGirisi(VeriDeposu.ben.sezonParselleri(v), sezon, c.ad, hedefParsel);
+    final hu = h == null ? null : ParselIcerik.oku(h.urun);
+    if (hu != null && !hu.bolunmus && hu.birlesik == null && hu.urun.isNotEmpty) urunler[i] = (hu.urun, urunler[i].$2);
+  }
+  final baglar = [for (var j = 0; j < urunler.length; j++) j == i ? hedefParsel : ic.bag(j)];
+  final metin = ParselIcerik.bolunmusMetin(urunler, ic.cizgiler, baglar);
+  if (metin.length > 60) {
+    bildir(context, 'Kayıt çok uzun (ürün ve parsel adları); daha kısa ad kullanın.');
+    return;
+  }
+  await _kaydet(context, sezon, c, p, metin, urunler.fold<double>(0, (a, x) => a + x.$2));
+}
+
+class _ParcaBaglaGir extends StatefulWidget {
+  const _ParcaBaglaGir({required this.ic, required this.adaylar});
+  final ParselIcerik ic;
+  final List<String> adaylar;
+  @override
+  State<_ParcaBaglaGir> createState() => _ParcaBaglaGirState();
+}
+
+class _ParcaBaglaGirState extends State<_ParcaBaglaGir> {
+  int _i = 0;
+  late String? _hedef = widget.ic.bag(0);
+  static const _yok = '— bağlı değil —';
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Parçayı başka parsele bağla'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Text('Hangi parça?', style: TextStyle(fontWeight: FontWeight.w700)),
+            for (final (i, x) in widget.ic.parcalar.indexed)
+              RadioListTile<int>(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                value: i,
+                groupValue: _i,
+                onChanged: (v) => setState(() {
+                  _i = v!;
+                  _hedef = widget.ic.bag(v);
+                }),
+                title: Text('${i + 1}. parça: ${x.$1}${x.$2 == null ? '' : ' ${_da(x.$2)}'}'
+                    '${widget.ic.bag(i) == null ? '' : ' → ${widget.ic.bag(i)}'}'),
+              ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              initialValue: _hedef ?? _yok,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Bağlanacağı parsel'),
+              items: [for (final a in [_yok, ...widget.adaylar]) DropdownMenuItem(value: a, child: Text(a))],
+              onChanged: (v) => setState(() => _hedef = v == _yok ? null : v),
+            ),
+            const SizedBox(height: 8),
+            const Text('Bağlanan parça o parselin ürününü alır; dekarı o parselin alanına eklenir, bu parselden düşülür.',
+                style: TextStyle(fontSize: 12, color: Renk.soluk)),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+          FilledButton(onPressed: () => Navigator.pop(context, (_i, _hedef)), child: const Text('Kaydet')),
+        ],
+      );
 }
 
 Future<void> _kaydet(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, String urun, double? alan) async {
