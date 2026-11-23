@@ -14,4 +14,13 @@ void main() {
     expect(ParselIcerik.bolunmusMetin([('Arpa', 120), ('Buğday', 80.5)]), 'Arpa:120+Buğday:80.5');
     expect(ParselIcerik.oku(ParselIcerik.bolunmusMetin([('Arpa', 120), ('Buğday', 80.5)])).parcalar.last, ('Buğday', 80.5));
   });
+
+  test('Ayırma çizgileri okunur ve yazılır', () {
+    final m = ParselIcerik.bolunmusMetin([('Arpa', 100), ('Buğday', 50)], [(37.4, 52.2)]);
+    expect(m, 'Arpa:100+Buğday:50/37,52');
+    final ic = ParselIcerik.oku(m);
+    expect(ic.parcalar, [('Arpa', 100.0), ('Buğday', 50.0)]);
+    expect(ic.cizgiler, [(37.0, 52.0)]);
+    expect(ParselIcerik.oku('Arpa:1+Buğday:2+Yonca:3/10,30;10,70').cizgiler.length, 2);
+  });
 }

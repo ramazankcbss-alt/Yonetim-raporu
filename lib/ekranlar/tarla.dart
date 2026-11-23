@@ -152,6 +152,7 @@ const _renkler = {
   'Yonca': Color(0xFF1E7FA8),
   'Patates': Color(0xFFA0522D),
 };
+Color urunAdRengi(String u) => _renkler[urunAnahtari(u)] ?? const Color(0xFF6D8B74);
 Color urunRengi(TarlaParsel p) {
   if (p.urunler.isEmpty) return p.tip == 'bos' || p.girilmedi ? const Color(0xFFD6D6D6) : const Color(0xFF90A4AE);
   return _renkler[urunAnahtari(p.urunler.first.$1)] ?? const Color(0xFF6D8B74);
@@ -374,6 +375,78 @@ double _kenarUzakligi(_N n, List<_N> k) {
   return m;
 }
 
+/// Ayırma çizgisi (açı°, konum %) → normal ve sabit: n·p = c.
+(double, double, double) _cizgiDenklemi(List<_N> k, (double, double) cz) {
+  final r = cz.$1 * math.pi / 180;
+  final nx = -math.sin(r), ny = math.cos(r);
+  var mn = double.infinity, mx = -double.infinity;
+  for (final p in k) {
+    final v = nx * p.$1 + ny * p.$2;
+    mn = math.min(mn, v);
+    mx = math.max(mx, v);
+  }
+  return (nx, ny, mn + (mx - mn) * cz.$2.clamp(0, 100) / 100);
+}
+
+/// Çokgeni bir çizginin bir yanına kırpar (Sutherland–Hodgman).
+List<_N> _kirp(List<_N> k, (double, double, double) d, bool birinciYan) {
+  double f(_N p) {
+    final v = d.$1 * p.$1 + d.$2 * p.$2 - d.$3;
+    return birinciYan ? v : -v;
+  }
+
+  final out = <_N>[];
+  for (var i = 0; i < k.length; i++) {
+    final a = k[i], b = k[(i + 1) % k.length];
+    final fa = f(a), fb = f(b);
+    if (fa <= 0) out.add(a);
+    if ((fa < 0 && fb > 0) || (fa > 0 && fb < 0)) {
+      final t = fa / (fa - fb);
+      out.add((a.$1 + t * (b.$1 - a.$1), a.$2 + t * (b.$2 - a.$2)));
+    }
+  }
+  return out;
+}
+
+/// Parseli çizgilerle parçalara ayırır: 1. parça 1. çizginin bir yanı, sonraki parçalar
+/// iki çizgi arası, son parça son çizginin öbür yanı.
+List<List<_N>> _parcala(List<_N> k, List<(double, double)> cizgiler) {
+  final d = [for (final c in cizgiler) _cizgiDenklemi(k, c)];
+  return [
+    for (var i = 0; i <= d.length; i++)
+      () {
+        var p = k;
+        if (i > 0) p = _kirp(p, d[i - 1], false);
+        if (i < d.length) p = _kirp(p, d[i], true);
+        return p;
+      }(),
+  ];
+}
+
+/// Çizgi çizilmemiş bölünmüş parsel: kuzey–güney doğrultulu çizgiler, parçalar dekar oranında.
+List<(double, double)> _otomatikCizgiler(List<_N> k, List<double> dekarlar) {
+  final toplam = dekarlar.fold<double>(0, (a, b) => a + b);
+  final oran = [for (final d in dekarlar) toplam > 0 ? d / toplam : 1 / dekarlar.length];
+  final tumAlan = _alan(k);
+  final l = <(double, double)>[];
+  var birikim = 0.0;
+  for (var i = 0; i < oran.length - 1; i++) {
+    birikim += oran[i];
+    var a = 0.0, b = 100.0;
+    for (var j = 0; j < 30; j++) {
+      final m = (a + b) / 2;
+      final p = _kirp(k, _cizgiDenklemi(k, (90, m)), true);
+      if ((p.length < 3 ? 0 : _alan(p)) / tumAlan < birikim) {
+        a = m;
+      } else {
+        b = m;
+      }
+    }
+    l.add((90, (a + b) / 2));
+  }
+  return l;
+}
+
 /// Haritanın düzlem geometrisi ve her parselin yazı noktası (üstteki
 /// küçük parsellerin dışında, kenarlardan en uzak iç nokta).
 class _Geometri {
@@ -384,6 +457,12 @@ class _Geometri {
     for (final x in p) {
       poligon[x] = [for (final c in x.koord) (c.$1 * kx, c.$2)];
       alan[x] = _alan(poligon[x]!);
+      if (x.urunler.length > 1 && poligon[x]!.length > 2) {
+        final cz = x.bolme.length == x.urunler.length - 1
+            ? x.bolme
+            : _otomatikCizgiler(poligon[x]!, [for (final u in x.urunler) u.$2]);
+        parca[x] = _parcala(poligon[x]!, cz);
+      }
     }
     sirali = [...p]..sort((a, b) => alan[b]!.compareTo(alan[a]!));
     gorsel = [
@@ -403,6 +482,9 @@ class _Geometri {
 
   final poligon = <TarlaParsel, List<_N>>{};
   final alan = <TarlaParsel, double>{};
+
+  /// Parçalara bölünmüş parsellerin parçaları (ürün sırasıyla).
+  final parca = <TarlaParsel, List<List<_N>>>{};
   final yaziNoktasi = <TarlaParsel, _N>{};
 
   /// KMZ görselleri (kuyu, direk, hatlar) düzlem koordinatında.
@@ -533,7 +615,22 @@ class _PoligonCizer extends CustomPainter {
     final d = g.donusum(size);
     for (final x in g.sirali) {
       final yol = Path()..addPolygon([for (final c in g.poligon[x]!) d(c)], true);
-      canvas.drawPath(yol, Paint()..color = urunRengi(x).withValues(alpha: 0.6));
+      final parcalar = g.parca[x];
+      if (parcalar != null) {
+        for (var i = 0; i < parcalar.length && i < x.urunler.length; i++) {
+          if (parcalar[i].length < 3) continue;
+          final py = Path()..addPolygon([for (final c in parcalar[i]) d(c)], true);
+          canvas.drawPath(py, Paint()..color = urunAdRengi(x.urunler[i].$1).withValues(alpha: 0.6));
+          canvas.drawPath(
+              py,
+              Paint()
+                ..color = Colors.white70
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 1.2);
+        }
+      } else {
+        canvas.drawPath(yol, Paint()..color = urunRengi(x).withValues(alpha: 0.6));
+      }
       canvas.drawPath(
           yol,
           Paint()
@@ -1452,6 +1549,14 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
                   ),
                 ),
               ]),
+              if (ic != null && ic.bolunmus && p.koord.length > 2) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _cizgiCiz(context, hedef, c, p, ic),
+                  icon: const Icon(Icons.draw_outlined),
+                  label: Text(ic.cizgiler.isEmpty ? 'Ayırma çizgisi çiz (renk ayrımı)' : 'Ayırma çizgisini değiştir'),
+                ),
+              ],
               if (g != null) ...[
                 const SizedBox(height: 8),
                 TextButton.icon(
@@ -1504,7 +1609,8 @@ Future<void> _bol(BuildContext context, String sezon, TarlaCiftlik c, TarlaParse
   final l = await showDialog<List<(String, double)>>(
       context: context, builder: (_) => _ParcaGir(baslik: p.ad, mevcut: ic != null && ic.bolunmus ? ic.parcalar : const []));
   if (l == null || !context.mounted) return;
-  final metin = ParselIcerik.bolunmusMetin(l);
+  final eski = ic != null && ic.bolunmus && ic.cizgiler.length == l.length - 1 ? ic.cizgiler : const <(double, double)>[];
+  final metin = ParselIcerik.bolunmusMetin(l, eski);
   if (metin.length > 60) {
     bildir(context, 'Ürün adları çok uzun; en fazla 3 parça girin ya da "Diğer" ürün adını kısaltın.');
     return;
@@ -1540,6 +1646,202 @@ Future<void> _birlestir(BuildContext context, String sezon, TarlaCiftlik c, Tarl
   } catch (e) {
     mesaj.showSnackBar(SnackBar(content: Text('$e')));
   }
+}
+
+/// Bölünmüş parsel için ayırma çizgisi çizme ekranı; kayıt "…/açı,konum".
+Future<void> _cizgiCiz(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, ParselIcerik ic) async {
+  final r = await Navigator.of(context).push<(List<(String, double?)>, List<(double, double)>)>(MaterialPageRoute(
+      builder: (_) => _BolmeCizimi(ad: '${c.ad} · ${p.ad}', koord: p.koord, urunler: ic.parcalar, cizgiler: ic.cizgiler)));
+  if (r == null || !context.mounted) return;
+  final (urunler, cizgiler) = r;
+  final l = [for (final u in urunler) (u.$1, u.$2 ?? 0.0)];
+  final metin = ParselIcerik.bolunmusMetin(l, cizgiler);
+  if (metin.length > 60) {
+    bildir(context, 'Kayıt çok uzun; ürün adlarını kısaltın ya da parça sayısını azaltın.');
+    return;
+  }
+  await _kaydet(context, sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
+}
+
+class _BolmeCizimi extends StatefulWidget {
+  const _BolmeCizimi({required this.ad, required this.koord, required this.urunler, this.cizgiler = const []});
+  final String ad;
+  final List<(double, double)> koord;
+  final List<(String, double?)> urunler;
+  final List<(double, double)> cizgiler;
+  @override
+  State<_BolmeCizimi> createState() => _BolmeCizimiState();
+}
+
+class _BolmeCizimiState extends State<_BolmeCizimi> {
+  late final List<_N> _k;
+  late List<(String, double?)> _urunler = [...widget.urunler];
+  late List<(double, double)> _cz = [...widget.cizgiler];
+  Offset? _bas, _son;
+  int _sira = 0;
+
+  int get _gereken => _urunler.length - 1;
+
+  @override
+  void initState() {
+    super.initState();
+    final lat0 = widget.koord.map((e) => e.$2).reduce((a, b) => a + b) / widget.koord.length;
+    final kx = math.cos(lat0 * math.pi / 180);
+    _k = [for (final c in widget.koord) (c.$1 * kx, c.$2)];
+  }
+
+  List<(double, double)> get _gecerli =>
+      _cz.length == _gereken ? _cz : _otomatikCizgiler(_k, [for (final u in _urunler) u.$2 ?? 0]);
+
+  // Düzlem ↔ ekran
+  (double, double, double, double, double) _olcek(Size s) {
+    final xs = _k.map((e) => e.$1), ys = _k.map((e) => e.$2);
+    final x0 = xs.reduce(math.min), x1 = xs.reduce(math.max), y0 = ys.reduce(math.min), y1 = ys.reduce(math.max);
+    final o = 0.86 * math.min(s.width / (x1 - x0), s.height / (y1 - y0));
+    return (o, x0, y0, (s.width - (x1 - x0) * o) / 2, (s.height - (y1 - y0) * o) / 2);
+  }
+
+  Offset _ekran(_N c, Size s) {
+    final (o, x0, y0, ox, oy) = _olcek(s);
+    return Offset(ox + (c.$1 - x0) * o, s.height - (oy + (c.$2 - y0) * o));
+  }
+
+  _N _duzlem(Offset e, Size s) {
+    final (o, x0, y0, ox, oy) = _olcek(s);
+    return (x0 + (e.dx - ox) / o, y0 + (s.height - e.dy - oy) / o);
+  }
+
+  void _cizgiBitir(Size s) {
+    final a = _bas, b = _son;
+    _bas = _son = null;
+    if (a == null || b == null || (a - b).distance < 24) {
+      setState(() {});
+      return;
+    }
+    final p = _duzlem(a, s), q = _duzlem(b, s);
+    final aci = math.atan2(q.$2 - p.$2, q.$1 - p.$1) * 180 / math.pi;
+    final r = aci * math.pi / 180;
+    final nx = -math.sin(r), ny = math.cos(r);
+    var mn = double.infinity, mx = -double.infinity;
+    for (final x in _k) {
+      final v = nx * x.$1 + ny * x.$2;
+      mn = math.min(mn, v);
+      mx = math.max(mx, v);
+    }
+    final konum = ((nx * p.$1 + ny * p.$2 - mn) / (mx - mn) * 100).clamp(1.0, 99.0);
+    setState(() {
+      if (_cz.length < _gereken) {
+        _cz = [..._cz, (aci, konum)];
+      } else {
+        _cz = [..._cz]..[_sira % _gereken] = (aci, konum);
+        _sira++;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final eksik = _gereken - _cz.length;
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.ad)),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: Text(
+              eksik > 0
+                  ? 'Parseli ayırmak için parmağınızla parselin üzerinden bir çizgi çekin'
+                      '${_gereken > 1 ? ' (${_cz.length + 1}. çizgi / $_gereken)' : ''}.'
+                  : 'Çizgiyi değiştirmek için yeniden çekin. Renkler ters düştüyse "Ürün sırasını çevir".',
+              style: const TextStyle(fontSize: 13.5)),
+        ),
+        Expanded(
+          child: LayoutBuilder(builder: (context, k) {
+            final s = k.biggest;
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (e) => setState(() => _bas = _son = e.localPosition),
+              onPanUpdate: (e) => setState(() => _son = e.localPosition),
+              onPanEnd: (_) => _cizgiBitir(s),
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: _BolmeCizer(
+                  parcalar: [for (final x in _parcala(_k, _gecerli)) [for (final c in x) _ekran(c, s)]],
+                  sinir: [for (final c in _k) _ekran(c, s)],
+                  urunler: _urunler,
+                  cizim: _bas == null || _son == null ? null : (_bas!, _son!),
+                  otomatik: _cz.length != _gereken,
+                ),
+              ),
+            );
+          }),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Wrap(spacing: 8, runSpacing: 4, alignment: WrapAlignment.center, children: [
+            OutlinedButton.icon(
+                onPressed: () => setState(() => _urunler = _urunler.reversed.toList()),
+                icon: const Icon(Icons.swap_horiz),
+                label: const Text('Ürün sırasını çevir')),
+            OutlinedButton.icon(
+                onPressed: _cz.isEmpty ? null : () => setState(() => _cz = []),
+                icon: const Icon(Icons.clear),
+                label: const Text('Çizgileri temizle')),
+            FilledButton.icon(
+                onPressed: eksik > 0 && _cz.isNotEmpty ? null : () => Navigator.pop(context, (_urunler, _cz)),
+                icon: const Icon(Icons.check),
+                label: const Text('Kaydet')),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class _BolmeCizer extends CustomPainter {
+  _BolmeCizer({required this.parcalar, required this.sinir, required this.urunler, this.cizim, this.otomatik = false});
+  final List<List<Offset>> parcalar;
+  final List<Offset> sinir;
+  final List<(String, double?)> urunler;
+  final (Offset, Offset)? cizim;
+  final bool otomatik;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < parcalar.length && i < urunler.length; i++) {
+      final p = parcalar[i];
+      if (p.length < 3) continue;
+      canvas.drawPath(Path()..addPolygon(p, true), Paint()..color = urunAdRengi(urunler[i].$1).withValues(alpha: 0.65));
+      canvas.drawPath(
+          Path()..addPolygon(p, true),
+          Paint()
+            ..color = Colors.white
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = otomatik ? 1 : 2.5);
+      final m = Offset(p.map((e) => e.dx).reduce((a, b) => a + b) / p.length, p.map((e) => e.dy).reduce((a, b) => a + b) / p.length);
+      final t = TextPainter(
+          text: TextSpan(
+              text: '${urunler[i].$1}${urunler[i].$2 == null ? '' : '\n${sayi(urunler[i].$2)} da'}',
+              style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w700, backgroundColor: Color(0xCCFFFFFF))),
+          textAlign: TextAlign.center,
+          textDirection: TextDirection.ltr)
+        ..layout(maxWidth: 160);
+      t.paint(canvas, m - Offset(t.width / 2, t.height / 2));
+    }
+    canvas.drawPath(
+        Path()..addPolygon(sinir, true),
+        Paint()
+          ..color = Colors.black87
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2);
+    if (cizim case (final a, final b)) {
+      canvas.drawLine(a, b, Paint()
+        ..color = Colors.red
+        ..strokeWidth = 3);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BolmeCizer old) => true;
 }
 
 Future<void> _kaydet(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, String urun, double? alan) async {

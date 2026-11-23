@@ -12,9 +12,12 @@ import 'model.dart';
 
 class TarlaParsel {
   const TarlaParsel({required this.ad, required this.tip, required this.urunler, this.beyan, this.olculen,
-      this.etiket = '', this.not = '', this.koord = const []});
+      this.etiket = '', this.not = '', this.koord = const [], this.bolme = const []});
   final String ad, tip, etiket, not;
   final List<(String, double)> urunler;
+
+  /// Parçalara bölünmüş parselde elle çizilen ayırma çizgileri: (açı°, konum %).
+  final List<(double, double)> bolme;
   final double? beyan, olculen;
   final List<(double, double)> koord;
 
@@ -308,8 +311,11 @@ SezonParsel? parselGirisi(List<SezonParsel> l, String sezon, String ciftlik, Str
 /// - "Arpa:120+Buğday:120" → parsel parçalara bölünmüş
 /// - "Arpa@7. pivot" → bu parsel "7. pivot" ile birleştirilmiş (alan ana parselde)
 class ParselIcerik {
-  const ParselIcerik(this.parcalar, {this.birlesik});
+  const ParselIcerik(this.parcalar, {this.birlesik, this.cizgiler = const []});
   final List<(String, double?)> parcalar;
+
+  /// Haritada çizilen ayırma çizgileri: (açı°, konum %), "…/37,52;120,70" ekinden.
+  final List<(double, double)> cizgiler;
 
   /// Birleştirildiği ana parsel (bu parsel ona bağlı).
   final String? birlesik;
@@ -321,16 +327,26 @@ class ParselIcerik {
     final at = t.indexOf('@');
     if (at > 0) return ParselIcerik([(t.substring(0, at).trim(), null)], birlesik: t.substring(at + 1).trim());
     if (!t.contains(':')) return ParselIcerik([(t, null)]);
+    final bolu = t.indexOf('/');
+    final govde = bolu < 0 ? t : t.substring(0, bolu);
+    final cizgiler = <(double, double)>[
+      if (bolu >= 0)
+        for (final c in t.substring(bolu + 1).split(';'))
+          if (c.split(',') case [final a, final k])
+            if (double.tryParse(a) case final aa?)
+              if (double.tryParse(k) case final kk?) (aa, kk),
+    ];
     return ParselIcerik([
-      for (final x in t.split('+'))
+      for (final x in govde.split('+'))
         if (x.trim().isNotEmpty)
           (x.split(':').first.trim(), x.contains(':') ? double.tryParse(x.split(':').last.trim().replaceAll(',', '.')) : null),
-    ]);
+    ], cizgiler: cizgiler);
   }
 
   /// Bölünmüş parsel için kayıt metni ("Arpa:120+Buğday:120").
-  static String bolunmusMetin(List<(String, double)> l) =>
-      l.map((x) => '${x.$1}:${x.$2 % 1 == 0 ? x.$2.toInt() : x.$2}').join('+');
+  static String bolunmusMetin(List<(String, double)> l, [List<(double, double)> cizgiler = const []]) =>
+      l.map((x) => '${x.$1}:${x.$2 % 1 == 0 ? x.$2.toInt() : x.$2}').join('+') +
+      (cizgiler.isEmpty ? '' : '/${cizgiler.map((c) => '${c.$1.round()},${c.$2.round()}').join(';')}');
 }
 
 /// "2025-2026" → "2024-2025".
@@ -379,7 +395,7 @@ TarlaParsel _girisParseli(TarlaParsel p, SezonParsel g, List<String> bagli) {
   if (ic.bolunmus) {
     final l = [for (final x in ic.parcalar) (x.$1, x.$2 ?? 0.0)];
     return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: l, beyan: g.alan ?? l.fold<double>(0, (a, x) => a + x.$2),
-        koord: p.koord, not: 'Parçalara bölündü');
+        koord: p.koord, not: 'Parçalara bölündü', bolme: ic.cizgiler.length == l.length - 1 ? ic.cizgiler : const []);
   }
   return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(g.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord,
       not: bagli.isEmpty ? '' : '${bagli.join(', ')} ile birleştirildi (alan toplamdır)');
