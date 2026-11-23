@@ -156,6 +156,29 @@ class EskBolumu extends StatelessWidget {
             renk: Renk.turuncu,
             alt: kesilenAlt,
           ),
+          GostergeKarti(
+            baslik: 'Gelen Hayvan',
+            deger: sayi(g.eskGelen),
+            ikon: Icons.local_shipping_outlined,
+            renk: Renk.yesil,
+            alt: kesilenAlt ?? 'Dışarıdan alınan',
+          ),
+          if (g.eskSonKesim != null && (g.eskKesilen ?? 0) == 0)
+            GostergeKarti(
+              baslik: 'Son Kesim',
+              deger: sayi(g.eskSonKesim!.adet),
+              ikon: Icons.history,
+              renk: Renk.turuncu,
+              alt: tarihKisa(g.eskSonKesim!.tarih),
+            ),
+          if (g.eskSonGelen != null && (g.eskGelen ?? 0) == 0)
+            GostergeKarti(
+              baslik: 'Son Gelen Hayvan',
+              deger: sayi(g.eskSonGelen!.adet),
+              ikon: Icons.history,
+              renk: Renk.yesil,
+              alt: tarihKisa(g.eskSonGelen!.tarih),
+            ),
           if ((olenDana ?? g.eskOlenDana ?? 0) > 0)
             GostergeKarti(
               baslik: 'Ölen Dana',

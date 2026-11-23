@@ -176,3 +176,60 @@ List<EskYil> eskYillari(List<EskAy> aylar) {
   }
   return y.values.toList()..sort((a, b) => b.yil.compareTo(a.yil));
 }
+
+/// ESK-Taşağıl'da tek bir günün hareketi (kesim veya gelen hayvan).
+class EskHareket {
+  const EskHareket(this.tarih, this.adet);
+  final DateTime tarih;
+  final double adet;
+}
+
+/// [d] günü dahil, ESK-Taşağıl'daki son kesim ve son gelen hayvan hareketi.
+/// Kaynak: işletme günlük raporu (Hayvan_Detay); o gün için yoksa Hayvan_Özet.
+({EskHareket? kesim, EskHareket? gelen}) eskSonHareketler(
+    RaporVerisi v, DateTime d) {
+  final son = gunu(d);
+  final kesim = <DateTime, double>{}, gelen = <DateTime, double>{};
+  for (final o in v.ozet) {
+    if (o.isletme != eskBesi) continue;
+    final t = gunu(o.tarih);
+    if (t.isAfter(son)) continue;
+    if (o.kesilenDana > 0) kesim[t] = o.kesilenDana;
+    if (o.alinan > 0) gelen[t] = o.alinan;
+  }
+  _detayGunleri(v).forEach((t, x) {
+    if (t.isAfter(son)) return;
+    if (x.kesilen > 0) kesim[t] = x.kesilen;
+    if (x.giren > 0) gelen[t] = x.giren;
+  });
+  EskHareket? enSon(Map<DateTime, double> m) {
+    if (m.isEmpty) return null;
+    final t = m.keys.reduce((a, b) => a.isAfter(b) ? a : b);
+    return EskHareket(t, m[t]!);
+  }
+
+  return (kesim: enSon(kesim), gelen: enSon(gelen));
+}
+
+/// ESK-Taşağıl'ın [d] günündeki gün sonu hayvan sayısı (işletme günlük
+/// raporunun "Toplam" satırı; gelen hayvanlar dahil). Veri yoksa null.
+double? eskGunSonuHayvan(RaporVerisi v, DateTime d) {
+  final x = _detayGunleri(v)[gunu(d)];
+  return x == null || x.mevcut <= 0 ? null : x.mevcut;
+}
+
+/// [bas]–[son] arasında ESK-Taşağıl'a gelen hayvan toplamı (günlük rapor,
+/// o gün yoksa Hayvan_Özet "Dışarıdan Alınan").
+double eskGelenToplam(RaporVerisi v, DateTime bas, DateTime son) {
+  final b = gunu(bas), s = gunu(son);
+  bool icinde(DateTime t) => !t.isBefore(b) && !t.isAfter(s);
+  final m = <DateTime, double>{};
+  for (final o in v.ozet) {
+    final t = gunu(o.tarih);
+    if (o.isletme == eskBesi && icinde(t) && o.alinan > 0) m[t] = o.alinan;
+  }
+  _detayGunleri(v).forEach((t, x) {
+    if (icinde(t) && x.giren > 0) m[t] = x.giren;
+  });
+  return m.values.fold(0.0, (a, b) => a + b);
+}

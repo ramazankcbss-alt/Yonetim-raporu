@@ -9,6 +9,7 @@
 //  - Haftalık süt, sağmal ve satılan süt Fethiye + Erentepe günlük
 //    kayıtlarından (Hayvan_Günlük) hesaplanır.
 
+import 'esk_rapor.dart';
 import 'mali.dart';
 import 'arac.dart';
 import 'bakim_onarim.dart';
@@ -1418,12 +1419,21 @@ class Gostergeler {
     this.gencOlum,
     this.olenDana,
     this.eskOlenDana,
+    this.eskGelen,
+    this.eskSonKesim,
+    this.eskSonGelen,
   });
 
   final double? toplamHayvan, sagilan, sut, ortVerim, satilan;
   final double? personel, taseron, dogan, kesilenDana, olenBuzagi, kesimSatis;
   final double? eskBesiHayvan, eskKesilen, eskPersonel, eskTaseron;
   final double? yavruAtma, inekOlum, gencOlum, olenDana, eskOlenDana;
+
+  /// ESK-Taşağıl'a dışarıdan gelen hayvan (gün / hafta toplamı).
+  final double? eskGelen;
+
+  /// Seçilen güne (haftada son güne) kadarki son kesim ve son gelen hayvan.
+  final EskHareket? eskSonKesim, eskSonGelen;
 
   /// Çiftliklerimizdeki toplam hayvan kaybı (ESK-Taşağıl hariç).
   double? get kayip => olenBuzagi == null
@@ -1454,7 +1464,8 @@ class Gostergeler {
       taseron == null ? null : taseron! - (eskTaseron ?? 0);
 
   /// ESK-Taşağıl için gösterilecek veri var mı.
-  bool get eskVar => eskBesiHayvan != null || eskKesilen != null;
+  bool get eskVar =>
+      eskBesiHayvan != null || eskKesilen != null || eskGelen != null;
 }
 
 /// Tek bir günün göstergeleri.
@@ -1465,6 +1476,9 @@ Gostergeler gunlukGostergeler(RaporVerisi v, DateTime d) {
   final ozVar = oz.ozetGunu != null;
   final sut = ozVar ? oz.toplam.sut : g?.sut;
   final sag = ozVar ? oz.toplam.sagilan : g?.sagmal;
+  final eskSon = eskSonHareketler(v, d);
+  // Gün sonu sayısı (gelen hayvanlar dahil) günlük rapordan; yoksa özetten.
+  final eskHayvan = eskGunSonuHayvan(v, d) ?? (ozVar ? esk?.hayvan : null);
   return Gostergeler(
     toplamHayvan: ozVar ? oz.toplam.hayvan : g?.toplamHayvan,
     sagilan: sag,
@@ -1477,7 +1491,7 @@ Gostergeler gunlukGostergeler(RaporVerisi v, DateTime d) {
     kesilenDana: ozVar ? oz.toplam.kesilenDana : null,
     olenBuzagi: ozVar ? oz.toplam.buzagiOlum : null,
     kesimSatis: ozVar ? oz.toplam.kesimSatis : null,
-    eskBesiHayvan: ozVar ? esk?.hayvan : null,
+    eskBesiHayvan: eskHayvan,
     eskKesilen: ozVar ? esk?.kesilenDana : null,
     eskPersonel: ozVar ? esk?.personel : null,
     eskTaseron: ozVar ? esk?.taseron : null,
@@ -1486,6 +1500,11 @@ Gostergeler gunlukGostergeler(RaporVerisi v, DateTime d) {
     gencOlum: ozVar ? oz.toplam.gencOlum : null,
     olenDana: ozVar ? oz.toplam.olenDana : null,
     eskOlenDana: ozVar ? esk?.olenDana : null,
+    eskGelen: ozVar || eskGunSonuHayvan(v, d) != null
+        ? eskGelenToplam(v, d, d)
+        : null,
+    eskSonKesim: eskSon.kesim,
+    eskSonGelen: eskSon.gelen,
   );
 }
 
@@ -1500,6 +1519,7 @@ Gostergeler haftalikGostergeler(RaporVerisi v, DateTime bas) {
   final sut =
       gunler.isEmpty ? null : gunler.fold<double>(0, (a, g) => a + g.sut);
   final sagGun = gunler.fold(0.0, (a, g) => a + g.sagmal);
+  final eskSon = eskSonHareketler(v, son);
   return Gostergeler(
     toplamHayvan: sonG?.toplamHayvan ?? (ozVar ? oz.toplam.hayvan : null),
     sagilan: sonG?.sagmal ?? (ozVar ? oz.toplam.sagilan : null),
@@ -1522,6 +1542,9 @@ Gostergeler haftalikGostergeler(RaporVerisi v, DateTime bas) {
     gencOlum: ozVar ? oz.toplam.gencOlum : null,
     olenDana: ozVar ? oz.toplam.olenDana : null,
     eskOlenDana: ozVar ? esk?.olenDana : null,
+    eskGelen: ozVar ? eskGelenToplam(v, bas, son) : null,
+    eskSonKesim: eskSon.kesim,
+    eskSonGelen: eskSon.gelen,
   );
 }
 

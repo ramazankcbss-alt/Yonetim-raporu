@@ -329,6 +329,13 @@ pw.Widget _gostergeler(Gostergeler g,
   final eskKutular = <(String, String, String?)>[
     ('Besi Hayvanı', sayi(g.eskBesiHayvan), null),
     ('Kesilen Dana', sayi(g.eskKesilen), haftalik ? 'Hafta toplamı' : null),
+    ('Gelen Hayvan', sayi(g.eskGelen),
+        haftalik ? 'Hafta toplamı' : 'Dışarıdan alınan'),
+    if (g.eskSonKesim != null && (g.eskKesilen ?? 0) == 0)
+      ('Son Kesim', sayi(g.eskSonKesim!.adet), tarihKisa(g.eskSonKesim!.tarih)),
+    if (g.eskSonGelen != null && (g.eskGelen ?? 0) == 0)
+      ('Son Gelen Hayvan', sayi(g.eskSonGelen!.adet),
+          tarihKisa(g.eskSonGelen!.tarih)),
     if ((eskOlen ?? g.eskOlenDana ?? 0) > 0)
       ('Ölen Dana', sayi(eskOlen ?? g.eskOlenDana), null),
     if (eskPers > 0 || eskTas > 0)
