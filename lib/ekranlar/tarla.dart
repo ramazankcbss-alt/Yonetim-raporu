@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bicim.dart';
 import '../servis/veri_servisi.dart';
@@ -153,10 +154,82 @@ const _renkler = {
   'Yonca': Color(0xFF1E7FA8),
   'Patates': Color(0xFFA0522D),
 };
-Color urunAdRengi(String u) => _renkler[urunAnahtari(u)] ?? const Color(0xFF6D8B74);
+/// Kullanıcının seçtiği ürün renkleri (cihazda saklanır).
+class UrunRenkleri extends ChangeNotifier {
+  UrunRenkleri._() {
+    _yukle();
+  }
+  static final ben = UrunRenkleri._();
+  static const _anahtar = 'tarla_urun_renkleri';
+  final Map<String, int> _secim = {};
+
+  Color? secili(String urun) => _secim[urunAnahtari(urun)] == null ? null : Color(_secim[urunAnahtari(urun)]!);
+
+  Future<void> _yukle() async {
+    final p = await SharedPreferences.getInstance();
+    for (final x in p.getStringList(_anahtar) ?? const <String>[]) {
+      final i = x.lastIndexOf('=');
+      if (i > 0) _secim[x.substring(0, i)] = int.tryParse(x.substring(i + 1)) ?? 0;
+    }
+    notifyListeners();
+  }
+
+  Future<void> ayarla(String urun, Color? renk) async {
+    final k = urunAnahtari(urun);
+    if (renk == null) {
+      _secim.remove(k);
+    } else {
+      _secim[k] = renk.toARGB32();
+    }
+    notifyListeners();
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList(_anahtar, [for (final e in _secim.entries) '${e.key}=${e.value}']);
+  }
+}
+
+Color urunAdRengi(String u) =>
+    UrunRenkleri.ben.secili(u) ?? _renkler[urunAnahtari(u)] ?? const Color(0xFF6D8B74);
 Color urunRengi(TarlaParsel p) {
   if (p.urunler.isEmpty) return p.tip == 'bos' || p.girilmedi ? const Color(0xFFD6D6D6) : const Color(0xFF90A4AE);
-  return _renkler[urunAnahtari(p.urunler.first.$1)] ?? const Color(0xFF6D8B74);
+  return urunAdRengi(p.urunler.first.$1);
+}
+
+const _renkPaleti = [
+  Color(0xFFE0A526), Color(0xFFF4D03F), Color(0xFFC9B458), Color(0xFFD35400), Color(0xFFC0392B), Color(0xFFE91E63),
+  Color(0xFF8E3B8A), Color(0xFF6C3483), Color(0xFF1E7FA8), Color(0xFF00BCD4), Color(0xFF1ABC9C), Color(0xFF3F9142),
+  Color(0xFF7CC47F), Color(0xFF827717), Color(0xFFA0522D), Color(0xFF5D4037), Color(0xFF607D8B), Color(0xFF212121),
+];
+
+/// Ürün rengi seçimi (haritadaki lejanttan açılır).
+Future<void> urunRengiSec(BuildContext context, String urun) async {
+  final secim = await showDialog<Object>(
+    context: context,
+    builder: (c) => AlertDialog(
+      title: Text('$urun rengi'),
+      content: Wrap(spacing: 10, runSpacing: 10, children: [
+        for (final r in _renkPaleti)
+          InkWell(
+            onTap: () => Navigator.pop(c, r),
+            customBorder: const CircleBorder(),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: r,
+                shape: BoxShape.circle,
+                border: Border.all(color: urunAdRengi(urun) == r ? Colors.black : Colors.white, width: 3),
+              ),
+            ),
+          ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(c, 'varsayilan'), child: const Text('Varsayılan renk')),
+        TextButton(onPressed: () => Navigator.pop(c), child: const Text('Vazgeç')),
+      ],
+    ),
+  );
+  if (secim is Color) await UrunRenkleri.ben.ayarla(urun, secim);
+  if (secim == 'varsayilan') await UrunRenkleri.ben.ayarla(urun, null);
 }
 
 /// KMZ görsel renkleri.
@@ -190,7 +263,9 @@ class _Harita extends StatefulWidget {
 class _HaritaState extends State<_Harita> {
   int _c = 0;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: UrunRenkleri.ben, builder: (context, _) => _yap(context));
+
+  Widget _yap(BuildContext context) {
     final ciftlikler = widget.s.ciftlikler.where((c) => c.parseller.any((p) => p.koord.length > 2)).toList();
     final c = ciftlikler[_c.clamp(0, ciftlikler.length - 1)];
     final cizili = c.parseller.where((p) => p.koord.length > 2).toList();
@@ -265,7 +340,8 @@ class _HaritaState extends State<_Harita> {
         padding: const EdgeInsets.only(top: 2, bottom: 6),
         child: Text(
             'Parsele dokunarak ${giris ? widget.s.sezon : sonrakiSezon(widget.s.sezon)} sezonu için ürün ve dekar girebilirsiniz. '
-            'İki parmakla yakınlaştırabilir, sağ üstteki düğmeyle tam ekran açabilirsiniz.',
+            'İki parmakla yakınlaştırabilir, sağ üstteki düğmeyle tam ekran açabilirsiniz. '
+            'Ürün rengini değiştirmek için aşağıdaki renk kutusuna dokunun.',
             style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
       ),
       if (!giris && widget.sezonSec != null)
@@ -301,11 +377,21 @@ class _HaritaState extends State<_Harita> {
             Text(_gorselAdlari[t]!, style: const TextStyle(fontSize: 12.5)),
           ]),
         for (final u in urunler)
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 12, height: 12, color: _renkler[u] ?? const Color(0xFF6D8B74)),
-            const SizedBox(width: 4),
-            Text('$u: ${excel[u] == null ? (giris ? 'girilmedi' : "Excel'de yok") : _da(excel[u])}', style: const TextStyle(fontSize: 12.5)),
-          ]),
+          InkWell(
+            onTap: () => urunRengiSec(context, u),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(color: urunAdRengi(u), borderRadius: BorderRadius.circular(3))),
+                const SizedBox(width: 4),
+                Text('$u: ${excel[u] == null ? (giris ? 'girilmedi' : "Excel'de yok") : _da(excel[u])}', style: const TextStyle(fontSize: 12.5)),
+                const Icon(Icons.palette_outlined, size: 14, color: Renk.soluk),
+              ]),
+            ),
+          ),
       ]),
       const BolumBasligi('Ekiliş özeti'),
       Text(
@@ -703,7 +789,9 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: UrunRenkleri.ben, builder: (context, _) => _yap(context));
+
+  Widget _yap(BuildContext context) {
     final cizilebilir = widget.cizgiKaydet != null && _g.parca.isNotEmpty;
     return ClipRect(
         child: Stack(fit: StackFit.expand, children: [
