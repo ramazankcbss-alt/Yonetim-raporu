@@ -24,6 +24,10 @@ class TarlaParsel {
   final List<String?> baglar;
 
   String? bag(int i) => i < baglar.length ? baglar[i] : null;
+
+  /// Ekilen tohum / çeşit adı (ürün sırasıyla; null: girilmemiş).
+  final List<String?> cesitler;
+  String? cesit(int i) => i < cesitler.length && (cesitler[i] ?? '').isNotEmpty ? cesitler[i] : null;
   final double? beyan, olculen;
   final List<(double, double)> koord;
 
