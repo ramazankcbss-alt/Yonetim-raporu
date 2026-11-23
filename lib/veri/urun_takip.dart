@@ -135,12 +135,12 @@ class UrunDurumu {
   /// Gerçekleşen (teslimat kayıtları).
   final List<TeslimatGunu> gunler = [];
   int get sefer => gunler.fold(0, (a, g) => a + g.sefer);
-  double get teslim => gunler.fold(0.0, (a, g) => a + g.teslim);
-  double get net => gunler.fold(0.0, (a, g) => a + g.net);
+  double get teslim => gunler.fold<double>(0, (a, g) => a + g.teslim);
+  double get net => gunler.fold<double>(0, (a, g) => a + g.net);
   double get kesinti => teslim > net ? teslim - net : 0;
   double get kesintiOrani => teslim > 0 ? kesinti / teslim * 100 : 0;
-  double get kantar => gunler.fold(0.0, (a, g) => a + g.kantar);
-  double get ekGelir => gunler.fold(0.0, (a, g) => a + g.ekGelir);
+  double get kantar => gunler.fold<double>(0, (a, g) => a + g.kantar);
+  double get ekGelir => gunler.fold<double>(0, (a, g) => a + g.ekGelir);
   double? get polar {
     var t = 0.0, n = 0.0;
     for (final g in gunler) {
@@ -159,7 +159,7 @@ class UrunDurumu {
 
   /// Şu ana kadarki satış geliri (ürün bedeli + nakliye gibi ek gelirler).
   double get gelir =>
-      gunler.fold(0.0, (a, g) => a + (g.fiyat != null ? g.tutar : g.net * planFiyat)) + ekGelir;
+      gunler.fold<double>(0, (a, g) => a + (g.fiyat != null ? g.tutar : g.net * planFiyat)) + ekGelir;
 
   /// Plandaki tonaja göre teslim oranı (%).
   double? get ilerleme => planVerim > 0 ? net / planVerim * 100 : null;
@@ -248,11 +248,11 @@ class _ToplamDurum extends UrunDurumu {
   final List<UrunDurumu> parcalar;
 
   @override
-  double get gelir => parcalar.fold(0.0, (a, d) => a + d.gelir);
+  double get gelir => parcalar.fold<double>(0, (a, d) => a + d.gelir);
   @override
-  double get kalan => parcalar.fold(0.0, (a, d) => a + d.kalan);
+  double get kalan => parcalar.fold<double>(0, (a, d) => a + d.kalan);
   @override
-  double get beklenenGelir => parcalar.fold(0.0, (a, d) => a + d.beklenenGelir);
+  double get beklenenGelir => parcalar.fold<double>(0, (a, d) => a + d.beklenenGelir);
   @override
   bool get fiyatTahmini => parcalar.any((d) => d.teslimatVar && d.fiyatTahmini);
 }

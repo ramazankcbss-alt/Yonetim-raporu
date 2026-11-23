@@ -109,10 +109,10 @@ class _Ciftlikler extends StatelessWidget {
           Panel(
             baslik: e.key,
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              _Satir('Ekim alanı', '${sayi(e.value.fold(0.0, (a, d) => a + d.dekar))} da'),
-              _Satir('Planlanan satış', _tl(e.value.fold(0.0, (a, d) => a + d.planSatis))),
-              _Satir('Gerçekleşen gelir (teslim edilen)', _tl(e.value.fold(0.0, (a, d) => a + d.gelir))),
-              _Satir('Toplam maliyet', _tl(e.value.fold(0.0, (a, d) => a + d.maliyet))),
+              _Satir('Ekim alanı', '${sayi(e.value.fold<double>(0, (a, d) => a + d.dekar))} da'),
+              _Satir('Planlanan satış', _tl(e.value.fold<double>(0, (a, d) => a + d.planSatis))),
+              _Satir('Gerçekleşen gelir (teslim edilen)', _tl(e.value.fold<double>(0, (a, d) => a + d.gelir))),
+              _Satir('Toplam maliyet', _tl(e.value.fold<double>(0, (a, d) => a + d.maliyet))),
               const Divider(height: 20),
               VeriTablosu(
                 ilkSutunGenislik: 120,
