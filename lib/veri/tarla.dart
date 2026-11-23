@@ -12,7 +12,8 @@ import 'model.dart';
 
 class TarlaParsel {
   const TarlaParsel({required this.ad, required this.tip, required this.urunler, this.beyan, this.olculen,
-      this.etiket = '', this.not = '', this.koord = const [], this.bolme = const [], this.baglar = const []});
+      this.etiket = '', this.not = '', this.koord = const [], this.bolme = const [], this.baglar = const [],
+      this.cesitler = const []});
   final String ad, tip, etiket, not;
   final List<(String, double)> urunler;
 
@@ -33,7 +34,8 @@ class TarlaParsel {
       ? (tip == 'bos' ? 'Boş alan' : 'Ürün belirtilmemiş')
       : [
           for (final (i, u) in urunler.indexed)
-            '${u.$2 > 0 ? '${u.$1} ${_s(u.$2)} da' : u.$1}${bag(i) == null ? '' : ' → ${bag(i)}'}'
+            '${u.$1}${cesit(i) == null ? '' : ' (${cesit(i)})'}${u.$2 > 0 ? ' ${_s(u.$2)} da' : ''}'
+                '${bag(i) == null ? '' : ' → ${bag(i)}'}'
         ].join(' + ');
 
   /// Yalnızca ekili ürün cinsleri (haritadaki dekarlar esas alınmaz).
@@ -324,7 +326,22 @@ SezonParsel? parselGirisi(List<SezonParsel> l, String sezon, String ciftlik, Str
 /// - "Arpa:120+Buğday:120" → parsel parçalara bölünmüş
 /// - "Arpa@7. pivot" → bu parsel "7. pivot" ile birleştirilmiş (alan ana parselde)
 class ParselIcerik {
-  const ParselIcerik(this.parcalar, {this.birlesik, this.cizgiler = const [], this.baglar = const []});
+  const ParselIcerik(this.parcalar,
+      {this.birlesik, this.cizgiler = const [], this.baglar = const [], this.cesitler = const []});
+
+  /// Tohum / çeşit adı ("Buğday#Altındane"); parça sırasıyla, null: girilmemiş.
+  final List<String?> cesitler;
+  String? cesit(int i) => i < cesitler.length && (cesitler[i] ?? '').isNotEmpty ? cesitler[i] : null;
+
+  /// "Buğday#Altındane" → ("Buğday", "Altındane").
+  static (String, String?) _urunCesit(String s) {
+    final i = s.indexOf('#');
+    return i < 0 ? (s.trim(), null) : (s.substring(0, i).trim(), s.substring(i + 1).trim());
+  }
+
+  /// Tek ürün kaydı: "Buğday" ya da "Buğday#Altındane".
+  static String urunMetni(String urun, String? cesit) =>
+      cesit == null || cesit.trim().isEmpty ? urun : '$urun#${cesit.trim()}';
   final List<(String, double?)> parcalar;
 
   /// Parçanın bağlandığı başka parsel ("Arpa>1. parsel:12"); parça sırasıyla, null: bağlı değil.
@@ -342,8 +359,14 @@ class ParselIcerik {
   static ParselIcerik oku(String urun) {
     final t = urun.trim();
     final at = t.indexOf('@');
-    if (at > 0) return ParselIcerik([(t.substring(0, at).trim(), null)], birlesik: t.substring(at + 1).trim());
-    if (!t.contains(':')) return ParselIcerik([(t, null)]);
+    if (at > 0) {
+      final (u, c) = _urunCesit(t.substring(0, at));
+      return ParselIcerik([(u, null)], birlesik: t.substring(at + 1).trim(), cesitler: [c]);
+    }
+    if (!t.contains(':')) {
+      final (u, c) = _urunCesit(t);
+      return ParselIcerik([(u, null)], cesitler: [c]);
+    }
     final bolu = t.indexOf('/');
     final govde = bolu < 0 ? t : t.substring(0, bolu);
     final cizgiler = <(double, double)>[
@@ -355,23 +378,29 @@ class ParselIcerik {
     ];
     final parcalar = <(String, double?)>[];
     final baglar = <String?>[];
+    final cesitler = <String?>[];
     for (final x in govde.split('+')) {
       if (x.trim().isEmpty) continue;
       final ad = x.split(':').first.trim();
       final ok = ad.indexOf('>');
-      parcalar.add((ok > 0 ? ad.substring(0, ok).trim() : ad,
-          x.contains(':') ? double.tryParse(x.split(':').last.trim().replaceAll(',', '.')) : null));
+      final (u, c) = _urunCesit(ok > 0 ? ad.substring(0, ok) : ad);
+      parcalar.add((u, x.contains(':') ? double.tryParse(x.split(':').last.trim().replaceAll(',', '.')) : null));
       baglar.add(ok > 0 ? ad.substring(ok + 1).trim() : null);
+      cesitler.add(c);
     }
-    return ParselIcerik(parcalar, cizgiler: cizgiler, baglar: baglar.any((b) => b != null) ? baglar : const []);
+    return ParselIcerik(parcalar,
+        cizgiler: cizgiler,
+        baglar: baglar.any((b) => b != null) ? baglar : const [],
+        cesitler: cesitler.any((c) => c != null) ? cesitler : const []);
   }
 
   /// Bölünmüş parsel için kayıt metni ("Arpa:120+Buğday:120").
   static String bolunmusMetin(List<(String, double)> l,
-          [List<(double, double)> cizgiler = const [], List<String?> baglar = const []]) =>
+          [List<(double, double)> cizgiler = const [], List<String?> baglar = const [], List<String?> cesitler = const []]) =>
       [
         for (final (i, x) in l.indexed)
-          '${x.$1}${i < baglar.length && baglar[i] != null ? '>${baglar[i]}' : ''}:${x.$2 % 1 == 0 ? x.$2.toInt() : x.$2}'
+          '${urunMetni(x.$1, i < cesitler.length ? cesitler[i] : null)}'
+              '${i < baglar.length && baglar[i] != null ? '>${baglar[i]}' : ''}:${x.$2 % 1 == 0 ? x.$2.toInt() : x.$2}'
       ].join('+') +
       (cizgiler.isEmpty ? '' : '/${cizgiler.map((c) => '${c.$1.round()},${c.$2.round()}').join(';')}');
 }
@@ -428,6 +457,7 @@ TarlaParsel _girisParseli(TarlaParsel p, SezonParsel g, List<String> bagli, {Lis
   final ek = gelen.fold<double>(0, (a, x) => a + x.$3);
   return TarlaParsel(
       ad: y.ad, tip: y.tip, urunler: y.urunler, beyan: (y.beyan ?? 0) + ek, koord: y.koord, bolme: y.bolme, baglar: y.baglar,
+      cesitler: y.cesitler,
       not: [
         if (y.not.isNotEmpty) y.not,
         for (final x in gelen) '${x.$1} parselinden bağlı parça: ${x.$2} ${x.$3 % 1 == 0 ? x.$3.toInt() : x.$3} da',
@@ -438,7 +468,8 @@ TarlaParsel _girisParseliTemel(TarlaParsel p, SezonParsel g, List<String> bagli)
   final ic = ParselIcerik.oku(g.urun);
   if (ic.birlesik != null) {
     // Alan ana parselde sayılır; burada yalnızca ürün cinsi görünür.
-    return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(ic.urun, 0)], koord: p.koord, not: '${ic.birlesik} ile birleştirildi');
+    return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(ic.urun, 0)], koord: p.koord, not: '${ic.birlesik} ile birleştirildi',
+        cesitler: ic.cesitler);
   }
   if (ic.bolunmus) {
     final l = [for (final x in ic.parcalar) (x.$1, x.$2 ?? 0.0)];
@@ -450,9 +481,10 @@ TarlaParsel _girisParseliTemel(TarlaParsel p, SezonParsel g, List<String> bagli)
     final kendi = l.fold<double>(0, (a, x) => a + x.$2) - giden;
     return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: l, beyan: giden > 0 ? kendi : (g.alan ?? kendi),
         koord: p.koord, not: 'Parçalara bölündü', bolme: ic.cizgiler.length == l.length - 1 ? ic.cizgiler : const [],
-        baglar: ic.baglar);
+        baglar: ic.baglar, cesitler: ic.cesitler);
   }
-  return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(g.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord,
+  return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(ic.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord,
+      cesitler: ic.cesitler,
       not: bagli.isEmpty ? '' : '${bagli.join(', ')} ile birleştirildi (alan toplamdır)');
 }
 
@@ -494,18 +526,34 @@ List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l) {
   if (paket.isEmpty) return const [];
   final kmz = paket.first;
   final eski = girisSezonu(kmz, l, sezon: oncekiSezon(kmz.sezon), ilkSezon: true, sonraki: kmz);
-  return [eski, for (final k in paket) kmzUzerine(k, l), girisSezonu(kmz, l, onceki: kmz)];
+  // KMZ sezonunun öncesi 2024-2025 (münavebe ve çok yıllık ürün yılı için).
+  final orta = [for (final (i, k) in paket.indexed) kmzUzerine(k, l, onceki: i == 0 ? eski : null)];
+  return [eski, ...orta, girisSezonu(kmz, l, onceki: orta.first)];
+}
+
+/// Çok yıllık ürünler: üst üste ekim münavebe hatası sayılmaz, kaçıncı yılı gösterilir.
+const cokYillikUrunler = {'Yonca', 'Korunga', 'Çayır'};
+bool cokYillik(String urun) => cokYillikUrunler.contains(urunAnahtari(urun));
+
+/// Parselde [urun] bu sezonla birlikte üst üste kaç sezondur ekili: (yıl, kayıtların başına ulaşıldı mı).
+(int, bool) ardisikYil(TarlaSezonu s, String ciftlik, String parsel, String urun) {
+  var n = 0;
+  TarlaSezonu? o = s;
+  while (o != null && sezonUrunleri(o, ciftlik, parsel).contains(urunAnahtari(urun))) {
+    n++;
+    o = o.onceki;
+  }
+  return (n, o == null);
 }
 
 /// KMZ sezonunda haritadan yapılan bölme / ayırma çizgisi kayıtları (aynı sezon için)
 /// KMZ parselinin üzerine uygulanır; kaydı olmayan parsel KMZ'deki gibi kalır.
-TarlaSezonu kmzUzerine(TarlaSezonu kmz, List<SezonParsel> l) {
-  if (!l.any((x) => x.sezon == kmz.sezon)) return kmz;
+TarlaSezonu kmzUzerine(TarlaSezonu kmz, List<SezonParsel> l, {TarlaSezonu? onceki}) {
   return TarlaSezonu(
     sezon: kmz.sezon,
     kaynak: kmz.kaynak,
     tarih: kmz.tarih,
-    onceki: kmz.onceki,
+    onceki: onceki ?? kmz.onceki,
     sonraki: kmz.sonraki,
     giris: kmz.giris,
     ciftlikler: [
@@ -516,7 +564,7 @@ TarlaSezonu kmzUzerine(TarlaSezonu kmz, List<SezonParsel> l) {
               () {
                 final y = _girisParseli(p, g, const []);
                 return TarlaParsel(ad: p.ad, tip: p.tip, urunler: y.urunler, beyan: p.beyan ?? y.beyan, olculen: p.olculen,
-                    etiket: p.etiket, not: p.not, koord: p.koord, bolme: y.bolme, baglar: y.baglar);
+                    etiket: p.etiket, not: p.not, koord: p.koord, bolme: y.bolme, baglar: y.baglar, cesitler: y.cesitler);
               }()
             else
               p,

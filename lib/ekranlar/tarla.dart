@@ -1036,12 +1036,18 @@ class _YaziCizer extends CustomPainter {
           TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
           if (x.girilmedi)
             TextSpan(text: '\nGirilmedi', style: TextStyle(fontSize: yazi * 0.85, color: Colors.black54)),
-          for (final kisa in {
-            for (final u in x.urunler) dekar && u.$2 > 0 ? '${_kisaUrun(u.$1)} ${sayi(u.$2)} da' : _kisaUrun(u.$1)
-          })
+          for (final (kisa, cesit) in {
+            for (final (i, u) in x.urunler.indexed)
+              (dekar && u.$2 > 0 ? '${_kisaUrun(u.$1)} ${sayi(u.$2)} da' : _kisaUrun(u.$1), x.cesit(i))
+          }) ...[
             TextSpan(
                 text: '\n$kisa',
                 style: TextStyle(fontSize: yazi * 0.92, color: Colors.black87, fontWeight: FontWeight.w600)),
+            if (cesit != null)
+              TextSpan(
+                  text: '\n$cesit',
+                  style: TextStyle(fontSize: yazi * 0.8, color: Colors.black54, fontStyle: FontStyle.italic)),
+          ],
         ]),
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
@@ -1837,7 +1843,13 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
         ];
         final once = s.giris ? oncekiUrunler(s, c.ad, p.ad) : [for (final u in p.urunler) urunAnahtari(u.$1)];
         final onceSezon = s.giris ? s.onceki?.sezon : s.sezon;
-        final ayni = ic != null && ic.parcalar.any((x) => once.contains(urunAnahtari(x.$1)));
+        final ayni = ic != null && ic.parcalar.any((x) => once.contains(urunAnahtari(x.$1)) && !cokYillik(x.$1));
+        final cokYil = ic == null
+            ? const <String>[]
+            : [
+                for (final x in ic.parcalar)
+                  if (cokYillik(x.$1) && once.contains(urunAnahtari(x.$1))) urunAnahtari(x.$1)
+              ];
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1853,6 +1865,18 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
                   padding: EdgeInsets.only(top: 4),
                   child: Text('Münavebe uyarısı: aynı ürün bu parselde üst üste ekiliyor.',
                       style: TextStyle(color: Renk.amber, fontSize: 12.5)),
+                ),
+              for (final u in cokYil)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                      () {
+                        final hs = s.giris ? s : null;
+                        if (hs == null) return '$u: çok yıllık bitki.';
+                        final (n, bas) = ardisikYil(hs, c.ad, p.ad, u);
+                        return '$u: ${bas ? 'en az ' : ''}${n < 2 ? 2 : n}. yıl (çok yıllık bitki).';
+                      }(),
+                      style: const TextStyle(color: Renk.yesil, fontSize: 12.5)),
                 ),
               const SizedBox(height: 12),
               FilledButton.icon(
@@ -1880,11 +1904,23 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
                   final a = await showDialog<double>(
                       context: context, builder: (_) => _DekarGir(deger: ic?.birlesik == null ? g?.alan : null, urun: urun!));
                   if (a == null || !context.mounted) return;
-                  await _kaydet(context, hedef, c, p, urun, a);
+                  await _kaydet(context, hedef, c, p,
+                      ic != null && ic.birlesik == null && ic.urun == urun ? ParselIcerik.urunMetni(urun, ic.cesit(0)) : urun, a);
                 },
                 icon: const Icon(Icons.straighten),
                 label: const Text('Dekar değiştir'),
               ),
+              if (ic != null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _tohumGir(context, hedef, c, p, g, ic),
+                  icon: const Icon(Icons.spa_outlined),
+                  label: Text(ic.cesitler.isEmpty ? 'Tohum / çeşit adı gir' : 'Tohum / çeşit: ${[
+                      for (var i = 0; i < ic.parcalar.length; i++)
+                        if (ic.cesit(i) != null) ic.cesit(i)!
+                    ].join(', ')}'),
+                ),
+              ],
               const SizedBox(height: 8),
               Row(children: [
                 Expanded(
@@ -1970,7 +2006,9 @@ Future<void> _bol(BuildContext context, String sezon, TarlaCiftlik c, TarlaParse
       context: context, builder: (_) => _ParcaGir(baslik: p.ad, mevcut: ic != null && ic.bolunmus ? ic.parcalar : const []));
   if (l == null || !context.mounted) return;
   final eski = ic != null && ic.bolunmus && ic.cizgiler.length == l.length - 1 ? ic.cizgiler : const <(double, double)>[];
-  final metin = ParselIcerik.bolunmusMetin(l, eski, ic != null && ic.parcalar.length == l.length ? ic.baglar : const []);
+  final ayniSayi = ic != null && ic.parcalar.length == l.length;
+  final metin = ParselIcerik.bolunmusMetin(
+      l, eski, ayniSayi ? ic.baglar : const [], ayniSayi ? ic.cesitler : const []);
   if (metin.length > 60) {
     bildir(context, 'Ürün adları çok uzun; en fazla 3 parça girin ya da "Diğer" ürün adını kısaltın.');
     return;
@@ -2013,7 +2051,7 @@ Future<void> _birlestir(BuildContext context, String sezon, TarlaCiftlik c, Tarl
 Future<void> _cizgiKaydet(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, List<(double, double)> cz) async {
   final hedef = s.sezon;
   final l = [for (final u in p.urunler) (u.$1, u.$2)];
-  final metin = ParselIcerik.bolunmusMetin(l, cz, p.baglar);
+  final metin = ParselIcerik.bolunmusMetin(l, cz, p.baglar, p.cesitler);
   if (metin.length > 60) {
     bildir(context, 'Kayıt çok uzun; ürün adlarını kısaltın ya da parça sayısını azaltın.');
     return;
@@ -2064,7 +2102,7 @@ Future<void> _parcaBagla(BuildContext context, String sezon, TarlaCiftlik c, Tar
     if (hu != null && !hu.bolunmus && hu.birlesik == null && hu.urun.isNotEmpty) urunler[i] = (hu.urun, urunler[i].$2);
   }
   final baglar = [for (var j = 0; j < urunler.length; j++) j == i ? hedefParsel : ic.bag(j)];
-  final metin = ParselIcerik.bolunmusMetin(urunler, ic.cizgiler, baglar);
+  final metin = ParselIcerik.bolunmusMetin(urunler, ic.cizgiler, baglar, ic.cesitler);
   if (metin.length > 60) {
     bildir(context, 'Kayıt çok uzun (ürün ve parsel adları); daha kısa ad kullanın.');
     return;
@@ -2120,6 +2158,107 @@ class _ParcaBaglaGirState extends State<_ParcaBaglaGir> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
           FilledButton(onPressed: () => Navigator.pop(context, (_i, _hedef)), child: const Text('Kaydet')),
+        ],
+      );
+}
+
+/// Ekilen tohum / çeşit adını girer (her parça için ayrı). Öneriler Tarımsal Faaliyet planındaki çeşitlerden.
+Future<void> _tohumGir(
+    BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, SezonParsel? g, ParselIcerik ic) async {
+  final v = VeriDeposu.ben.veri;
+  List<String> oneriler(String urun) {
+    final m = <String>{};
+    for (final cf in v?.tarimsalUretim.ciftlikler ?? const []) {
+      for (final k in cf.urunler) {
+        if (urunAnahtari(k.ad) != urunAnahtari(urun)) continue;
+        for (final t in k.cesit.split(RegExp(r'[-,/]'))) {
+          final x = t.trim();
+          if (x.length > 1) m.add(x[0].toUpperCase() + x.substring(1).toLowerCase());
+        }
+      }
+    }
+    return m.toList()..sort();
+  }
+
+  final sonuc = await showDialog<List<String?>>(
+      context: context,
+      builder: (_) => _TohumGir(
+          urunler: [for (final x in ic.parcalar) x.$1],
+          mevcut: [for (var i = 0; i < ic.parcalar.length; i++) ic.cesit(i)],
+          oneriler: [for (final x in ic.parcalar) oneriler(x.$1)]));
+  if (sonuc == null || !context.mounted) return;
+  final String metin;
+  final double? alan;
+  if (ic.birlesik != null) {
+    metin = '${ParselIcerik.urunMetni(ic.urun, sonuc.first)}@${ic.birlesik}';
+    alan = null;
+  } else if (ic.bolunmus) {
+    final l = [for (final x in ic.parcalar) (x.$1, x.$2 ?? 0.0)];
+    metin = ParselIcerik.bolunmusMetin(l, ic.cizgiler, ic.baglar, sonuc);
+    alan = l.fold<double>(0, (a, x) => a + x.$2);
+  } else {
+    metin = ParselIcerik.urunMetni(ic.urun, sonuc.first);
+    alan = g?.alan;
+  }
+  if (metin.length > 60) {
+    bildir(context, 'Kayıt çok uzun; tohum adını kısaltın.');
+    return;
+  }
+  await _kaydet(context, sezon, c, p, metin, alan);
+}
+
+class _TohumGir extends StatefulWidget {
+  const _TohumGir({required this.urunler, required this.mevcut, required this.oneriler});
+  final List<String> urunler;
+  final List<String?> mevcut;
+  final List<List<String>> oneriler;
+  @override
+  State<_TohumGir> createState() => _TohumGirState();
+}
+
+class _TohumGirState extends State<_TohumGir> {
+  late final _t = [for (final m in widget.mevcut) TextEditingController(text: m ?? '')];
+
+  @override
+  void dispose() {
+    for (final t in _t) {
+      t.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Tohum / çeşit adı'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (var i = 0; i < widget.urunler.length; i++) ...[
+              TextField(
+                controller: _t[i],
+                maxLength: 24,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(labelText: widget.urunler[i], hintText: 'örn. Altındane, Halis, Touareg'),
+                onChanged: (_) => setState(() {}),
+              ),
+              if (widget.oneriler[i].isNotEmpty)
+                Wrap(spacing: 6, runSpacing: 0, children: [
+                  for (final o in widget.oneriler[i])
+                    ActionChip(label: Text(o), onPressed: () => setState(() => _t[i].text = o)),
+                ]),
+              const SizedBox(height: 8),
+            ],
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, [
+                    for (final t in _t)
+                      t.text.trim().replaceAll(RegExp(r'[#@>:+/;]'), '').isEmpty
+                          ? null
+                          : t.text.trim().replaceAll(RegExp(r'[#@>:+/;]'), '')
+                  ]),
+              child: const Text('Kaydet')),
         ],
       );
 }
@@ -2481,17 +2620,31 @@ class _GirisKarsilastirma extends StatelessWidget {
               : 'Münavebe (${karsiSezon.sezon} → ${s.sezon})'),
       if (munavebe.isEmpty) const Text('Henüz giriş yok.'),
       for (final (c, p, once) in munavebe)
-        Card(
-          margin: const EdgeInsets.only(bottom: 6),
-          child: ListTile(
-            dense: true,
-            leading: Icon(once.contains(urunAnahtari(p.urunler.first.$1)) ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                color: once.contains(urunAnahtari(p.urunler.first.$1)) ? Renk.amber : Renk.yesil),
-            title: Text('$c · ${p.ad}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            subtitle: Text('${ileri ? '${p.urunYazi} → ${once.isEmpty ? 'ürün yok' : once.join(' + ')}' : '${once.isEmpty ? 'ürün yok' : once.join(' + ')} → ${p.urunYazi}'}'
-                '${once.contains(urunAnahtari(p.urunler.first.$1)) ? '\nAynı ürün üst üste ekiliyor.' : ''}'),
-          ),
-        ),
+        () {
+          // Üst üste ekilen ürünler; çok yıllık olanlar (yonca) uyarı değil, kaçıncı yılı yazılır.
+          final ust = [for (final u in p.urunler) if (once.contains(urunAnahtari(u.$1))) urunAnahtari(u.$1)];
+          final hata = ust.where((u) => !cokYillik(u)).toList();
+          final yillar = [
+            for (final u in {...ust.where(cokYillik)})
+              () {
+                final (n, bas) = ileri ? (2, false) : ardisikYil(s, c, p.ad, u);
+                return '$u: ${bas ? 'en az ' : ''}$n. yıl (çok yıllık bitki, münavebe gerekmez)';
+              }(),
+          ];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 6),
+            child: ListTile(
+              dense: true,
+              leading: Icon(hata.isNotEmpty ? Icons.warning_amber_rounded : (yillar.isNotEmpty ? Icons.eco_outlined : Icons.check_circle_outline),
+                  color: hata.isNotEmpty ? Renk.amber : Renk.yesil),
+              title: Text('$c · ${p.ad}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(
+                  '${ileri ? '${p.urunYazi} → ${once.isEmpty ? 'ürün yok' : once.join(' + ')}' : '${once.isEmpty ? 'ürün yok' : once.join(' + ')} → ${p.urunYazi}'}'
+                  '${hata.isNotEmpty ? '\nAynı ürün üst üste ekiliyor: ${hata.join(', ')}.' : ''}'
+                  '${yillar.isEmpty ? '' : '\n${yillar.join('\n')}'}'),
+            ),
+          );
+        }(),
     ]);
   }
 }

@@ -33,4 +33,20 @@ void main() {
     expect(ic.bag(1), isNull);
     expect(ic.cizgiler, [(10.0, 20.0)]);
   });
+
+  test('Tohum / çeşit adı okunur ve yazılır', () {
+    final tek = ParselIcerik.oku('Buğday#Altındane');
+    expect(tek.urun, 'Buğday');
+    expect(tek.cesit(0), 'Altındane');
+    expect(ParselIcerik.urunMetni('Buğday', 'Halis'), 'Buğday#Halis');
+    final b = ParselIcerik.oku(ParselIcerik.bolunmusMetin([('Arpa', 10), ('Buğday', 20)], [], ['1. parsel', null], ['Touareg', 'Halis']));
+    expect(b.parcalar, [('Arpa', 10.0), ('Buğday', 20.0)]);
+    expect(b.cesit(0), 'Touareg');
+    expect(b.cesit(1), 'Halis');
+    expect(b.bag(0), '1. parsel');
+    final m = ParselIcerik.oku('Yonca#Magnum@7. pivot');
+    expect(m.urun, 'Yonca');
+    expect(m.cesit(0), 'Magnum');
+    expect(m.birlesik, '7. pivot');
+  });
 }
