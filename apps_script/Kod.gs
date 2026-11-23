@@ -215,6 +215,9 @@ function veriTopla_(gun) {
     ekimPlani: (function () { try { return ekimPlaniOku_(); } catch (err) { return []; } })(),
     // Tarımsal Faaliyet › ÇİFTLİK BAZINDA: ekim alanı, verim, satış, maliyet, net kazanç
     tarimsalUretim: (function () { try { return tarimsalUretimOku_(); } catch (err) { return null; } })(),
+    // Ürün teslimat ve satışları (günlük toplamlar): TarKop pancar, patates fire listesi,
+    // Ürün_Teslimatları sayfasına uygulamadan girilen kayıtlar. Plaka/satıcı no yok.
+    urunTeslimat: (function () { try { return urunTeslimatlari_(); } catch (err) { return { hata: String(err) }; } })(),
     // Tarımsal Faaliyet › PARSEL: Çiftlik, İlçe, Köy, Ada, Parsel, Alan (da), Ürün
     resmiParsel: (function () { try { return resmiParsellerOku_(); } catch (err) { return []; } })(),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
@@ -354,6 +357,7 @@ function doPost(e) {
     if (govde.tur === 'cksYukle') return json_(cksYukle_(govde));
     if (govde.tur === 'ekimDuzelt' || govde.tur === 'ekimDuzeltGeriAl') return json_(ekimDuzelt_(govde));
     if (govde.tur === 'sezonParsel' || govde.tur === 'sezonParselGeriAl') return json_(sezonParsel_(govde));
+    if (govde.tur === 'teslimatEkle' || govde.tur === 'teslimatSil') return json_(teslimatKaydet_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
@@ -1204,6 +1208,214 @@ function tarimsalUretimOku_() {
     var ub = ss.getSheetByName('ÜRÜN BAZINDA');
     return { dosya: ss.getName(), urunBasligi: ub ? String(ub.getRange(1, 1).getValue()) : '', satirlar: v };
   });
+}
+
+// ---------------------------------------------------------------------------
+// ÜRÜN TAKİBİ: ekilen her ürünün teslimat / satış hareketleri.
+// Kaynaklar (otomatik):
+//   • Drive'da adında "TarKop" geçen .xlsx dosyaları → Şeker Pancarı (Konya Şeker)
+//   • Patates fire bilgilendirme tablosu › LİSTE → Patates (bedele esas kg, fiyat, nakliye)
+// Kaynak (elle): rapor tablosundaki "Ürün_Teslimatları" sayfası — uygulamadan girilir.
+// Çıktı günlük toplamlardır. KVKK: plaka, satıcı no, şoför ve kişi adı okunmaz/gönderilmez.
+var PATATES_FIRE_ID = '1JCn4ud7xVIiqotJSyDpm7_QqTN0fo3WfQIwK82cCcXE';
+var TESLIMAT_SAYFASI = 'Ürün_Teslimatları';
+var TESLIMAT_BASLIK = ['Tarih', 'Çiftlik', 'Ürün', 'Teslim edilen (kg)', 'Kesinti / fire (kg)',
+  'Bedele esas (kg)', 'Alıcı / depo', 'Birim fiyat (TL/kg)', 'Açıklama', 'Kayıt tarihi', 'Durum'];
+
+function xmlMetin_(x) {
+  return String(x).replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+}
+
+/** xlsx (zip) → her sayfa için [{A: değer, B: …}] satırları. */
+function xlsxSatirlari_(blob) {
+  var dosyalar = {};
+  Utilities.unzip(blob.setContentType('application/zip')).forEach(function (x) {
+    var a = x.getName();
+    if (a === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/.test(a)) dosyalar[a] = x.getDataAsString('UTF-8');
+  });
+  var paylasilan = [], m, re = /<si>([\s\S]*?)<\/si>/g;
+  while ((m = re.exec(dosyalar['xl/sharedStrings.xml'] || ''))) {
+    var t = '', m2, re2 = /<t[^>]*>([\s\S]*?)<\/t>/g;
+    while ((m2 = re2.exec(m[1]))) t += m2[1];
+    paylasilan.push(xmlMetin_(t));
+  }
+  return Object.keys(dosyalar).sort().filter(function (a) { return a.indexOf('worksheets') > 0; }).map(function (ad) {
+    var satirlar = [], mr, reR = /<row[^>]*>([\s\S]*?)<\/row>/g;
+    while ((mr = reR.exec(dosyalar[ad]))) {
+      var h = {}, mc, reC = /<c r="([A-Z]+)\d+"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+      while ((mc = reC.exec(mr[1]))) {
+        var tip = (/t="(\w+)"/.exec(mc[2]) || [])[1], ic = mc[3] || '', vm = /<v>([\s\S]*?)<\/v>/.exec(ic);
+        h[mc[1]] = tip === 's' ? (vm ? paylasilan[Number(vm[1])] : '')
+          : tip === 'inlineStr' ? xmlMetin_((/<t[^>]*>([\s\S]*?)<\/t>/.exec(ic) || [])[1] || '')
+          : (tip === 'str' || tip === 'b') ? (vm ? xmlMetin_(vm[1]) : '')
+          : (vm ? Number(vm[1]) : '');
+      }
+      satirlar.push(h);
+    }
+    return satirlar;
+  });
+}
+
+/** Polar değeri dosyada 1741 / "1.73" / 181 gibi farklı yazılıyor → % 17,41 / 17,3 / 18,1. */
+function polarDuzelt_(v) {
+  var p = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
+  if (!(p > 0)) return null;
+  while (p >= 100) p /= 10;
+  if (p < 10) p *= 10;
+  return Math.round(p * 100) / 100;
+}
+
+/** Günlük toplam anahtarı: ürün|çiftlik|kaynak|tarih. */
+function teslimatTopla_(g, k) {
+  var a = [k.urun, k.ciftlik, k.kaynak, k.tarih].join('|');
+  var x = g[a];
+  if (!x) x = g[a] = { urun: k.urun, ciftlik: k.ciftlik, kaynak: k.kaynak, alici: k.alici || '', tarih: k.tarih,
+    sefer: 0, teslim: 0, net: 0, fiyat: null, tutar: 0, ekGelir: 0, polarT: 0, polarN: 0, kantar: 0, tahmini: !!k.tahmini };
+  x.sefer += k.sefer || 1;
+  x.teslim += k.teslim || 0;
+  x.net += k.net || 0;
+  if (k.fiyat) { x.fiyat = k.fiyat; x.tutar += (k.net || 0) * k.fiyat; }
+  x.ekGelir += k.ekGelir || 0;
+  if (k.polar) { x.polarT += k.polar * (k.net || 0); x.polarN += k.net || 0; }
+  x.kantar += k.kantar || 0;
+}
+
+function tarkopOku_(g, kaynaklar) {
+  var it = DriveApp.searchFiles("title contains 'TarKop' and trashed = false");
+  while (it.hasNext()) {
+    var f = it.next();
+    if (!/\.xlsx$/i.test(f.getName()) || f.getMimeType() === 'application/vnd.google-apps.shortcut') continue;
+    var ciftlik = ciftlikAdi_((/(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|TAŞAĞIL|ORMANLIK|FİDANLIK)/i.exec(f.getName()) || [])[1] || 'Aslım');
+    var say = 0, gor = {};
+    xlsxSatirlari_(f.getBlob()).forEach(function (satirlar) {
+      var bi = -1, s = {};
+      for (var i = 0; i < Math.min(satirlar.length, 10) && bi < 0; i++) {
+        var h = satirlar[i];
+        Object.keys(h).forEach(function (k) {
+          var x = String(h[k]).toLocaleLowerCase('tr').trim();
+          if (x === 'tarih') s.tarih = k;
+          else if (x.indexOf('tartım no') === 0) s.tartim = k;
+          else if (x.indexOf('net miktar') === 0) s.net = k;
+          else if (x.indexOf('fabpolar') === 0) s.polar = k;
+          else if (x.indexOf('fireli miktar') === 0) s.fireli = k;
+        });
+        if (s.tarih && s.net && s.tartim) {
+          bi = i;
+          for (var j = 0; j < i; j++) Object.keys(satirlar[j]).forEach(function (k) {
+            var x = String(satirlar[j][k]);
+            if (/kantar/i.test(x) && !/portal/i.test(x)) s.kantar = k;
+          });
+        } else s = {};
+      }
+      if (bi < 0) return;
+      for (var r = bi + 1; r < satirlar.length; r++) {
+        var x = satirlar[r], tn = x[s.tartim], tr = x[s.tarih];
+        if (typeof tn !== 'number' || typeof tr !== 'number' || gor[tn]) continue;
+        gor[tn] = 1; say++;
+        var t = Utilities.formatDate(new Date(Date.UTC(1899, 11, 30) + Math.round(tr) * 86400000), 'UTC', 'yyyy-MM-dd');
+        // Dosyada miktarlar ton; kg'a çevrilir.
+        var net = typeof x[s.net] === 'number' ? x[s.net] * 1000 : 0;
+        var fireli = typeof x[s.fireli] === 'number' ? x[s.fireli] * 1000 : net;
+        teslimatTopla_(g, { urun: 'Şeker Pancarı', ciftlik: ciftlik, kaynak: 'TarKop', alici: 'Konya Şeker',
+          tarih: t, teslim: fireli, net: net, polar: polarDuzelt_(x[s.polar]),
+          kantar: s.kantar && typeof x[s.kantar] === 'number' ? x[s.kantar] : 0 });
+      }
+    });
+    kaynaklar.push({ ad: f.getName(), urun: 'Şeker Pancarı', ciftlik: ciftlik, satir: say,
+      guncelleme: Utilities.formatDate(f.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm') });
+  }
+}
+
+function patatesOku_(g, kaynaklar) {
+  var ss = SpreadsheetApp.openById(PATATES_FIRE_ID);
+  var sh = ss.getSheetByName('LİSTE');
+  if (!sh || sh.getLastRow() < 3) return;
+  var v = sh.getRange(1, 1, sh.getLastRow(), Math.min(sh.getLastColumn(), 22)).getDisplayValues();
+  var bi = v.findIndex(function (r) { return /tartım no/i.test(r[0]); });
+  if (bi < 0) return;
+  var h = v[bi].map(function (x) { return String(x).toLocaleLowerCase('tr').trim(); });
+  function sut(re) { return h.findIndex(function (x) { return re.test(x); }); }
+  var c = { tarih: sut(/tartım tarihi/), fiyat: sut(/^fiyat/), bolge: sut(/bölge/), teslim: sut(/fireli kg/),
+    net: sut(/bedele esas/), nakKg: sut(/^nakliye kg/), nakFiyat: sut(/^nakliye tl/) };
+  var say = 0;
+  for (var r = bi + 1; r < v.length; r++) {
+    var x = v[r], m = /(\d{2})\.(\d{2})\.(\d{4})/.exec(x[c.tarih] || '');
+    var net = sayi_(x[c.net]);
+    if (!m || net === '' || !x[0]) continue;
+    say++;
+    var fiyat = sayi_(x[c.fiyat]), nk = c.nakKg >= 0 ? sayi_(x[c.nakKg]) : '', nf = c.nakFiyat >= 0 ? sayi_(x[c.nakFiyat]) : '';
+    teslimatTopla_(g, { urun: 'Patates', ciftlik: ciftlikAdi_(x[c.bolge] || 'Taşağıl'), kaynak: 'Patates fire listesi',
+      alici: 'Konya Şeker', tarih: m[3] + '-' + m[2] + '-' + m[1],
+      teslim: sayi_(x[c.teslim]) || net, net: net, fiyat: fiyat || null,
+      ekGelir: nk !== '' && nf !== '' ? nk * nf : 0 });
+  }
+  kaynaklar.push({ ad: ss.getName(), urun: 'Patates', ciftlik: 'Taşağıl', satir: say,
+    guncelleme: Utilities.formatDate(DriveApp.getFileById(PATATES_FIRE_ID).getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm') });
+}
+
+function elleTeslimatOku_(g, kaynaklar, elle) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(TESLIMAT_SAYFASI);
+  if (!sh || sh.getLastRow() < 2) return;
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  var v = sh.getRange(2, 1, sh.getLastRow() - 1, TESLIMAT_BASLIK.length).getValues(), say = 0;
+  v.forEach(function (r, i) {
+    if (r[10] === 'Silindi' || !(r[0] instanceof Date) || !r[2]) return;
+    var net = sayi_(r[5]) !== '' ? sayi_(r[5]) : (sayi_(r[3]) || 0) - (sayi_(r[4]) || 0);
+    say++;
+    var tarih = Utilities.formatDate(r[0], tz, 'yyyy-MM-dd');
+    elle.push([i + 2, tarih, ciftlikAdi_(r[1]), String(r[2]), sayi_(r[3]), sayi_(r[4]), net,
+      String(r[6] || ''), sayi_(r[7]), String(r[8] || '')]);
+    teslimatTopla_(g, { urun: String(r[2]), ciftlik: ciftlikAdi_(r[1]), kaynak: 'Uygulama girişi',
+      alici: String(r[6] || ''), tarih: Utilities.formatDate(r[0], tz, 'yyyy-MM-dd'),
+      teslim: sayi_(r[3]) || net, net: net, fiyat: sayi_(r[7]) || null });
+  });
+  if (say) kaynaklar.push({ ad: TESLIMAT_SAYFASI + ' (uygulamadan girilen)', urun: '', ciftlik: '', satir: say, guncelleme: '' });
+}
+
+function urunTeslimatlari_() {
+  return onbellekli_('teslimat_v1', 600, function () {
+    var g = {}, kaynaklar = [], hatalar = [], elle = [];
+    [tarkopOku_, patatesOku_, elleTeslimatOku_].forEach(function (f) {
+      try { f(g, kaynaklar, elle); } catch (e) { hatalar.push(String(e).slice(0, 200)); }
+    });
+    var satirlar = Object.keys(g).sort().map(function (k) {
+      var x = g[k];
+      return [x.urun, x.ciftlik, x.kaynak, x.alici, x.tarih, x.sefer, Math.round(x.teslim), Math.round(x.net),
+        x.fiyat === null ? '' : x.fiyat, Math.round(x.tutar), Math.round(x.ekGelir),
+        x.polarN ? Math.round(x.polarT / x.polarN * 100) / 100 : '', Math.round(x.kantar)];
+    });
+    return { satirlar: satirlar, elle: elle, kaynaklar: kaynaklar, hatalar: hatalar,
+      okunma: Utilities.formatDate(new Date(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm') };
+  });
+}
+
+/** Uygulamadan elle teslimat/satış kaydı ekler ya da kaydı "Silindi" yapar. Kişi adı tutulmaz. */
+function teslimatKaydet_(g) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(TESLIMAT_SAYFASI);
+  if (!sh) {
+    sh = ss.insertSheet(TESLIMAT_SAYFASI);
+    sh.appendRow(TESLIMAT_BASLIK);
+    sh.setFrozenRows(1);
+  }
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  CacheService.getScriptCache().remove('teslimat_v1');
+  if (g.tur === 'teslimatSil') {
+    var no = parseInt(g.satir, 10);
+    if (!(no >= 2) || no > sh.getLastRow()) return { ok: false, hata: 'Kayıt bulunamadı.' };
+    sh.getRange(no, 11).setValue('Silindi');
+    return { ok: true, mesaj: 'Kayıt silindi.' };
+  }
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(g.tarih || ''));
+  var urun = String(g.urun || '').slice(0, 60), cf = String(g.ciftlik || '').slice(0, 60);
+  var teslim = sayi_(g.teslim), kesinti = sayi_(g.kesinti), fiyat = sayi_(g.fiyat);
+  if (!m || !urun || !cf || !(teslim > 0)) return { ok: false, hata: 'Tarih, çiftlik, ürün ve teslim edilen miktar gerekli.' };
+  if (kesinti !== '' && (kesinti < 0 || kesinti > teslim)) return { ok: false, hata: 'Kesinti miktarı hatalı.' };
+  var net = teslim - (kesinti || 0);
+  sh.appendRow([new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])), cf, urun, teslim, kesinti === '' ? 0 : kesinti, net,
+    String(g.alici || '').slice(0, 80), fiyat === '' ? '' : fiyat, String(g.aciklama || '').slice(0, 200),
+    Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy HH:mm'), 'Aktif']);
+  return { ok: true, mesaj: urun + ' · ' + cf + ': ' + net + ' kg kaydedildi.' };
 }
 
 function onbellekli_(anahtar, sure, uret) {

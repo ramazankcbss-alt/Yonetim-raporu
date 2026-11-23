@@ -410,6 +410,27 @@ class VeriDeposu extends ChangeNotifier {
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
 
+  /// Ürün Takibi: elle teslimat / satış kaydı ekler ve veriyi yeniler.
+  /// Miktarlar kg, fiyat TL/kg. Kişi adı gönderilmez.
+  Future<String> teslimatKaydet({required DateTime tarih, required String ciftlik, required String urun,
+      required double teslim, double kesinti = 0, String alici = '', double? fiyat, String aciklama = ''}) async {
+    String g(double v) => '$v'.replaceAll('.', ',');
+    final j = await _islem('teslimatEkle', {
+      'tarih': '${tarih.year}-${tarih.month.toString().padLeft(2, '0')}-${tarih.day.toString().padLeft(2, '0')}',
+      'ciftlik': ciftlik, 'urun': urun, 'teslim': g(teslim), 'kesinti': g(kesinti),
+      'alici': alici, 'fiyat': fiyat == null ? '' : g(fiyat), 'aciklama': aciklama,
+    });
+    await yenile();
+    return (j['mesaj'] ?? 'Kaydedildi.').toString();
+  }
+
+  /// Uygulamadan girilmiş teslimat kaydını siler (tabloda "Silindi" olarak işaretlenir).
+  Future<String> teslimatSil(int satir) async {
+    final j = await _islem('teslimatSil', {'satir': '$satir'});
+    await yenile();
+    return (j['mesaj'] ?? 'Silindi.').toString();
+  }
+
   /// Kişiler sayfasındaki kişiye uygulamanın sahibi adına e-posta gönderir.
   Future<void> epostaGonder(String ad, String konu, String metin) async {
     await _islem('mesaj', {'ad': ad, 'konu': konu, 'metin': metin});

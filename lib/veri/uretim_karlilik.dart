@@ -96,7 +96,7 @@ class TarimsalUretim {
 
   static String _kucuk(String s) => s.replaceAll('İ', 'i').replaceAll('I', 'ı').toLowerCase();
 
-  static String _ciftlik(String c) {
+  static String ciftlikAdi(String c) {
     final k = _kucuk(c);
     if (k.contains('şeker')) return 'Şekersüt';
     if (k.contains('aslım')) return 'Aslım';
@@ -107,7 +107,7 @@ class TarimsalUretim {
     return t.isEmpty ? t : '${t[0]}${_kucuk(t.substring(1))}';
   }
 
-  static String _urun(String u) {
+  static String urunAdi(String u) {
     final k = _kucuk(u.trim());
     if (k.contains('pancar')) return 'Şeker Pancarı';
     if (k.contains('mısır')) return 'Silajlık Mısır';
@@ -144,7 +144,7 @@ class TarimsalUretim {
       }
       if (a.isNotEmpty && !ak.startsWith('toplam')) {
         hamCiftlik = a;
-        ciftlik = _ciftlik(a);
+        ciftlik = ciftlikAdi(a);
       }
       // Alt bölüm: "NET KAZANÇ / SAP BALYALARI / … / TOPLAM KAZANÇ" (B sütunu etiket, C değer)
       if (a.isEmpty && b.isNotEmpty && m(r, 2).isNotEmpty && sayiOku(r[2]) != null && m(r, 3).isEmpty) {
@@ -161,7 +161,7 @@ class TarimsalUretim {
       if (dekar <= 0) continue;
       final ormanlik = _kucuk(hamCiftlik).contains('ormanlık');
       ciftlikler.putIfAbsent(ciftlik, () => CiftlikUretimi(ciftlik)).urunler.add(UretimKalemi(
-            ad: _urun(b),
+            ad: urunAdi(b),
             cesit: m(r, 2),
             alt: ormanlik ? 'Ormanlık' : '',
             dekar: dekar,

@@ -56,11 +56,10 @@ class AsistanEkran extends StatelessWidget {
         ),
         _Bolum(
           ikon: Icons.insights_outlined,
-          baslik: 'Üretim ve Kârlılık',
+          baslik: 'Ürün Takibi',
           aciklama: veri.tarimsalUretim.bos
-              ? 'Tarımsal Faaliyet: ürün ve çiftlik bazında alan, verim, satış, maliyet, net kazanç'
-              : '${sayi(veri.tarimsalUretim.genelToplam.dekar)} da · net kazanç '
-                  '${sayi(veri.tarimsalUretim.genelToplam.netKazanc)} ₺',
+              ? 'Ekim alanı, maliyet, teslimat, satış ve net kazanç — ürün ve çiftlik bazında'
+              : '${sayi(veri.tarimsalUretim.genelToplam.dekar)} da · teslimat, satış, maliyet, net kazanç',
           renk: Renk.yesil,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => UretimKarlilikEkran(veri: veri))),
