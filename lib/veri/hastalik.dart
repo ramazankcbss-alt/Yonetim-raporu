@@ -177,6 +177,21 @@ const tedbirHaritasi = <String, Tedbir>{
     'Kaygan zemine oluk/kauçuk; kapı ve geçitlerde sıkışma noktaları düzeltilsin.',
     'Aşırı kalabalık önlensin; nakil ve yüklemede rampa kontrolü.',
   ]),
+  'Yatma/kalkamama': Tedbir('Hipokalsemi (süt humması), doğum felci, kaygan zeminde kayma, sağımhanede sıkışma, ileri topallık', [
+    'Doğum sonrası ilk 72 saatte yatan inekte kan kalsiyumu ölçülsün; riskli ineklere doğumda kalsiyum bolusu.',
+    'Sağımhane girişi ve bekleme alanında kaymaz zemin; yatan hayvan aynı gün yumuşak altlıklı bölmeye alınsın.',
+    'Kalkamayan inek 12 saatten fazla aynı yanına yatırılmasın; kaldırma desteği veteriner gözetiminde yapılsın.',
+  ]),
+  'Leptospirozis': Tedbir('Leptospira (zoonoz); kemirgen, kirli su ve yemle bulaşma', [
+    'Sürü leptospira aşı programı veteriner hekimle güncellensin.',
+    'Su depoları ve yem ambarlarında kemirgen kontrolü düzenli yapılsın.',
+    'Hasta hayvan ve atık/ölü doğum materyaliyle eldiven ve koruyucu ekipmanla çalışılsın.',
+  ]),
+  'Şap': Tedbir('Şap virüsü (ihbarı zorunlu hastalık)', [
+    'Şüphede İl/İlçe Tarım ve Orman Müdürlüğüne hemen ihbar; hayvan giriş-çıkışı durdurulsun.',
+    'Şap aşılaması resmî takvime göre eksiksiz yapılsın; yeni gelen hayvana karantina.',
+    'Araç, ekipman ve ziyaretçi girişinde dezenfeksiyon uygulansın.',
+  ]),
   'Felç': Tedbir('Süt humması, doğum felci, travma, sinir hasarı', [
     'Hipokalsemi önlemleri; yatan ineğe ilk saatlerde kaldırma desteği ve yumuşak zemin.',
   ]),

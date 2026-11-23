@@ -1427,7 +1427,7 @@ function detayGecmisiAl() {
 // "Veteriner Paneli – sayfa (…).html" ve "Veteriner Paneli – hastalık arşivi (…).json".
 // Kaynakları depoda: apps_script/Veteriner.html ve assets/veri/hastalik.json.
 var VET_HTML_ID = '14izW3rxYQvhXV668iD_McdEcds4VvTs8';
-var VET_ARSIV_ID = '1t_4NvUHrQDjyX-TmLPEidP51hi8Zun8e';
+var VET_ARSIV_ID = '13m3kHW6whr56GRcgSZiMsyB00bCaXJRT'; // 23.11.2026: yalnızca Drive Sağlık Raporları (araclar/hastalik/olustur.py)
 
 // Panel durumu (20.11.2026): Komut dosyası özelliği VET_PANEL = 'acik' ise
 // açıktır; tanımlı değilse kapalı kabul edilir. Uygulamadaki anahtarla
@@ -1592,10 +1592,10 @@ function vetVeri(kod) {
 /** Hastalık arşivi (Drive'daki JSON; 6 saat önbellek). */
 function vetArsiv_() {
   var cache = CacheService.getScriptCache();
-  var m = cache.get('vet_arsiv');
+  var m = cache.get('vet_arsiv_v2');
   if (!m) {
     m = DriveApp.getFileById(VET_ARSIV_ID).getBlob().getDataAsString('UTF-8');
-    try { cache.put('vet_arsiv', m, 21600); } catch (err) { /* büyükse önbelleğe alınmaz */ }
+    try { cache.put('vet_arsiv_v2', m, 21600); } catch (err) { /* büyükse önbelleğe alınmaz */ }
   }
   return JSON.parse(m);
 }
