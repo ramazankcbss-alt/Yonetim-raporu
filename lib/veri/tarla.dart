@@ -67,6 +67,11 @@ class TarlaParsel {
         etiket: j['etiket'] ?? '',
         not: j['not_'] ?? '',
         koord: [for (final c in (j['koord'] as List? ?? [])) ((c[0] as num).toDouble(), (c[1] as num).toDouble())],
+        cesitler: [for (final c in (j['cesitler'] as List? ?? [])) c as String?],
+        bolgeler: [
+          for (final b in (j['bolgeler'] as List? ?? []))
+            if (b case [final String t, final List v]) (t, [for (final x in v) (x as num).toDouble()])
+        ],
       );
 }
 
@@ -109,7 +114,12 @@ class TarlaCiftlik {
 
 class TarlaSezonu {
   const TarlaSezonu(
-      {required this.sezon, required this.kaynak, required this.tarih, required this.ciftlikler, this.onceki, this.sonraki, this.giris = false});
+      {required this.sezon, required this.kaynak, required this.tarih, required this.ciftlikler, this.onceki, this.sonraki, this.giris = false,
+      this.tur = 'kmz'});
+
+  /// Paket dosyasının türü: 'kmz' (esas harita), 'katman' (esas parsellerin üzerine o sezonun KMZ ürünleri),
+  /// 'ayri' (parsel düzeni farklı eski sezon, kendi çizimleriyle).
+  final String tur;
   final String sezon, kaynak, tarih;
   final List<TarlaCiftlik> ciftlikler;
 
@@ -129,6 +139,7 @@ class TarlaSezonu {
         sezon: j['sezon'] ?? '',
         kaynak: j['kaynak'] ?? '',
         tarih: j['tarih'] ?? '',
+        tur: j['tur'] ?? 'kmz',
         ciftlikler: [
           for (final c in (j['ciftlikler'] as List? ?? []))
             TarlaCiftlik(
@@ -153,7 +164,13 @@ class TarlaSezonu {
 }
 
 /// Paketlenmiş sezon dosyaları (yeniden eskiye).
-const tarlaSezonDosyalari = ['assets/veri/tarla_2025_2026.json'];
+const tarlaSezonDosyalari = [
+  'assets/veri/tarla_2025_2026.json',
+  // Yerlerim 24.11.2026 GÜNCEL.kmz: sezon katmanları (araclar/tarla/kmz_sezonlar.py)
+  'assets/veri/tarla_2023_2024.json',
+  'assets/veri/tarla_2024_2025.json',
+  'assets/veri/tarla_2026_2027.json',
+];
 
 String _s(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1).replaceAll('.', ',');
 
@@ -172,6 +189,8 @@ String urunAnahtari(String u) {
   if (k.contains('arpa')) return 'Arpa';
   if (k.contains('yonca')) return 'Yonca';
   if (k.contains('patates')) return 'Patates';
+  if (k.contains('soğan')) return 'Soğan';
+  if (k.contains('tritikale')) return 'Tritikale';
   if (k.contains('deneme')) return 'Deneme alanı';
   if (k.contains('ıslah')) return 'Islah edilen alan';
   if (k.contains('ağaç')) return 'Ağaçlık alan';
@@ -452,12 +471,24 @@ String oncekiSezon(String s) {
 
 /// [taban] sezonunun parsel çizimleriyle, ürün ve alanları haritadan girilen sezon.
 /// [sezon] verilmezse bir sonraki sezon olur; [onceki] münavebe karşılaştırması içindir.
-TarlaSezonu girisSezonu(TarlaSezonu taban, List<SezonParsel> l, {String? sezon, TarlaSezonu? onceki, bool ilkSezon = false, TarlaSezonu? sonraki}) {
+TarlaSezonu girisSezonu(TarlaSezonu taban, List<SezonParsel> l,
+    {String? sezon, TarlaSezonu? onceki, bool ilkSezon = false, TarlaSezonu? sonraki, TarlaSezonu? katman}) {
   final ad = sezon ?? sonrakiSezon(taban.sezon);
   final once = ilkSezon ? null : (onceki ?? taban);
+  TarlaParsel? kmzde(String cf, String p) {
+    for (final c in katman?.ciftlikler ?? const <TarlaCiftlik>[]) {
+      if (c.ad != cf) continue;
+      for (final x in c.parseller) {
+        if (x.ad == p) return x;
+      }
+    }
+    return null;
+  }
+
   return TarlaSezonu(
     sezon: ad,
-    kaynak: 'haritadan girilen bilgiler',
+    kaynak: katman == null ? 'haritadan girilen bilgiler' : '${katman.kaynak} + haritadan girilen bilgiler',
+    tur: katman?.tur ?? 'giris',
     tarih: '',
     onceki: once,
     sonraki: sonraki,
@@ -467,18 +498,43 @@ TarlaSezonu girisSezonu(TarlaSezonu taban, List<SezonParsel> l, {String? sezon, 
         TarlaCiftlik(ad: c.ad, tesis: c.tesis, gorseller: c.gorseller, parseller: [
           for (final p in c.parseller)
             if (parselGirisi(l, ad, c.ad, p.ad) case final g?)
-              _girisParseli(p, g, [
-                for (final q in c.parseller)
-                  if (parselGirisi(l, ad, c.ad, q.ad) case final h?
-                      when q.ad != p.ad && ParselIcerik.oku(h.urun).birlesik == p.ad)
-                    q.ad
-              ], gelen: gelenParcalar(l, ad, c, p.ad))
+              _kmzNotu(
+                  _girisParseli(p, g, [
+                    for (final q in c.parseller)
+                      if (parselGirisi(l, ad, c.ad, q.ad) case final h?
+                          when q.ad != p.ad && ParselIcerik.oku(h.urun).birlesik == p.ad)
+                        q.ad
+                  ], gelen: gelenParcalar(l, ad, c, p.ad)),
+                  kmzde(c.ad, p.ad))
+            else if (kmzde(c.ad, p.ad) case final k? when k.urunler.isNotEmpty)
+              TarlaParsel(
+                  ad: p.ad,
+                  tip: k.tip == 'girilmedi' || k.tip.isEmpty ? 'parsel' : k.tip,
+                  urunler: k.urunler,
+                  beyan: k.urunler.fold<double>(0, (a, x) => a + x.$2),
+                  koord: p.koord,
+                  not: k.not,
+                  cesitler: k.cesitler,
+                  bolgeler: k.bolgeler.length == k.urunler.length - 1 ? k.bolgeler : const [])
             else
               TarlaParsel(
                   ad: p.ad, tip: p.tip == 'diger' || p.tip == 'bos' ? p.tip : 'girilmedi', urunler: const [], koord: p.koord),
         ]),
     ],
   );
+}
+
+/// Uygulamadan girilen kayıt KMZ'deki çizimden farklıysa KMZ'deki hâli nota eklenir (kontrol için).
+TarlaParsel _kmzNotu(TarlaParsel y, TarlaParsel? k) {
+  if (k == null || k.urunler.isEmpty || k.not.isEmpty) return y;
+  String ozet(TarlaParsel x) => [
+        for (final u in x.urunler) '${urunAnahtari(u.$1)} ${u.$2.round()}',
+      ].join('+');
+  if (ozet(y) == ozet(k)) return y;
+  return TarlaParsel(
+      ad: y.ad, tip: y.tip, urunler: y.urunler, beyan: y.beyan, olculen: y.olculen, etiket: y.etiket,
+      not: [if (y.not.isNotEmpty) y.not, 'KMZ\'de farklı → ${k.not.replaceFirst('KMZ: ', '')}'].join(' · '),
+      koord: y.koord, bolme: y.bolme, baglar: y.baglar, cesitler: y.cesitler, bolgeler: y.bolgeler);
 }
 
 /// Başka parsellerden bu parsele bağlanan parçalar: (kaynak parsel, ürün, dekar).
@@ -558,7 +614,7 @@ const secilebilirUrunler = [
   // Hububat
   'Buğday', 'Arpa', 'Tritikale', 'Çavdar', 'Yulaf', 'Dane mısır',
   // Endüstri ve yağ bitkileri
-  'Şeker pancarı', 'Patates', 'Yağlık ayçiçeği', 'Çerezlik ayçiçeği', 'Kanola (kolza)', 'Aspir', 'Soya',
+  'Şeker pancarı', 'Patates', 'Soğan', 'Yağlık ayçiçeği', 'Çerezlik ayçiçeği', 'Kanola (kolza)', 'Aspir', 'Soya',
   // Baklagiller
   'Nohut', 'Kuru fasulye', 'Mercimek',
   // Yem bitkileri
@@ -577,13 +633,25 @@ bool ekimDisi(String urun) => ekimDisiAlanlar.contains(urunAnahtari(urun));
 /// Tarla Haritası bölümleri: 2024-2025 (haritadan giriş), KMZ sezonu (2025-2026),
 /// 2026-2027 (haritadan giriş). Hepsi KMZ sezonunun parsel çizimlerini kullanır.
 List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l, {List<ParselSinir> sinirlar = const []}) {
-  if (paket.isEmpty) return const [];
-  if (sinirlar.isNotEmpty) paket = [for (final k in paket) sinirUygula(k, sinirlar)];
-  final kmz = paket.first;
-  final eski = girisSezonu(kmz, l, sezon: oncekiSezon(kmz.sezon), ilkSezon: true, sonraki: kmz);
-  // KMZ sezonunun öncesi 2024-2025 (münavebe ve çok yıllık ürün yılı için).
-  final orta = [for (final (i, k) in paket.indexed) kmzUzerine(k, l, onceki: i == 0 ? eski : null)];
-  return [eski, ...orta, girisSezonu(kmz, l, onceki: orta.first)];
+  final esaslar = paket.where((k) => k.tur == 'kmz').toList();
+  if (esaslar.isEmpty) return const [];
+  // Yeniden çizilen sınırlar yalnızca esas haritaya uygulanır (katman sezonları esas çizimleri kullanır).
+  final kmz = sinirlar.isEmpty ? esaslar.first : sinirUygula(esaslar.first, sinirlar);
+  TarlaSezonu? bul(String sezon, String tur) => paket.where((k) => k.sezon == sezon && k.tur == tur).firstOrNull;
+  final s1 = oncekiSezon(kmz.sezon), s3 = sonrakiSezon(kmz.sezon);
+  final ayri = bul(oncekiSezon(s1), 'ayri');
+  final k1 = bul(s1, 'katman'), k3 = bul(s3, 'katman');
+  // Parsel düzeni farklı en eski sezon (2023-2024): kendi çizimleri, uygulamadan girilen kayıtlar üzerine.
+  TarlaSezonu? s0;
+  if (ayri != null) {
+    final taslak = girisSezonu(kmz, l, sezon: s1, ilkSezon: true, katman: k1);
+    s0 = girisSezonu(ayri, l, sezon: ayri.sezon, ilkSezon: true, sonraki: taslak, katman: ayri);
+  }
+  final eski = girisSezonu(kmz, l, sezon: s1, ilkSezon: s0 == null, onceki: s0, sonraki: s0 == null ? kmz : null, katman: k1);
+  final orta = [
+    for (final (i, k) in esaslar.indexed) kmzUzerine(i == 0 ? kmz : k, l, onceki: i == 0 ? eski : null)
+  ];
+  return [if (s0 != null) s0, eski, ...orta, girisSezonu(kmz, l, onceki: orta.first, katman: k3)];
 }
 
 /// Geçerli parsel sınırları: (çiftlik, parsel) → (boylam, enlem) noktaları. Son "Aktif" kayıt geçerlidir,

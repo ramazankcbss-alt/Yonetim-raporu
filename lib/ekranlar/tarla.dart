@@ -62,8 +62,9 @@ class _TarlaEkranState extends State<TarlaEkran> {
                   child: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
                     const BilgiKutusu(
                         yazi: 'Her sezon ayrı bir bölümdür; içinde Harita, Parseller, Karşılaştırma ve ÇKS sekmeleri yer alır. '
-                            'Parsel çizimleri 2025-2026 KMZ haritasından alınır. 2024-2025 ve 2026-2027 sezonlarında ürün ve '
-                            'alanlar haritada parsele dokunularak girilir. Alanlarda Excel dosyaları esas alınır.'),
+                            'Parsel çizimleri ve sezonların ürünleri Google Earth KMZ haritasından (Yerlerim 24.11.2026 GÜNCEL) '
+                            'alınır; 2023-2024 sezonu o yılın parsel düzeniyle gösterilir. Haritada parsele dokunularak '
+                            'yapılan girişler KMZ bilgisinin önüne geçer; KMZ\'de farklı yazan parsellerde uyarı notu görünür.'),
                     const SizedBox(height: 8),
                     for (final x in hepsi) _sezonKarti(context, l, x, v),
                     _MenuKarti(
@@ -285,6 +286,7 @@ const _renkler = {
   'Silajlık mısır (2. ürün)': Color(0xFF7CC47F),
   'Yonca': Color(0xFF1E7FA8),
   'Patates': Color(0xFFA0522D),
+  'Soğan': Color(0xFFB8860B),
   'Dane mısır': Color(0xFFF4D03F),
   'Yağlık ayçiçeği': Color(0xFFF1C40F),
   'Çerezlik ayçiçeği': Color(0xFFD4AC0D),
@@ -461,8 +463,8 @@ class _HaritaState extends State<_Harita> {
                 cizgiKaydet: (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz),
                 cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, widget.s, c, p, cz, oran),
                 bolgeEkle: (p, b, pay) => _bolgeEkle(context, widget.s, c, p, b, pay),
-                sinirKaydet: (p, k, da) => _sinirKaydet(context, c, p, k, da),
-                sinirGeriAl: (p) => _sinirGeriAl(context, c, p),
+                sinirKaydet: widget.s.tur == 'ayri' ? null : (p, k, da) => _sinirKaydet(context, c, p, k, da),
+                sinirGeriAl: widget.s.tur == 'ayri' ? null : (p) => _sinirGeriAl(context, c, p),
                 degisenSinir: _degisenSinirlar(widget.v, c)),
           ),
           Positioned(
@@ -490,8 +492,8 @@ class _HaritaState extends State<_Harita> {
                           cizgiKaydet: (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
                           cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran),
                           bolgeEkle: (p, b, pay) => _bolgeEkle(context, s2, c2, p, b, pay),
-                          sinirKaydet: (p, k, da) => _sinirKaydet(context, c2, p, k, da),
-                          sinirGeriAl: (p) => _sinirGeriAl(context, c2, p),
+                          sinirKaydet: s2.tur == 'ayri' ? null : (p, k, da) => _sinirKaydet(context, c2, p, k, da),
+                          sinirGeriAl: s2.tur == 'ayri' ? null : (p) => _sinirGeriAl(context, c2, p),
                           degisenSinir: _degisenSinirlar(VeriDeposu.ben.veri ?? widget.v, c2)),
                     );
                   },

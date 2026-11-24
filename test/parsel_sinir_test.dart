@@ -37,4 +37,33 @@ void main() {
     final geri = sinirUygula(kmz, [...l, const ParselSinir(ciftlik: 'Örnek', parsel: 'A', durum: 'Geri alındı')]);
     expect(geri.ciftlikler.single.parseller.first.koord, kare);
   });
+
+  test('KMZ sezon katmanı: girilmeyen parsele KMZ ürünü gelir, uygulama girişi önce gelir', () {
+    const kare = [(1.0, 1.0), (2.0, 1.0), (2.0, 2.0), (1.0, 2.0)];
+    final kmz = TarlaSezonu(sezon: '2025-2026', kaynak: 'KMZ', tarih: '', ciftlikler: [
+      TarlaCiftlik(ad: 'Örnek', parseller: [
+        TarlaParsel(ad: 'A', tip: 'parsel', urunler: const [('Arpa', 0)], koord: kare),
+        TarlaParsel(ad: 'B', tip: 'parsel', urunler: const [('Arpa', 0)], koord: kare),
+      ]),
+    ]);
+    final katman = TarlaSezonu.json({
+      'sezon': '2026-2027', 'kaynak': 'örnek.kmz', 'tarih': '', 'tur': 'katman',
+      'ciftlikler': [
+        {'ad': 'Örnek', 'parseller': [
+          {'ad': 'A', 'tip': 'parsel', 'urunler': [['Buğday', 10], ['Arpa', 20]], 'cesitler': ['Halis', null],
+           'bolgeler': [['P', [0, 0, 50, 0, 50, 50]]], 'not_': 'KMZ: örnek'},
+          {'ad': 'B', 'tip': 'parsel', 'urunler': [['Buğday', 30]], 'not_': 'KMZ: örnek B'},
+        ]},
+      ],
+    });
+    final l = [const SezonParsel(sezon: '2026-2027', ciftlik: 'Örnek', parsel: 'B', urun: 'Arpa', alan: 30, durum: 'Aktif')];
+    final ss = tarlaSezonlari([kmz, katman], l);
+    expect([for (final x in ss) x.sezon], ['2024-2025', '2025-2026', '2026-2027']);
+    final p = ss.last.ciftlikler.single.parseller;
+    expect(p.first.urunler, [('Buğday', 10.0), ('Arpa', 20.0)]);
+    expect(p.first.cesit(0), 'Halis');
+    expect(p.first.bolgeler.single.$1, 'P');
+    expect(p.last.urunler, [('Arpa', 30.0)]);
+    expect(p.last.not, contains('KMZ\'de farklı'));
+  });
 }

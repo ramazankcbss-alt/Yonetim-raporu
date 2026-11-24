@@ -34,3 +34,6 @@ flutter:
     - assets/fonts/DejaVuSans-Bold.ttf
     - assets/veri/hastalik.json
     - assets/veri/tarla_2025_2026.json
+    - assets/veri/tarla_2023_2024.json
+    - assets/veri/tarla_2024_2025.json
+    - assets/veri/tarla_2026_2027.json
