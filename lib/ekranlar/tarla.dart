@@ -66,6 +66,13 @@ class _TarlaEkranState extends State<TarlaEkran> {
                             'alanlar haritada parsele dokunularak girilir. Alanlarda Excel dosyaları esas alınır.'),
                     const SizedBox(height: 8),
                     for (final x in hepsi) _sezonKarti(context, l, x, v),
+                    _MenuKarti(
+                      baslik: 'Yıllara göre ekim karşılaştırması',
+                      alt: '${hepsi.map((x) => x.sezon).join(' · ')} — çiftlik ve ürün alanları, parsel geçmişi',
+                      ikon: Icons.compare_arrows,
+                      dokun: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => _YilKarsilastirma(paket: l, ilk: widget.veri))),
+                    ),
                   ]),
                 ),
               );
@@ -92,6 +99,131 @@ class _TarlaEkranState extends State<TarlaEkran> {
       dokun: () => _ac(context, l, x.sezon),
     );
   }
+}
+
+/// Sezonlar arası ekim karşılaştırması: çiftlik/ürün alanları (Excel esaslı; Excel yoksa haritadan girilen)
+/// ve parsel bazında ürün geçmişi.
+class _YilKarsilastirma extends StatelessWidget {
+  const _YilKarsilastirma({required this.paket, required this.ilk});
+  final List<TarlaSezonu> paket;
+  final RaporVerisi ilk;
+
+  static String _kisa(String s) {
+    final m = RegExp(r'^\d{2}(\d{2})-\d{2}(\d{2})$').firstMatch(s);
+    return m == null ? s : '${m[1]}-${m[2]}';
+  }
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: VeriDeposu.ben,
+        builder: (context, _) {
+          final v = VeriDeposu.ben.veri ?? ilk;
+          final sezonlar = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v));
+          final ciftlikler = <String>{for (final s in sezonlar) for (final c in s.ciftlikler) c.ad}.toList();
+          // (sezon, çiftlik) → ürün → (dekar, haritadan mı)
+          Map<String, (double, bool)> alanlar(TarlaSezonu s, String c) {
+            final ex = sezonExcel(v.ekim, v.ekimPlani, s, c);
+            if (ex.isNotEmpty) return {for (final e in ex.entries) e.key: (e.value, false)};
+            final cf = s.ciftlikler.where((x) => ciftlikAnahtari(x.ad) == ciftlikAnahtari(c));
+            if (cf.isEmpty) return {};
+            return {for (final e in cf.first.urunToplami.entries) if (e.value > 0) e.key: (e.value, true)};
+          }
+
+          String hucre((double, bool)? x) => x == null ? '—' : '${sayi(x.$1)}${x.$2 ? '*' : ''}';
+          String degisim((double, bool)? a, (double, bool)? b) {
+            if (a == null && b == null) return '—';
+            final d = (b?.$1 ?? 0) - (a?.$1 ?? 0);
+            if (d.abs() < 0.5) return '=';
+            return '${d > 0 ? '+' : '−'}${sayi(d.abs())}';
+          }
+
+          final son = sezonlar.length >= 2 ? sezonlar[sezonlar.length - 2] : null;
+          return Scaffold(
+            appBar: AppBar(title: const Text('Yıllara göre ekim')),
+            body: GonderAlani(
+              konu: 'Tarla Haritası – Yıllara göre ekim karşılaştırması',
+              child: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+                const BilgiKutusu(
+                    yazi: 'Alanlar dekar olarak Excel dosyalarından alınır; Excel kaydı olmayan sezonda haritadan girilen '
+                        'alanlar gösterilir (* işaretli). Son sütun, son iki sezon arasındaki değişimdir.'),
+                for (final c in ciftlikler)
+                  () {
+                    final m = [for (final s in sezonlar) alanlar(s, c)];
+                    final urunler = <String>{for (final x in m) ...x.keys}.toList()..sort();
+                    if (urunler.isEmpty) return const SizedBox.shrink();
+                    final toplam = [
+                      for (final x in m) x.isEmpty ? null : (x.values.fold<double>(0, (a, b) => a + b.$1), x.values.any((y) => y.$2))
+                    ];
+                    return Panel(
+                      baslik: c,
+                      child: VeriTablosu(
+                        ilkSutunGenislik: 120,
+                        basliklar: ['Ürün', for (final s in sezonlar) _kisa(s.sezon), if (son != null) 'Değişim'],
+                        satirlar: [
+                          for (final u in urunler)
+                            [
+                              u,
+                              for (final x in m) hucre(x[u]),
+                              if (son != null) degisim(m[m.length - 2][u], m.last[u]),
+                            ],
+                          [
+                            'Toplam',
+                            for (final t in toplam) hucre(t),
+                            if (son != null) degisim(toplam[toplam.length - 2], toplam.last),
+                          ],
+                        ],
+                        vurguluSonSatir: true,
+                      ),
+                    );
+                  }(),
+                const BolumBasligi('Parsel bazında ekim geçmişi'),
+                for (final c in ciftlikler)
+                  () {
+                    final parseller = <String>[
+                      for (final s in sezonlar)
+                        for (final cf in s.ciftlikler)
+                          if (ciftlikAnahtari(cf.ad) == ciftlikAnahtari(c))
+                            for (final p in cf.parseller)
+                              if (p.tip != 'diger') p.ad
+                    ].toSet().toList();
+                    String yaz(TarlaSezonu s, String parsel) {
+                      for (final cf in s.ciftlikler) {
+                        if (ciftlikAnahtari(cf.ad) != ciftlikAnahtari(c)) continue;
+                        for (final p in cf.parseller) {
+                          if (p.ad != parsel) continue;
+                          if (p.urunler.isEmpty) return p.girilmedi ? 'girilmedi' : '—';
+                          return [
+                            for (final (i, u) in p.urunler.indexed)
+                              '${_YaziCizer._kisaUrun(u.$1)}'
+                                  '${_YaziCizer._urunDekari(p, i) == null ? '' : ' ${sayi(_YaziCizer._urunDekari(p, i))}'}'
+                                  '${p.cesit(i) == null ? '' : ' (${p.cesit(i)})'}'
+                                  '${cokYillik(u.$1) ? ' · ${ardisikYil(s, c, parsel, u.$1).$1}. yıl' : ''}'
+                          ].join(' + ');
+                        }
+                      }
+                      return '—';
+                    }
+
+                    final satirlar = [
+                      for (final p in parseller)
+                        if (sezonlar.any((s) => !['—', 'girilmedi'].contains(yaz(s, p)))) [p, for (final s in sezonlar) yaz(s, p)]
+                    ];
+                    if (satirlar.isEmpty) return const SizedBox.shrink();
+                    return Panel(
+                      baslik: c,
+                      child: VeriTablosu(
+                        ilkSutunGenislik: 96,
+                        basliklar: ['Parsel', for (final s in sezonlar) _kisa(s.sezon)],
+                        metinSutunlari: {for (var i = 0; i <= sezonlar.length; i++) i},
+                        satirlar: satirlar,
+                      ),
+                    );
+                  }(),
+              ]),
+            ),
+          );
+        },
+      );
 }
 
 /// Bir sezon bölümü: Harita, Parseller, Karşılaştırma, ÇKS.
@@ -302,7 +434,7 @@ class _HaritaState extends State<_Harita> {
           AspectRatio(
             aspectRatio: 0.82,
             child: _HaritaGorunum(
-                p: cizili, g: c.gorseller, cks: cksAdlari, maxOlcek: 6, dekar: giris, onDokun: dokun,
+                p: cizili, g: c.gorseller, cks: cksAdlari, maxOlcek: 6, dekar: true, onDokun: dokun,
                 cizgiKaydet: (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz),
                 cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, widget.s, c, p, cz, oran)),
           ),
@@ -326,7 +458,7 @@ class _HaritaState extends State<_Harita> {
                           cks: cksAdlari,
                           maxOlcek: 10,
                           yazi: 13,
-                          dekar: s2.giris,
+                          dekar: true,
                           onDokun: (p) => _parselIslem(context, s2, c2, p),
                           cizgiKaydet: (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
                           cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran)),
@@ -1036,17 +1168,21 @@ class _YaziCizer extends CustomPainter {
           TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
           if (x.girilmedi)
             TextSpan(text: '\nGirilmedi', style: TextStyle(fontSize: yazi * 0.85, color: Colors.black54)),
-          for (final (kisa, cesit) in {
+          for (final (kisa, alt) in {
             for (final (i, u) in x.urunler.indexed)
-              (dekar && u.$2 > 0 ? '${_kisaUrun(u.$1)} ${sayi(u.$2)} da' : _kisaUrun(u.$1), x.cesit(i))
+              (
+                _kisaUrun(u.$1),
+                [
+                  if (dekar && _urunDekari(x, i) != null) '${sayi(_urunDekari(x, i))} da',
+                  if (x.cesit(i) != null) x.cesit(i)!,
+                ].join(' · '),
+              )
           }) ...[
             TextSpan(
                 text: '\n$kisa',
                 style: TextStyle(fontSize: yazi * 0.92, color: Colors.black87, fontWeight: FontWeight.w600)),
-            if (cesit != null)
-              TextSpan(
-                  text: '\n$cesit',
-                  style: TextStyle(fontSize: yazi * 0.8, color: Colors.black54, fontStyle: FontStyle.italic)),
+            if (alt.isNotEmpty)
+              TextSpan(text: '\n$alt', style: TextStyle(fontSize: yazi * 0.8, color: Colors.black54)),
           ],
         ]),
         textAlign: TextAlign.center,
@@ -1059,6 +1195,14 @@ class _YaziCizer extends CustomPainter {
       canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), Paint()..color = Colors.white.withValues(alpha: 0.8));
       tp.paint(canvas, n - Offset(tp.width / 2, tp.height / 2));
     }
+  }
+
+  /// Ürünün dekarı: girilen değer; tek ürünlü KMZ parselinde parselin beyan/ölçülen alanı.
+  static double? _urunDekari(TarlaParsel x, int i) {
+    final d = x.urunler[i].$2;
+    if (d > 0) return d;
+    if (x.urunler.length == 1) return x.beyan ?? x.olculen;
+    return null;
   }
 
   static String _kisaUrun(String u) {
