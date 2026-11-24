@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<base target="_top">
+<title>Tarla Haritası</title>
+<style>
+  :root { --mavi:#1d4ed8; --soluk:#64748b; --amber:#b45309; --kenar:#e2e8f0; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#0f172a; background:#f8fafc; }
+  header { background:#14532d; color:#fff; padding:12px 14px; }
+  header h1 { margin:0; font-size:18px; }
+  header div { font-size:12.5px; opacity:.85; margin-top:2px; }
+  main { max-width:1100px; margin:0 auto; padding:10px 12px 40px; }
+  .cipler { display:flex; gap:6px; overflow-x:auto; padding:4px 0 8px; }
+  .cip { border:1px solid var(--kenar); background:#fff; border-radius:16px; padding:6px 12px; font-size:13.5px; white-space:nowrap; cursor:pointer; }
+  .cip.secili { background:#14532d; color:#fff; border-color:#14532d; }
+  .kart { background:#fff; border:1px solid var(--kenar); border-radius:12px; padding:10px; margin-bottom:10px; }
+  .bilgi { background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:8px 10px; font-size:13px; margin-bottom:10px; }
+  .uyari { color:var(--amber); font-size:12.5px; }
+  #haritaKap { position:relative; overflow:auto; border-radius:10px; background:#eef2ee; height:62vh; touch-action:pan-x pan-y; }
+  #harita { display:block; }
+  .araclar { position:absolute; right:8px; top:8px; display:flex; flex-direction:column; gap:6px; z-index:2; }
+  .araclar button { width:38px; height:38px; border-radius:19px; border:1px solid var(--kenar); background:#fff; font-size:20px; }
+  .lejant { display:flex; flex-wrap:wrap; gap:6px 12px; font-size:12.5px; margin-top:8px; }
+  .lejant span i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:-1px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td, th { border-bottom:1px solid var(--kenar); padding:6px 4px; text-align:left; vertical-align:top; }
+  tr.tik { cursor:pointer; }
+  #perde { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; z-index:10; }
+  #sayfa { position:fixed; left:0; right:0; bottom:0; max-height:88vh; overflow:auto; background:#fff; border-radius:16px 16px 0 0;
+           padding:14px 14px 24px; display:none; z-index:11; max-width:640px; margin:0 auto; }
+  #sayfa h2 { margin:0 0 2px; font-size:17px; }
+  label { display:block; font-size:12.5px; color:var(--soluk); margin-top:8px; }
+  select, input { width:100%; font-size:15px; padding:8px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
+  .parca { border:1px solid var(--kenar); border-radius:10px; padding:8px; margin-top:8px; }
+  .satir { display:flex; gap:8px; } .satir > * { flex:1; }
+  .dugmeler { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+  button.ana { background:#14532d; color:#fff; border:0; border-radius:10px; padding:10px 16px; font-size:15px; }
+  button.ikinci { background:#fff; color:#0f172a; border:1px solid #cbd5e1; border-radius:10px; padding:10px 16px; font-size:15px; }
+  button:disabled { opacity:.5; }
+  #durum { position:fixed; left:50%; transform:translateX(-50%); bottom:16px; background:#0f172a; color:#fff; padding:8px 14px;
+           border-radius:10px; font-size:13.5px; display:none; z-index:20; max-width:92vw; }
+  .yukleniyor { padding:40px; text-align:center; color:var(--soluk); }
+</style>
+</head>
+<body>
+<header><h1>Tarla Haritası</h1><div id="ust">Yükleniyor…</div></header>
+<main>
+  <div id="icerik" class="yukleniyor">Harita yükleniyor…</div>
+</main>
+<div id="perde" onclick="kapat()"></div>
+<div id="sayfa"></div>
+<div id="durum"></div>
+<script>
+var ANAHTAR = __ANAHTAR__;
+var VERI_ADRESI = 'https://raw.githubusercontent.com/ramazankcbss-alt/Yonetim-raporu/main/assets/veri/';
+var DOSYALAR = ['tarla_2025_2026.json', 'tarla_2023_2024.json', 'tarla_2024_2025.json', 'tarla_2026_2027.json'];
+var SINIR = 400;
+var URUNLER = ['Buğday', 'Arpa', 'Tritikale', 'Çavdar', 'Yulaf', 'Dane mısır', 'Şeker pancarı', 'Patates', 'Soğan',
+  'Yağlık ayçiçeği', 'Çerezlik ayçiçeği', 'Kanola (kolza)', 'Aspir', 'Soya', 'Nohut', 'Kuru fasulye', 'Mercimek',
+  'Silajlık mısır', 'Silajlık mısır (2. ürün)', 'Yonca', 'Korunga', 'Fiğ', 'Silajlık sorgum', 'Sudan otu', 'Kimyon', 'Kişniş',
+  'Nadas', 'Deneme alanı', 'Islah edilen alan', 'Ağaçlık alan', 'Boş alan'];
+var RENK = { 'Buğday':'#E0A526','Arpa':'#C9B458','Şeker pancarı':'#8E3B8A','Silajlık mısır':'#3F9142','Silajlık mısır (2. ürün)':'#7CC47F',
+  'Yonca':'#1E7FA8','Patates':'#A0522D','Soğan':'#B8860B','Dane mısır':'#F4D03F','Yağlık ayçiçeği':'#F1C40F','Çerezlik ayçiçeği':'#D4AC0D',
+  'Kanola (kolza)':'#E5E85C','Aspir':'#E67E22','Soya':'#7DAA5A','Nohut':'#D7B98E','Kuru fasulye':'#B05A4A','Mercimek':'#C8743A',
+  'Çavdar':'#A38B5B','Yulaf':'#D9C79E','Tritikale':'#BFA76A','Korunga':'#C2185B','Fiğ':'#6C7A3A','Silajlık sorgum':'#5E8C31',
+  'Sudan otu':'#8BC34A','Kimyon':'#9E7C5A','Kişniş':'#7FA67F','Nadas':'#B8A88A','Deneme alanı':'#00BCD4','Islah edilen alan':'#795548',
+  'Ağaçlık alan':'#2E7D32','Boş alan':'#D6D6D6' };
+
+var S = { paket: [], sezonParsel: [], parselSinir: [], yetki: 'gor', etiket: '', sezon: null, ciftlik: null, olcek: 1, yazi: true };
+
+// ---------- yardımcılar ----------
+function kucuk(s) { return String(s || '').replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase(); }
+function ciftlikAnahtari(c) {
+  var k = kucuk(c);
+  if (k.indexOf('ormanlık') >= 0) return 'taşağıl';
+  var l = ['şekersüt', 'aslım', 'taşağıl', 'fidanlık', 'pangev', 'pankent'];
+  for (var i = 0; i < l.length; i++) if (k.indexOf(l[i]) >= 0) return l[i];
+  return k;
+}
+function urunAnahtari(u) {
+  var k = kucuk(u);
+  if (k.indexOf('2. ürün') >= 0) return 'Silajlık mısır (2. ürün)';
+  if (k.indexOf('pancar') >= 0) return 'Şeker pancarı';
+  if (k.indexOf('dane mısır') >= 0 || k.indexOf('danelik mısır') >= 0) return 'Dane mısır';
+  if (k.indexOf('mısır') >= 0) return 'Silajlık mısır';
+  if (k.indexOf('çerez') >= 0) return 'Çerezlik ayçiçeği';
+  if (k.indexOf('ayçiçe') >= 0) return 'Yağlık ayçiçeği';
+  if (k.indexOf('kanola') >= 0 || k.indexOf('kolza') >= 0) return 'Kanola (kolza)';
+  if (k.indexOf('sorgum') >= 0) return 'Silajlık sorgum';
+  var l = [['buğday','Buğday'],['arpa','Arpa'],['yonca','Yonca'],['patates','Patates'],['soğan','Soğan'],['tritikale','Tritikale'],
+    ['deneme','Deneme alanı'],['ıslah','Islah edilen alan'],['ağaç','Ağaçlık alan'],['boş alan','Boş alan'],['nadas','Nadas']];
+  for (var i = 0; i < l.length; i++) if (k.indexOf(l[i][0]) >= 0) return l[i][1];
+  if (k === 'boş') return 'Boş alan';
+  return u;
+}
+function renk(u) { return RENK[urunAnahtari(u)] || '#6D8B74'; }
+function kisa(u) { var k = urunAnahtari(u); if (k.indexOf('Silajlık mısır') === 0) return k.indexOf('2.') >= 0 ? 'Mısır (2. ürün)' : 'Mısır'; if (k === 'Şeker pancarı') return 'Pancar'; return u; }
+function sayi(v) { return (Math.round(v * 10) / 10).toLocaleString('tr-TR'); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+function sayiOku(v) { if (v === '' || v == null) return null; if (typeof v === 'number') return v; var x = parseFloat(String(v).replace(/\./g, '').replace(',', '.')); return isNaN(x) ? null : x; }
+function sonrakiSezon(s) { var m = /^(\d{4})-(\d{4})$/.exec(s); return m ? (+m[1] + 1) + '-' + (+m[2] + 1) : s; }
+function oncekiSezon(s) { var m = /^(\d{4})-(\d{4})$/.exec(s); return m ? (+m[1] - 1) + '-' + (+m[2] - 1) : s; }
+function durum(t) { var d = document.getElementById('durum'); d.textContent = t; d.style.display = 'block'; clearTimeout(durum.z); durum.z = setTimeout(function () { d.style.display = 'none'; }, 3500); }
+
+// ---------- Sezon_Parselleri "Ürün" metni ----------
+function urunCesit(s) { var i = s.indexOf('#'); return i < 0 ? [s.trim(), null] : [s.slice(0, i).trim(), s.slice(i + 1).trim()]; }
+function icerikOku(t) {
+  t = String(t || '').trim();
+  var at = t.indexOf('@');
+  if (at > 0 && t.indexOf(':') < 0) { var uc = urunCesit(t.slice(0, at)); return { parcalar: [[uc[0], null]], birlesik: t.slice(at + 1).trim(), cizgiler: [], baglar: [], cesitler: [uc[1]], bolgeler: [] }; }
+  if (t.indexOf(':') < 0) { var u = urunCesit(t); return { parcalar: [[u[0], null]], cizgiler: [], baglar: [], cesitler: [u[1]], bolgeler: [] }; }
+  var bolu = t.indexOf('/'), govde = bolu < 0 ? t : t.slice(0, bolu), ek = bolu < 0 ? '' : t.slice(bolu + 1);
+  var bolgeler = [], cizgiler = [];
+  if (ek.charAt(0) === 'B') {
+    ek.slice(1).split(';').forEach(function (b) {
+      if (b.length > 1 && 'DCP'.indexOf(b[0]) >= 0) bolgeler.push([b[0], b.slice(1).split(',').map(parseFloat).filter(function (x) { return !isNaN(x); })]);
+    });
+  } else if (ek) {
+    ek.split(';').forEach(function (c) { var a = c.split(','); if (a.length === 2 && !isNaN(parseFloat(a[0])) && !isNaN(parseFloat(a[1]))) cizgiler.push([parseFloat(a[0]), parseFloat(a[1])]); });
+  }
+  var parcalar = [], baglar = [], cesitler = [];
+  govde.split('+').forEach(function (x) {
+    if (!x.trim()) return;
+    var ad = x.split(':')[0].trim(), ok = ad.indexOf('>');
+    var uc = urunCesit(ok > 0 ? ad.slice(0, ok) : ad);
+    var da = x.indexOf(':') >= 0 ? parseFloat(x.split(':').pop().trim().replace(',', '.')) : null;
+    parcalar.push([uc[0], isNaN(da) ? null : da]); baglar.push(ok > 0 ? ad.slice(ok + 1).trim() : null); cesitler.push(uc[1]);
+  });
+  return { parcalar: parcalar, cizgiler: cizgiler, baglar: baglar, cesitler: cesitler, bolgeler: bolgeler };
+}
+function urunMetni(u, c) { return c && c.trim() ? u + '#' + c.trim() : u; }
+function sayiYaz(v) { return v % 1 === 0 ? String(v) : String(v); }
+function bolunmusMetin(l, cizgiler, baglar, cesitler, bolgeler) {
+  var g = l.map(function (x, i) { return urunMetni(x[0], cesitler[i]) + (baglar[i] ? '>' + baglar[i] : '') + ':' + sayiYaz(x[1]); }).join('+');
+  if (bolgeler && bolgeler.length) return g + '/B' + bolgeler.map(function (b) { return b[0] + b[1].map(function (x) { return Math.round(x); }).join(','); }).join(';');
+  if (cizgiler && cizgiler.length) return g + '/' + cizgiler.map(function (c) { return Math.round(c[0]) + ',' + Math.round(c[1]); }).join(';');
+  return g;
+}
+
+// ---------- sezonlar (uygulamadaki mantıkla) ----------
+function parselOku(j) {
+  return { ad: j.ad || '', tip: j.tip || '', not: j.not_ || '', beyan: j.beyan == null ? null : j.beyan,
+    urunler: (j.urunler || []).map(function (u) { return Array.isArray(u) ? [u[0], u.length > 1 ? +u[1] : 0] : [String(u), 0]; }),
+    koord: (j.koord || []).map(function (c) { return [+c[0], +c[1]]; }), cesitler: j.cesitler || [], bolgeler: j.bolgeler || [], bolme: [], baglar: [] };
+}
+function sezonOku(j) {
+  return { sezon: j.sezon, kaynak: j.kaynak || '', tur: j.tur || 'kmz', giris: false,
+    ciftlikler: (j.ciftlikler || []).map(function (c) { return { ad: c.ad, parseller: (c.parseller || []).map(parselOku) }; }) };
+}
+function parselGirisi(sezon, cf, parsel) {
+  var d = null;
+  S.sezonParsel.forEach(function (r) {
+    if (String(r[0]) === sezon && ciftlikAnahtari(r[1]) === ciftlikAnahtari(cf) && kucuk(r[2]).trim() === kucuk(parsel).trim()) {
+      if (r[6] === 'Aktif') d = { urun: String(r[3]), alan: sayiOku(r[4]) }; else if (r[6] === 'Geri alındı') d = null;
+    }
+  });
+  return d;
+}
+function kopya(p, ek) { var o = {}; for (var k in p) o[k] = p[k]; for (var k2 in ek) o[k2] = ek[k2]; return o; }
+function girisParseli(p, g, bagli, gelen) {
+  var ic = icerikOku(g.urun), y;
+  if (ic.birlesik) y = kopya(p, { tip: 'ekili', urunler: [[ic.parcalar[0][0], 0]], beyan: null, not: ic.birlesik + ' ile birleştirildi', cesitler: ic.cesitler, bolme: [], bolgeler: [], baglar: [], birlesik: ic.birlesik });
+  else if (ic.parcalar.length > 1) {
+    var l = ic.parcalar.map(function (x) { return [x[0], x[1] || 0]; }), giden = 0, top = 0;
+    l.forEach(function (x, i) { top += x[1]; if (ic.baglar[i]) giden += x[1]; });
+    y = kopya(p, { tip: 'ekili', urunler: l, beyan: giden > 0 ? top - giden : (g.alan != null ? g.alan : top), not: 'Parçalara bölündü',
+      bolme: ic.cizgiler.length === l.length - 1 ? ic.cizgiler : [], baglar: ic.baglar, cesitler: ic.cesitler,
+      bolgeler: ic.bolgeler.length === l.length - 1 ? ic.bolgeler : [] });
+  } else y = kopya(p, { tip: 'ekili', urunler: [[ic.parcalar[0][0], g.alan || 0]], beyan: g.alan, cesitler: ic.cesitler, bolme: [], bolgeler: [], baglar: [],
+      not: bagli.length ? bagli.join(', ') + ' ile birleştirildi (alan toplamdır)' : '' });
+  if (gelen.length) {
+    var ek = 0; gelen.forEach(function (x) { ek += x[2]; });
+    y.beyan = (y.beyan || 0) + ek;
+    y.not = [y.not, gelen.map(function (x) { return x[0] + ' parselinden ' + x[1] + ' ' + sayi(x[2]) + ' da'; }).join(', ')].filter(Boolean).join(' · ');
+  }
+  y.giris = true;
+  return y;
+}
+function kmzNotu(y, k) {
+  if (!k || !k.urunler.length || !k.not) return y;
+  function oz(x) { return x.urunler.map(function (u) { return urunAnahtari(u[0]) + ' ' + Math.round(u[1]); }).join('+'); }
+  if (oz(y) === oz(k)) return y;
+  return kopya(y, { not: [y.not, "KMZ'de farklı → " + k.not.replace('KMZ: ', '')].filter(Boolean).join(' · ') });
+}
+function katmanda(katman, cf, ad) {
+  if (!katman) return null;
+  for (var i = 0; i < katman.ciftlikler.length; i++) {
+    var c = katman.ciftlikler[i]; if (c.ad !== cf) continue;
+    for (var j = 0; j < c.parseller.length; j++) if (c.parseller[j].ad === ad) return c.parseller[j];
+  }
+  return null;
+}
+function girisSezonu(taban, ad, katman) {
+  return { sezon: ad, giris: true, tur: katman ? katman.tur : 'giris', kaynak: (katman ? katman.kaynak + ' + ' : '') + 'haritadan girilen bilgiler',
+    ciftlikler: taban.ciftlikler.map(function (c) {
+      return { ad: c.ad, parseller: c.parseller.map(function (p) {
+        var g = parselGirisi(ad, c.ad, p.ad), k = katmanda(katman, c.ad, p.ad);
+        if (g) {
+          var bagli = [], gelen = [];
+          c.parseller.forEach(function (q) {
+            if (q.ad === p.ad) return;
+            var h = parselGirisi(ad, c.ad, q.ad); if (!h) return;
+            var ic = icerikOku(h.urun);
+            if (ic.birlesik === p.ad) bagli.push(q.ad);
+            ic.parcalar.forEach(function (x, i) { if (ic.baglar[i] === p.ad) gelen.push([q.ad, x[0], x[1] || 0]); });
+          });
+          return kmzNotu(girisParseli(p, g, bagli, gelen), k);
+        }
+        if (k && k.urunler.length) {
+          var top = 0; k.urunler.forEach(function (u) { top += u[1]; });
+          return kopya(p, { tip: k.tip === 'girilmedi' || !k.tip ? 'parsel' : k.tip, urunler: k.urunler, beyan: top, not: k.not,
+            cesitler: k.cesitler, bolgeler: k.bolgeler.length === k.urunler.length - 1 ? k.bolgeler : [], bolme: [], baglar: [] });
+        }
+        return kopya(p, { tip: p.tip === 'diger' || p.tip === 'bos' ? p.tip : 'girilmedi', urunler: [], beyan: null, not: '', cesitler: [], bolgeler: [], bolme: [], baglar: [] });
+      }) };
+    }) };
+}
+function kmzUzerine(kmz) {
+  return { sezon: kmz.sezon, giris: false, tur: 'kmz', kaynak: kmz.kaynak, ciftlikler: kmz.ciftlikler.map(function (c) {
+    return { ad: c.ad, parseller: c.parseller.map(function (p) {
+      var g = parselGirisi(kmz.sezon, c.ad, p.ad);
+      if (g && (icerikOku(g.urun).parcalar.length > 1 || p.tip === 'girilmedi')) {
+        var y = girisParseli(p, g, [], []);
+        return kopya(y, { tip: p.tip === 'girilmedi' ? y.tip : p.tip, beyan: p.beyan != null ? p.beyan : y.beyan, giris: false });
+      }
+      return p;
+    }) };
+  }) };
+}
+function sinirUygula(kmz) {
+  var m = {};
+  S.parselSinir.forEach(function (r) {
+    var key = r[0] + '|' + r[1];
+    if (r[4] === 'Aktif') {
+      var k = String(r[2] || '').trim().split(/\s+/).map(function (n) { var a = n.split(','); return [parseFloat(a[0]), parseFloat(a[1])]; })
+        .filter(function (c) { return !isNaN(c[0]) && !isNaN(c[1]); });
+      if (k.length > 2) m[key] = k;
+    } else if (r[4] === 'Geri alındı') delete m[key];
+  });
+  return kopya(kmz, { ciftlikler: kmz.ciftlikler.map(function (c) {
+    var l = c.parseller.map(function (p) { return m[c.ad + '|' + p.ad] ? kopya(p, { koord: m[c.ad + '|' + p.ad] }) : p; });
+    Object.keys(m).forEach(function (key) {
+      var a = key.split('|'); if (a[0] !== c.ad) return;
+      if (!c.parseller.some(function (p) { return p.ad === a[1]; }))
+        l.push({ ad: a[1], tip: 'girilmedi', urunler: [], koord: m[key], not: 'Haritadan eklendi', cesitler: [], bolgeler: [], bolme: [], baglar: [] });
+    });
+    return { ad: c.ad, parseller: l };
+  }) });
+}
+function sezonlar() {
+  var kmz = S.paket.filter(function (k) { return k.tur === 'kmz'; })[0];
+  if (!kmz) return [];
+  kmz = sinirUygula(kmz);
+  function bul(s, t) { return S.paket.filter(function (k) { return k.sezon === s && k.tur === t; })[0]; }
+  var s1 = oncekiSezon(kmz.sezon), s3 = sonrakiSezon(kmz.sezon), ayri = bul(oncekiSezon(s1), 'ayri');
+  var l = [];
+  if (ayri) l.push(girisSezonu(ayri, ayri.sezon, ayri));
+  l.push(girisSezonu(kmz, s1, bul(s1, 'katman')));
+  l.push(kmzUzerine(kmz));
+  l.push(girisSezonu(kmz, s3, bul(s3, 'katman')));
+  return l;
+}
+
+// ---------- geometri ----------
+function alan(k) { var a = 0; for (var i = 0; i < k.length; i++) { var p = k[i], q = k[(i + 1) % k.length]; a += p[0] * q[1] - q[0] * p[1]; } return Math.abs(a) / 2; }
+function cizgiDenklemi(k, cz) {
+  var r = cz[0] * Math.PI / 180, nx = -Math.sin(r), ny = Math.cos(r), mn = Infinity, mx = -Infinity;
+  k.forEach(function (p) { var v = nx * p[0] + ny * p[1]; mn = Math.min(mn, v); mx = Math.max(mx, v); });
+  return [nx, ny, mn + (mx - mn) * Math.max(0, Math.min(100, cz[1])) / 100];
+}
+function kirp(k, d, birinci) {
+  function f(p) { var v = d[0] * p[0] + d[1] * p[1] - d[2]; return birinci ? v : -v; }
+  var out = [];
+  for (var i = 0; i < k.length; i++) {
+    var a = k[i], b = k[(i + 1) % k.length], fa = f(a), fb = f(b);
+    if (fa <= 0) out.push(a);
+    if ((fa < 0 && fb > 0) || (fa > 0 && fb < 0)) { var t = fa / (fa - fb); out.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]); }
+  }
+  return out;
+}
+function parcala(k, cizgiler) {
+  var d = cizgiler.map(function (c) { return cizgiDenklemi(k, c); }), l = [];
+  for (var i = 0; i <= d.length; i++) { var p = k; if (i > 0) p = kirp(p, d[i - 1], false); if (i < d.length) p = kirp(p, d[i], true); l.push(p); }
+  return l;
+}
+function otomatikCizgiler(k, dekarlar) {
+  var top = dekarlar.reduce(function (a, b) { return a + b; }, 0);
+  var oran = dekarlar.map(function (d) { return top > 0 ? d / top : 1 / dekarlar.length; }), tum = alan(k), l = [], bir = 0;
+  for (var i = 0; i < oran.length - 1; i++) {
+    bir += oran[i]; var a = 0, b = 100;
+    for (var j = 0; j < 30; j++) { var m = (a + b) / 2, p = kirp(k, cizgiDenklemi(k, [90, m]), true); if ((p.length < 3 ? 0 : alan(p)) / tum < bir) a = m; else b = m; }
+    l.push([90, (a + b) / 2]);
+  }
+  return l;
+}
+function kutu(k) { var xs = k.map(function (e) { return e[0]; }), ys = k.map(function (e) { return e[1]; });
+  return [Math.min.apply(null, xs), Math.min.apply(null, ys), Math.max.apply(null, xs), Math.max.apply(null, ys)]; }
+function bolgePoligon(k, b) {
+  var q = kutu(k), w = q[2] - q[0], h = q[3] - q[1], v = b[1];
+  function n(px, py) { return [q[0] + px / 100 * w, q[1] + py / 100 * h]; }
+  if (b[0] === 'D' && v.length >= 4) return [n(v[0], v[1]), n(v[2], v[1]), n(v[2], v[3]), n(v[0], v[3])];
+  if (b[0] === 'C' && v.length >= 4) { var l = []; for (var i = 0; i < 48; i++) l.push(n(v[0] + v[2] * Math.cos(i * Math.PI / 24), v[1] + v[3] * Math.sin(i * Math.PI / 24))); return l; }
+  if (b[0] === 'P' && v.length >= 6) { var p = []; for (var j = 0; j + 1 < v.length; j += 2) p.push(n(v[j], v[j + 1])); return p; }
+  return [];
+}
+function merkez(k) { var x = 0, y = 0; k.forEach(function (p) { x += p[0]; y += p[1]; }); return [x / k.length, y / k.length]; }
+
+// ---------- ekran ----------
+function guncelSezon() { var l = sezonlar(); return l.filter(function (x) { return x.sezon === S.sezon; })[0] || l[0]; }
+function ciz() {
+  var l = sezonlar();
+  if (!l.length) { document.getElementById('icerik').innerHTML = '<div class="kart">Harita verisi yok.</div>'; return; }
+  if (!S.sezon || !l.some(function (x) { return x.sezon === S.sezon; })) S.sezon = l[l.length - 1].sezon;
+  var s = guncelSezon();
+  var cfler = s.ciftlikler.filter(function (c) { return c.parseller.some(function (p) { return p.koord.length > 2; }); });
+  if (!S.ciftlik || !cfler.some(function (c) { return c.ad === S.ciftlik; })) S.ciftlik = cfler.length ? cfler[0].ad : null;
+  var c = cfler.filter(function (x) { return x.ad === S.ciftlik; })[0];
+  var h = '';
+  h += '<div class="cipler">' + l.map(function (x) { return '<span class="cip' + (x.sezon === s.sezon ? ' secili' : '') + '" onclick="sezonSec(\'' + x.sezon + '\')">' + x.sezon + '</span>'; }).join('') + '</div>';
+  h += '<div class="cipler">' + cfler.map(function (x) { return '<span class="cip' + (c && x.ad === c.ad ? ' secili' : '') + '" onclick="ciftlikSec(\'' + esc(x.ad) + '\')">' + esc(x.ad) + '</span>'; }).join('') + '</div>';
+  var duz = S.yetki === 'duzenle' && s.giris;
+  h += '<div class="bilgi">' + esc(s.sezon) + ' sezonu · kaynak: ' + esc(s.kaynak) + '<br>' +
+    (S.yetki !== 'duzenle' ? 'Yalnızca görüntüleme yetkiniz var.' : duz ? 'Parsele dokunarak ürün, dekar ve tohum girebilirsiniz.' :
+      'Bu sezon (KMZ esas haritası) yalnızca görüntülenir; giriş için diğer sezonları seçin.') + '</div>';
+  if (!c) { h += '<div class="kart">Bu sezonda çizili parsel yok.</div>'; document.getElementById('icerik').innerHTML = h; return; }
+  h += '<div class="kart"><div id="haritaKap"><div class="araclar"><button onclick="yakinlas(1.5)">+</button><button onclick="yakinlas(1/1.5)">−</button>' +
+    '<button title="Yazılar" onclick="S.yazi=!S.yazi;ciz()" style="font-size:14px">Aa</button></div>' + svg(c) + '</div>';
+  var top = {};
+  c.parseller.forEach(function (p) { p.urunler.forEach(function (u) { var k = urunAnahtari(u[0]); top[k] = (top[k] || 0) + (u[1] || 0); }); });
+  h += '<div class="lejant">' + Object.keys(top).map(function (k) { return '<span><i style="background:' + renk(k) + '"></i>' + esc(k) + (top[k] > 0 ? ' ' + sayi(top[k]) + ' da' : '') + '</span>'; }).join('') + '</div></div>';
+  h += '<div class="kart"><table><tr><th>Parsel</th><th>Ürün</th><th>Dekar</th></tr>' + c.parseller.map(function (p, i) {
+    return '<tr class="tik" onclick="parselAc(' + i + ')"><td>' + esc(p.ad) + '</td><td>' + esc(urunYazi(p)) + (p.not ? '<div class="uyari">' + esc(p.not) + '</div>' : '') +
+      '</td><td>' + (dekar(p) ? sayi(dekar(p)) : '—') + '</td></tr>';
+  }).join('') + '</table></div>';
+  document.getElementById('icerik').className = '';
+  document.getElementById('icerik').innerHTML = h;
+}
+function urunYazi(p) {
+  if (!p.urunler.length) return p.tip === 'bos' ? 'Boş alan' : p.tip === 'girilmedi' ? 'Girilmedi' : 'Ürün belirtilmemiş';
+  return p.urunler.map(function (u, i) { var c = p.cesitler[i]; return u[0] + (c ? ' (' + c + ')' : '') + (u[1] > 0 ? ' ' + sayi(u[1]) + ' da' : '') + (p.baglar[i] ? ' → ' + p.baglar[i] : ''); }).join(' + ');
+}
+function dekar(p) { if (p.beyan) return p.beyan; var t = 0; p.urunler.forEach(function (u) { t += u[1] || 0; }); return t; }
+function svg(c) {
+  var cizili = c.parseller.filter(function (p) { return p.koord.length > 2; });
+  var tum = []; cizili.forEach(function (p) { tum = tum.concat(p.koord); });
+  var lat0 = tum.reduce(function (a, b) { return a + b[1]; }, 0) / tum.length, kx = Math.cos(lat0 * Math.PI / 180);
+  var G = cizili.map(function (p) { return { p: p, k: p.koord.map(function (x) { return [x[0] * kx, x[1]]; }) }; });
+  var xs = [], ys = []; G.forEach(function (g) { g.k.forEach(function (n) { xs.push(n[0]); ys.push(n[1]); }); });
+  var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+  var W = 1000, olc = W / (x1 - x0), H = (y1 - y0) * olc;
+  function n(p) { return ((p[0] - x0) * olc).toFixed(1) + ',' + ((y1 - p[1]) * olc).toFixed(1); }
+  function yol(k) { return k.map(n).join(' '); }
+  G.sort(function (a, b) { return alan(b.k) - alan(a.k); });
+  var o = '<svg id="harita" xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 ' + (W + 20) + ' ' + (H + 20) + '" style="width:' + (100 * S.olcek) + '%"><defs>';
+  var govde = '', yazi = '', fs = Math.max(11, W / 60);
+  G.forEach(function (g, gi) {
+    var p = g.p, idx = c.parseller.indexOf(p), dokun = ' onclick="parselAc(' + idx + ',PARCA)" style="cursor:pointer"';
+    o += '<clipPath id="k' + gi + '"><polygon points="' + yol(g.k) + '"/></clipPath>';
+    var etiket = [];
+    if (p.bolgeler.length && p.bolgeler.length === p.urunler.length - 1) {
+      govde += '<polygon points="' + yol(g.k) + '" fill="' + renk(p.urunler[p.urunler.length - 1][0]) + '" fill-opacity=".62"' + dokun.replace('PARCA', p.urunler.length - 1) + '/>';
+      p.bolgeler.forEach(function (b, i) {
+        var bp = bolgePoligon(g.k, b); if (bp.length < 3) return;
+        govde += '<polygon clip-path="url(#k' + gi + ')" points="' + yol(bp) + '" fill="' + renk(p.urunler[i][0]) + '" fill-opacity=".78" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"' + dokun.replace('PARCA', i) + '/>';
+        etiket.push([merkez(bp), i]);
+      });
+      etiket.push([merkez(g.k), p.urunler.length - 1, true]);
+    } else if (p.urunler.length > 1) {
+      var cz = p.bolme.length === p.urunler.length - 1 ? p.bolme : otomatikCizgiler(g.k, p.urunler.map(function (u) { return u[1]; }));
+      parcala(g.k, cz).forEach(function (pp, i) {
+        if (pp.length < 3) return;
+        govde += '<polygon points="' + yol(pp) + '" fill="' + renk(p.urunler[i][0]) + '" fill-opacity=".62" stroke="#fff" stroke-width="1.2" vector-effect="non-scaling-stroke"' + dokun.replace('PARCA', i) + '/>';
+        etiket.push([merkez(pp), i, i === 0]);
+      });
+    } else {
+      var r = p.urunler.length ? renk(p.urunler[0][0]) : (p.tip === 'bos' || p.tip === 'girilmedi' ? '#D6D6D6' : '#90A4AE');
+      govde += '<polygon points="' + yol(g.k) + '" fill="' + r + '" fill-opacity=".62"' + dokun.replace('PARCA', 'null') + '/>';
+      etiket.push([merkez(g.k), 0, true]);
+    }
+    govde += '<polygon points="' + yol(g.k) + '" fill="none" stroke="#333" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>';
+    if (!S.yazi) return;
+    etiket.forEach(function (e) {
+      var m = n(e[0]).split(','), i = e[1], u = p.urunler[i], satir = [];
+      if (e[2]) satir.push(['<tspan font-weight="800">' + esc(p.ad) + '</tspan>']);
+      if (u) satir.push([esc(kisa(u[0])) + (u[1] > 0 ? ' ' + sayi(u[1]) + ' da' : '')]);
+      else if (e[2]) satir.push([p.tip === 'girilmedi' ? 'Girilmedi' : '']);
+      if (u && p.cesitler[i]) satir.push([esc(p.cesitler[i])]);
+      yazi += '<text x="' + m[0] + '" y="' + (m[1] - (satir.length - 1) * fs * 0.55) + '" font-size="' + fs + '" text-anchor="middle" pointer-events="none" ' +
+        'paint-order="stroke" stroke="#fff" stroke-width="3" stroke-linejoin="round">' +
+        satir.map(function (s, j) { return '<tspan x="' + m[0] + '" dy="' + (j ? fs * 1.1 : 0) + '">' + s[0] + '</tspan>'; }).join('') + '</text>';
+    });
+  });
+  return o + '</defs>' + govde + yazi + '</svg>';
+}
+function yakinlas(f) {
+  var kap = document.getElementById('haritaKap'), cx = (kap.scrollLeft + kap.clientWidth / 2) / kap.scrollWidth, cy = (kap.scrollTop + kap.clientHeight / 2) / kap.scrollHeight;
+  S.olcek = Math.max(1, Math.min(8, S.olcek * f));
+  document.getElementById('harita').style.width = (100 * S.olcek) + '%';
+  kap.scrollLeft = cx * kap.scrollWidth - kap.clientWidth / 2; kap.scrollTop = cy * kap.scrollHeight - kap.clientHeight / 2;
+}
+function sezonSec(s) { S.sezon = s; ciz(); }
+function ciftlikSec(c) { S.ciftlik = c; S.olcek = 1; ciz(); }
+
+// ---------- parsel sayfası ----------
+var ACIK = null;
+function aktifParsel() { var s = guncelSezon(); var c = s.ciftlikler.filter(function (x) { return x.ad === S.ciftlik; })[0]; return { s: s, c: c }; }
+function secenekler(sec) {
+  var k = urunAnahtari(sec || ''), varMi = URUNLER.indexOf(k) >= 0;
+  return URUNLER.map(function (u) { return '<option' + (u === k ? ' selected' : '') + '>' + esc(u) + '</option>'; }).join('') +
+    '<option value="__diger"' + (!varMi && sec ? ' selected' : '') + '>Diğer…</option>';
+}
+function parselAc(i, parca) {
+  var a = aktifParsel(), p = a.c.parseller[i]; ACIK = { s: a.s, c: a.c, p: p };
+  var g = parselGirisi(a.s.sezon, a.c.ad, p.ad), ic = g ? icerikOku(g.urun) : null;
+  var duz = S.yetki === 'duzenle' && a.s.giris && p.tip !== 'diger';
+  var h = '<h2>' + esc(a.c.ad) + ' · ' + esc(p.ad) + '</h2><div style="color:var(--soluk);font-size:12.5px">' + esc(a.s.sezon) + ' sezonu</div>' +
+    '<p style="font-size:15px;margin:8px 0">' + esc(urunYazi(p)) + (dekar(p) ? ' · toplam ' + sayi(dekar(p)) + ' da' : '') + '</p>' +
+    (p.not ? '<div class="uyari">' + esc(p.not) + '</div>' : '');
+  if (!duz) {
+    h += '<p style="color:var(--soluk);font-size:13px">' + (S.yetki !== 'duzenle' ? 'Yalnızca görüntüleme yetkiniz var.' : p.tip === 'diger' ? 'Ekim alanı değil.' :
+      'Bu sezon yalnızca görüntülenir.') + '</p><div class="dugmeler"><button class="ikinci" onclick="kapat()">Kapat</button></div>';
+    return sayfaAc(h);
+  }
+  if (ic && ic.birlesik) {
+    h += '<p style="font-size:13px">Bu parsel ' + esc(ic.birlesik) + ' ile birleştirilmiş; değişikliği uygulama sahibi yapar.</p><div class="dugmeler"><button class="ikinci" onclick="kapat()">Kapat</button></div>';
+    return sayfaAc(h);
+  }
+  var parcalar = p.urunler.length ? p.urunler : [['', null]];
+  if (parcalar.length > 1) h += '<p style="font-size:12.5px;color:var(--soluk)">Parsel ' + parcalar.length + ' parçaya bölünmüş; her parçanın ürününü, dekarını ve tohumunu girin. Bölme çizgileri değişmez.</p>';
+  parcalar.forEach(function (u, j) {
+    h += '<div class="parca"' + (parca === j && parcalar.length > 1 ? ' style="border-color:#14532d;border-width:2px"' : '') + '>' +
+      (parcalar.length > 1 ? '<b>' + (j + 1) + '. parça</b>' + (p.baglar[j] ? ' <span class="uyari">→ ' + esc(p.baglar[j]) + ' parseline bağlı</span>' : '') : '') +
+      '<label>Ürün / alan türü</label><select id="u' + j + '" onchange="digerGoster(' + j + ')">' + secenekler(u[0]) + '</select>' +
+      '<input id="ud' + j + '" placeholder="Ürün adı" style="margin-top:6px;display:' + (u[0] && URUNLER.indexOf(urunAnahtari(u[0])) < 0 ? 'block' : 'none') + '" value="' + esc(URUNLER.indexOf(urunAnahtari(u[0])) < 0 ? u[0] : '') + '">' +
+      '<div class="satir"><div><label>Dekar</label><input id="d' + j + '" inputmode="decimal" value="' + (parcalar.length > 1 ? (u[1] || '') : (p.beyan || u[1] || '')) + '"></div>' +
+      '<div><label>Tohum / çeşit</label><input id="t' + j + '" value="' + esc(p.cesitler[j] || '') + '"></div></div></div>';
+  });
+  h += '<div class="dugmeler"><button class="ana" id="kaydetB" onclick="kaydet()">Kaydet</button>' +
+    (g ? '<button class="ikinci" onclick="geriAl()">Girişi geri al</button>' : '') + '<button class="ikinci" onclick="kapat()">Vazgeç</button></div>';
+  sayfaAc(h);
+}
+function digerGoster(j) { document.getElementById('ud' + j).style.display = document.getElementById('u' + j).value === '__diger' ? 'block' : 'none'; }
+function sayfaAc(h) { var s = document.getElementById('sayfa'); s.innerHTML = h; s.style.display = 'block'; document.getElementById('perde').style.display = 'block'; }
+function kapat() { document.getElementById('sayfa').style.display = 'none'; document.getElementById('perde').style.display = 'none'; ACIK = null; }
+function kaydet() {
+  var p = ACIK.p, n = Math.max(1, p.urunler.length), l = [], cesit = [];
+  for (var j = 0; j < n; j++) {
+    var u = document.getElementById('u' + j).value; if (u === '__diger') u = document.getElementById('ud' + j).value.trim();
+    var d = sayiOku(document.getElementById('d' + j).value);
+    if (!u) return durum('Ürün seçin.');
+    if (u.length > 40 || /[:+>@#\/;]/.test(u)) return durum('Ürün adında : + > @ # / ; işaretleri kullanılamaz.');
+    if (n > 1 && (d == null || d < 0)) return durum((j + 1) + '. parçanın dekarını girin.');
+    if (d != null && d < 0) return durum('Dekar okunamadı.');
+    var t = document.getElementById('t' + j).value.trim();
+    if (/[:+>@#\/;]/.test(t)) return durum('Tohum adında : + > @ # / ; işaretleri kullanılamaz.');
+    l.push([u, d]); cesit.push(t || null);
+  }
+  var metin, alanDa;
+  if (n === 1) { metin = urunMetni(l[0][0], cesit[0]); alanDa = l[0][1]; }
+  else {
+    var g = parselGirisi(ACIK.s.sezon, ACIK.c.ad, p.ad), ic = g ? icerikOku(g.urun) : null;
+    metin = bolunmusMetin(l, ic ? ic.cizgiler : p.bolme, p.baglar, cesit, p.bolgeler);
+    alanDa = l.reduce(function (a, x) { return a + x[1]; }, 0);
+  }
+  if (metin.length > SINIR) return durum('Kayıt çok uzun; tohum adlarını kısaltın.');
+  gonder({ tur: 'sezonParsel', sezon: ACIK.s.sezon, ciftlik: ACIK.c.ad, parsel: p.ad, urun: metin, alan: alanDa == null ? '' : String(alanDa).replace('.', ',') });
+}
+function geriAl() {
+  if (!confirm('Bu parseldeki son giriş geri alınsın mı?')) return;
+  gonder({ tur: 'sezonParselGeriAl', sezon: ACIK.s.sezon, ciftlik: ACIK.c.ad, parsel: ACIK.p.ad });
+}
+function gonder(g) {
+  var b = document.getElementById('kaydetB'); if (b) b.disabled = true;
+  google.script.run.withSuccessHandler(function (r) {
+    if (!r || !r.ok) { if (b) b.disabled = false; return hataGoster(r); }
+    S.sezonParsel = r.sezonParsel || S.sezonParsel; kapat(); ciz(); durum(r.mesaj || 'Kaydedildi.');
+  }).withFailureHandler(function (e) { if (b) b.disabled = false; durum('Kaydedilemedi: ' + e.message); }).tarlaPanelKaydet(ANAHTAR, g);
+}
+function hataGoster(r) {
+  if (r && r.kapali) { document.querySelector('main').innerHTML = '<div class="kart" style="margin-top:20px">Bu paylaşım kapatıldı.</div>'; kapat(); return; }
+  durum((r && r.hata) || 'İşlem yapılamadı.');
+}
+
+// ---------- açılış ----------
+function yukle() {
+  var bekle = DOSYALAR.length + 1, hata = null;
+  function bitti() {
+    if (--bekle) return;
+    if (hata) { document.getElementById('icerik').innerHTML = '<div class="kart">' + esc(hata) + '</div>'; return; }
+    ciz();
+  }
+  google.script.run.withSuccessHandler(function (r) {
+    if (!r || !r.ok) { hata = (r && r.hata) || 'Veri alınamadı.'; if (r && r.kapali) hata = 'Bu paylaşım kapatıldı.'; return bitti(); }
+    S.sezonParsel = r.sezonParsel || []; S.parselSinir = r.parselSinir || []; S.yetki = r.yetki; S.etiket = r.etiket; SINIR = r.sezonParselSiniri || 400;
+    document.getElementById('ust').textContent = r.etiket + ' · ' + (r.yetki === 'duzenle' ? 'düzenleme yetkisi' : 'yalnızca görüntüleme');
+    bitti();
+  }).withFailureHandler(function (e) { hata = 'Veri alınamadı: ' + e.message; bitti(); }).tarlaPanelVeri(ANAHTAR);
+  var sira = {};
+  DOSYALAR.forEach(function (d, i) {
+    fetch(VERI_ADRESI + d, { cache: 'no-store' }).then(function (x) { if (!x.ok) throw new Error(x.status); return x.json(); })
+      .then(function (j) { sira[i] = sezonOku(j); }).catch(function () { if (i === 0) hata = 'Harita dosyası alınamadı. İnternet bağlantınızı kontrol edin.'; })
+      .then(function () { S.paket = DOSYALAR.map(function (_, k) { return sira[k]; }).filter(Boolean); bitti(); });
+  });
+}
+yukle();
+</script>
+</body>
+</html>

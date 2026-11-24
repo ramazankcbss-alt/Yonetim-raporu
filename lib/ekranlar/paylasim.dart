@@ -62,10 +62,11 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                 onPressed: _mesgul ? null : _ekle, icon: const Icon(Icons.person_add_alt), label: const Text('Yeni paylaşım')),
             body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 90), children: [
               const BilgiKutusu(
-                  yazi: 'Paylaşım linkiyle uygulamayı kuran kişi yalnızca Tarla Haritası\'nı görür; rapor, mali, hayvan ve '
-                      'araç verileri gitmez. "Düzenleme" yetkisinde parsel ürünü/dekarı ve sınırları değiştirebilir; '
-                      'girişler tabloda paylaşım adıyla işaretlenir. Paylaşımı kapattığınızda link hemen çalışmaz olur ve '
-                      'karşı taraftaki harita verisi silinir. KVKK: paylaşım adına kişi adı değil görev/birim yazın.'),
+                  yazi: 'Paylaşım linki tarayıcıda Tarla Haritası web panelini açar (uygulama kurmak gerekmez). Rapor, mali, '
+                      'hayvan ve araç verileri gitmez. "Düzenleme" yetkisinde parsellere ürün, dekar ve tohum girilir; parsel '
+                      'bölme ve sınır değişikliği yalnızca sizin uygulamanızdan yapılır. Girişler tabloda paylaşım adıyla '
+                      'işaretlenir. Paylaşımı kapattığınızda link hemen çalışmaz olur. KVKK: paylaşım adına kişi adı değil '
+                      'görev/birim yazın.'),
               if (_mesgul) const LinearProgressIndicator(),
               if (l.isEmpty)
                 const Padding(padding: EdgeInsets.all(16), child: Text('Henüz paylaşım yok.', style: TextStyle(color: Renk.soluk))),
@@ -99,10 +100,8 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                             onPressed: !p.acik || p.link.isEmpty
                                 ? null
                                 : () => Share.share(
-                                    'Tarla Haritası paylaşımı (${p.yetki == 'duzenle' ? 'düzenleme' : 'görüntüleme'} yetkisi).\n'
-                                    '1) Yönetim Raporu uygulamasını kurun: '
-                                    'https://github.com/ramazankcbss-alt/Yonetim-raporu/releases/latest\n'
-                                    '2) Uygulama açılınca bu linki yapıştırın:\n${p.link}',
+                                    'Tarla Haritası (${p.yetki == 'duzenle' ? 'ürün ve dekar girişi' : 'görüntüleme'}). '
+                                    'Linki telefonda ya da bilgisayarda tarayıcıda açın:\n${p.link}',
                                     subject: 'Tarla Haritası paylaşımı'),
                             icon: const Icon(Icons.send_outlined),
                             label: const Text('Linki gönder')),
