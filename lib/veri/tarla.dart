@@ -159,7 +159,12 @@ String urunAnahtari(String u) {
   final k = kucuk(u);
   if (k.contains('2. ürün')) return 'Silajlık mısır (2. ürün)';
   if (k.contains('pancar')) return 'Şeker pancarı';
+  if (k.contains('dane mısır') || k.contains('danelik mısır')) return 'Dane mısır';
   if (k.contains('mısır')) return 'Silajlık mısır';
+  if (k.contains('çerez')) return 'Çerezlik ayçiçeği';
+  if (k.contains('ayçiçe')) return 'Yağlık ayçiçeği';
+  if (k.contains('kanola') || k.contains('kolza')) return 'Kanola (kolza)';
+  if (k.contains('sorgum')) return 'Silajlık sorgum';
   if (k.contains('buğday')) return 'Buğday';
   if (k.contains('arpa')) return 'Arpa';
   if (k.contains('yonca')) return 'Yonca';
@@ -524,8 +529,18 @@ Map<String, double> yilPlani(List<EkimPlanSatir> l, String yil, String ciftlik) 
 
 /// Haritadan seçilebilen ürünler.
 const secilebilirUrunler = [
-  'Buğday', 'Arpa', 'Şeker pancarı', 'Silajlık mısır', 'Silajlık mısır (2. ürün)', 'Yonca', 'Patates',
-  'Tritikale', 'Fiğ', 'Nadas', 'Deneme alanı', 'Islah edilen alan', 'Ağaçlık alan', 'Boş alan',
+  // Hububat
+  'Buğday', 'Arpa', 'Tritikale', 'Çavdar', 'Yulaf', 'Dane mısır',
+  // Endüstri ve yağ bitkileri
+  'Şeker pancarı', 'Patates', 'Yağlık ayçiçeği', 'Çerezlik ayçiçeği', 'Kanola (kolza)', 'Aspir', 'Soya',
+  // Baklagiller
+  'Nohut', 'Kuru fasulye', 'Mercimek',
+  // Yem bitkileri
+  'Silajlık mısır', 'Silajlık mısır (2. ürün)', 'Yonca', 'Korunga', 'Fiğ', 'Silajlık sorgum', 'Sudan otu',
+  // Baharat
+  'Kimyon', 'Kişniş',
+  // Ekim dışı alanlar
+  'Nadas', 'Deneme alanı', 'Islah edilen alan', 'Ağaçlık alan', 'Boş alan',
 ];
 
 /// Ekim dışı alan türleri: münavebe uyarısı verilmez.
