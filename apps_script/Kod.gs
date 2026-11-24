@@ -1594,25 +1594,8 @@ function paylasimBul_(anahtar) {
   return x.acik ? x : 'kapali';
 }
 
-// Paylaşılabilen bölümler ve gönderdikleri veri alanları (yalnızca işaretlenen bölümlerin verisi gider).
-var PAYLASIM_BOLUMLERI = {
-  tarla: ['ekim', 'hasat', 'cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel'],
-  tarim: ['tarim', 'ekim', 'hasat', 'besi', 'hayvanOzet', 'hayvanGunluk', 'hayvanDetay'],
-  mali: ['mali'],
-  esk: ['eskAylik', 'eskBilgi', 'hayvanOzet', 'hayvanGunluk', 'hayvanDetay'],
-  hastalik: ['gecmis'],
-  urun: ['urunTeslimat', 'tarimsalUretim', 'ekim', 'ekimPlani']
-};
-var PAYLASIM_WEB = 'https://ramazankcbss-alt.github.io/Yonetim-raporu/';
-
-function paylasimBolumleri_(p) {
-  var l = (p.bolumler || ['tarla']).filter(function (b) { return PAYLASIM_BOLUMLERI[b]; });
-  return l.length ? l : ['tarla'];
-}
-
-/** Paylaşım linki: uygulamanın web sürümü (kurulum gerekmez), veri adresi ve paylaşım anahtarıyla. */
 function paylasimLinki_(p) {
-  return PAYLASIM_WEB + '?s=' + encodeURIComponent(ScriptApp.getService().getUrl()) + '&k=' + p.anahtar;
+  return ScriptApp.getService().getUrl() + '?panel=tarla&anahtar=' + p.anahtar;
 }
 
 /** Tarla Haritası web paneli: sayfa veri içermez; veri anahtarla google.script.run üzerinden gelir. */
@@ -1623,17 +1606,6 @@ function tarlaPanel_(anahtar) {
       '<div style="font-family:sans-serif;padding:24px;font-size:16px">Bu paylaşım kapalı ya da geçersiz.</div>')
       .setTitle('Tarla Haritası');
   }
-  // Paylaşım artık uygulamanın web sürümünde açılır; eski panel linki oraya yönlendirir.
-  var yeni = paylasimLinki_(pay);
-  return HtmlService.createHtmlOutput('<meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<div style="font-family:sans-serif;padding:24px;font-size:16px;text-align:center">' +
-    '<p>Tarla Haritası ve paylaşılan bölümler yeni adreste açılıyor.</p>' +
-    '<p><a href="' + yeni + '" target="_top" style="display:inline-block;background:#3D7A55;color:#fff;padding:14px 22px;' +
-    'border-radius:10px;text-decoration:none;font-size:17px">Aç</a></p>' +
-    '<script>try { window.top.location.href = ' + JSON.stringify(yeni) + '; } catch (e) {}</script></div>')
-    .setTitle('Tarla Haritası')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  // eslint-disable-next-line no-unreachable
   return HtmlService.createHtmlOutput(TARLA_PANEL_HTML_.replace('__ANAHTAR__', JSON.stringify(pay.anahtar)))
     .setTitle('Tarla Haritası')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -1681,14 +1653,8 @@ function tarlaPanelKaydet(anahtar, g) {
 function paylasimListesi_() {
   return paylasimlar_().map(function (p) {
     return { id: p.id, etiket: p.etiket, yetki: p.yetki, acik: p.acik, olusturma: p.olusturma,
-      degisiklik: p.degisiklik || '', link: paylasimLinki_(p), bolumler: paylasimBolumleri_(p) };
+      degisiklik: p.degisiklik || '', link: paylasimLinki_(p) };
   });
-}
-
-function bolumOku_(v) {
-  var l = String(v || 'tarla').split(',').map(function (x) { return x.trim(); })
-    .filter(function (x) { return PAYLASIM_BOLUMLERI[x]; });
-  return l.length ? l : ['tarla'];
 }
 
 function paylasimYonet_(g) {
@@ -1700,7 +1666,7 @@ function paylasimYonet_(g) {
     var etiket = String(g.etiket || '').trim().slice(0, 40);
     if (!etiket) return { ok: false, hata: 'Paylaşım adı (görev/birim) girin.' };
     var p = { id: Utilities.getUuid().slice(0, 8), etiket: etiket, yetki: yetki, acik: true, olusturma: simdi,
-      anahtar: 'p' + Utilities.getUuid().replace(/-/g, ''), bolumler: bolumOku_(g.bolumler) };
+      anahtar: 'p' + Utilities.getUuid().replace(/-/g, '') };
     l.push(p);
     paylasimKaydet_(l);
     return { ok: true, mesaj: etiket + ' için paylaşım açıldı.', paylasimlar: paylasimListesi_() };
@@ -1708,7 +1674,6 @@ function paylasimYonet_(g) {
   var x = l.filter(function (p) { return p.id === g.id; })[0];
   if (!x) return { ok: false, hata: 'Paylaşım bulunamadı.' };
   if (g.tur === 'paylasimYetki') { x.yetki = yetki; }
-  else if (g.tur === 'paylasimBolum') { x.bolumler = bolumOku_(g.bolumler); }
   else if (g.tur === 'paylasimAd') {
     var ad = String(g.etiket || '').trim().slice(0, 40);
     if (!ad) return { ok: false, hata: 'Paylaşım adı boş olamaz.' };
@@ -1725,10 +1690,11 @@ function paylasimYonet_(g) {
 
 /** Paylaşım linkine giden veri: yalnızca Tarla Haritası'nın kullandığı alanlar. */
 function tarlaVeri_(pay) {
-  var v = veriTopla_(400), bolumler = paylasimBolumleri_(pay);
+  var v = veriTopla_(400);
   var o = { ok: true, surum: v.surum, olusturma: v.olusturma,
-    paylasim: { kapsam: 'tarla', yetki: pay.yetki, etiket: pay.etiket, bolumler: bolumler } };
-  bolumler.forEach(function (b) { PAYLASIM_BOLUMLERI[b].forEach(function (k) { o[k] = v[k]; }); });
+    paylasim: { kapsam: 'tarla', yetki: pay.yetki, etiket: pay.etiket } };
+  ['ekim', 'hasat', 'cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel']
+    .forEach(function (k) { o[k] = v[k]; });
   return o;
 }
 
@@ -1736,9 +1702,7 @@ function tarlaVeri_(pay) {
 function paylasimIslem_(pay, g) {
   var izinli = ['sezonParsel', 'sezonParselGeriAl', 'parselSinir', 'parselSinirGeriAl'];
   if (izinli.indexOf(g.tur) < 0) return { ok: false, hata: 'Bu işlem paylaşımda yapılamaz.' };
-  if (pay.yetki !== 'duzenle' || paylasimBolumleri_(pay).indexOf('tarla') < 0) {
-    return { ok: false, hata: 'Bu paylaşımda yalnızca görüntüleme yetkisi var.' };
-  }
+  if (pay.yetki !== 'duzenle') return { ok: false, hata: 'Bu paylaşımda yalnızca görüntüleme yetkisi var.' };
   g.giren = pay.etiket;
   return g.tur.indexOf('sezonParsel') === 0 ? sezonParsel_(g) : parselSinir_(g);
 }

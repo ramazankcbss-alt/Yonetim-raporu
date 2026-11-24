@@ -21,29 +21,24 @@ class TarimEkran extends StatefulWidget {
 class _TarimEkranState extends State<TarimEkran> {
   String? _ciftlik; // null: tümü
   bool _hayvancilik = false; // false: Ziraat, true: Hayvancılık
-  bool _gunluk = false; // false: haftalık, true: günlük
-  DateTime? _gun, _hafta;
 
   @override
   Widget build(BuildContext context) {
     final v = widget.veri;
     final (plan, ekilen) = ekimToplami(v.ekim);
-    // Seçilen dönem: gün ya da hafta (varsayılan en son).
-    final gunler = <DateTime>{...v.gunler, for (final t in v.tarim) gunu(t.tarih)}.toList()..sort((a, b) => b.compareTo(a));
-    final haftalar = v.haftalar;
-    final gun = _gun != null && gunler.contains(_gun) ? _gun! : (gunler.isEmpty ? null : gunler.first);
-    final hafta = _hafta != null && haftalar.contains(_hafta) ? _hafta! : (haftalar.isEmpty ? null : haftalar.first);
-    final DateTime? bas = _gunluk ? gun : hafta;
-    final DateTime? son = bas == null ? null : (_gunluk ? bas : bas.add(const Duration(days: 6)));
-    final List<TarimKaydi> akis = bas == null
-        ? const <TarimKaydi>[]
-        : (v
-            .tarimDonem(bas, son!)
-            .where((t) => t.hayvancilik == _hayvancilik)
-            .where((t) => _ciftlik == null || t.ciftlik == _ciftlik)
-            .toList()
-          // En yeni faaliyet en üstte.
-          ..sort((a, b) => b.tarih.compareTo(a.tarih)));
+    final sonTarih = v.tarim.isEmpty ? null : v.tarim.last.tarih;
+    final List<TarimKaydi> akis;
+    if (sonTarih == null) {
+      akis = const <TarimKaydi>[];
+    } else {
+      // En yeni faaliyet en üstte.
+      akis = v
+          .tarimDonem(sonTarih.subtract(const Duration(days: 30)), sonTarih)
+          .where((t) => t.hayvancilik == _hayvancilik)
+          .where((t) => _ciftlik == null || t.ciftlik == _ciftlik)
+          .toList()
+        ..sort((a, b) => b.tarih.compareTo(a.tarih));
+    }
     // Çiftlik çipleri yalnızca seçili türde kaydı olan çiftlikleri göstersin.
     final turCiftlikleri = {
       for (final t in v.tarim)
@@ -54,10 +49,16 @@ class _TarimEkranState extends State<TarimEkran> {
       ...turCiftlikleri.where((c) => !ciftlikSirasi.contains(c)),
     ];
 
-    // Hayvancılık: seçilen gün ya da haftanın hayvan verileri.
-    final hg = bas == null ? null : (_gunluk ? gunlukGostergeler(v, bas) : haftalikGostergeler(v, bas));
-    final ko = bas == null ? null : kayipOzeti(v, bas, son!);
-    final hayvanOzeti = bas == null ? null : canliHayvanOzeti(v, bas, son!);
+    // Hayvancılık için son haftanın hayvan verileri.
+    final haftalar = v.haftalar;
+    final sonHafta = haftalar.isEmpty ? null : haftalar.first;
+    final hg = sonHafta == null ? null : haftalikGostergeler(v, sonHafta);
+    final ko = sonHafta == null
+        ? null
+        : kayipOzeti(v, sonHafta, sonHafta.add(const Duration(days: 6)));
+    final hayvanOzeti = sonHafta == null
+        ? null
+        : canliHayvanOzeti(v, sonHafta, sonHafta.add(const Duration(days: 6)));
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -70,20 +71,6 @@ class _TarimEkranState extends State<TarimEkran> {
           }),
         ),
         const SizedBox(height: 12),
-        SegmentedButton<bool>(
-          segments: const [
-            ButtonSegment(value: true, label: Text('Günlük'), icon: Icon(Icons.today_outlined)),
-            ButtonSegment(value: false, label: Text('Haftalık'), icon: Icon(Icons.date_range_outlined)),
-          ],
-          selected: {_gunluk},
-          onSelectionChanged: (x) => setState(() => _gunluk = x.first),
-        ),
-        const SizedBox(height: 8),
-        if (_gunluk && gun != null)
-          Secici<DateTime>(secenekler: gunler, secili: gun, etiket: tarihUzun, degisti: (d) => setState(() => _gun = d))
-        else if (!_gunluk && hafta != null)
-          Secici<DateTime>(
-              secenekler: haftalar, secili: hafta, etiket: haftaEtiketi, degisti: (d) => setState(() => _hafta = d)),
         if (!_hayvancilik) ...[
           GostergeIzgarasi(kartlar: [
             GostergeKarti(
@@ -133,11 +120,13 @@ class _TarimEkranState extends State<TarimEkran> {
           ),
         ] else ...[
           if (hg != null) ...[
-            if (hayvanOzeti?.ozetGunu == null)
-              BilgiKutusu(
-                  uyari: true,
-                  yazi: 'Bu ${_gunluk ? 'gün' : 'hafta'} için işletme özeti yok; kartlarda yalnızca günlük süt verisi bulunan '
-                      'değerler gösterilir.'),
+            if (sonHafta != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10, left: 2),
+                child: Text('Son hafta: ${haftaEtiketi(sonHafta)}',
+                    style:
+                        const TextStyle(fontSize: 12.5, color: Renk.soluk)),
+              ),
             const BolumBasligi('Çiftliklerimiz', ikon: Icons.home_work_outlined),
             GostergeIzgarasi(kartlar: [
               GostergeKarti(
@@ -152,7 +141,7 @@ class _TarimEkranState extends State<TarimEkran> {
                 renk: Renk.mavi,
               ),
               GostergeKarti(
-                baslik: _gunluk ? 'Günlük Süt' : 'Haftalık Süt',
+                baslik: 'Haftalık Süt',
                 deger: kg(hg.sut),
                 ikon: Icons.local_drink_outlined,
                 renk: Renk.mavi,
@@ -189,7 +178,7 @@ class _TarimEkranState extends State<TarimEkran> {
                 renk: Renk.turuncu,
               ),
             ]),
-            EskBolumu(g: hg, kesilenAlt: _gunluk ? 'Gün toplamı' : 'Hafta toplamı'),
+            EskBolumu(g: hg, kesilenAlt: 'Hafta toplamı'),
             const SizedBox(height: 12),
           ],
           Panel(
@@ -219,8 +208,9 @@ class _TarimEkranState extends State<TarimEkran> {
           ),
         ],
         Panel(
-          baslik: '${_hayvancilik ? 'Hayvancılık' : 'Ziraat'} Faaliyetleri '
-              '(${bas == null ? 'kayıt yok' : _gunluk ? tarihUzun(bas) : haftaEtiketi(bas)})',
+          baslik: _hayvancilik
+              ? 'Hayvancılık Faaliyetleri (son 30 gün)'
+              : 'Ziraat Faaliyetleri (son 30 gün)',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -245,7 +235,7 @@ class _TarimEkranState extends State<TarimEkran> {
               if (akis.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Text('Bu dönemde kayıt yok.', style: TextStyle(color: Renk.soluk)),
+                  child: Text('Kayıt yok.', style: TextStyle(color: Renk.soluk)),
                 ),
               for (final f in akis) FaaliyetSatiri(kayit: f),
             ],

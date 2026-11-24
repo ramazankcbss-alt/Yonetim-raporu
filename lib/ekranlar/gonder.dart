@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../servis/veri_servisi.dart';
 import 'bilesenler.dart';
 
 /// Gönderilen metinlerin imzası.
@@ -51,10 +50,7 @@ class _GonderAlaniState extends State<GonderAlani> {
   }
 
   @override
-  Widget build(BuildContext context) => VeriDeposu.ben.paylasim != null
-      // Paylaşım linkiyle açılan görünümde gönderme yok (imzalı inceleme talebi sahibe aittir).
-      ? KeyedSubtree(key: _icerik, child: widget.child)
-      : Column(children: [
+  Widget build(BuildContext context) => Column(children: [
         Material(
           color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
           child: Padding(
