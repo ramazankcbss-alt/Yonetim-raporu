@@ -64,8 +64,8 @@ void main() {
       ('C', [60.0, 50.0, 15.0, 20.0]),
     ]);
     final p = ParselIcerik.oku('Boş alan:2+Arpa:20/BP10,10,30,10,20,40');
-    expect(p.bolgeler.single.\$1, 'P');
-    expect(p.bolgeler.single.\$2.length, 6);
+    expect(p.bolgeler.single.$1, 'P');
+    expect(p.bolgeler.single.$2.length, 6);
     // Eski çizgi kaydı bozulmaz.
     expect(ParselIcerik.oku('Arpa:10+Buğday:20/37,52').cizgiler, [(37.0, 52.0)]);
   });

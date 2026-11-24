@@ -666,7 +666,8 @@ List<_N> _bolgePoligon(List<_N> k, ParselBolge b) {
 ParselBolge _bolgeKodla(List<_N> k, String tip, List<_N> noktalar) {
   final (x0, y0, x1, y1) = _kutu(k);
   final w = x1 - x0, h = y1 - y0;
-  double px(double x) => (x - x0) / w * 100, py(double y) => (y - y0) / h * 100;
+  double px(double x) => (x - x0) / w * 100;
+  double py(double y) => (y - y0) / h * 100;
   if (tip == 'C') {
     // noktalar: [merkez, çevredeki nokta]
     final r = math.sqrt(math.pow(noktalar[1].$1 - noktalar[0].$1, 2) + math.pow(noktalar[1].$2 - noktalar[0].$2, 2));
