@@ -37,6 +37,25 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
     if (r != null) await _yap('paylasimEkle', etiket: r.$1, yetki: r.$2);
   }
 
+  Future<void> _adDegistir(PaylasimKaydi p) async {
+    final t = TextEditingController(text: p.etiket);
+    final ad = await showDialog<String>(
+        context: context,
+        builder: (d) => AlertDialog(
+              title: const Text('Paylaşım adı'),
+              content: TextField(
+                  controller: t,
+                  maxLength: 40,
+                  decoration: const InputDecoration(helperText: 'KVKK: kişi adı değil görev / birim yazın')),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(d), child: const Text('Vazgeç')),
+                FilledButton(onPressed: () => Navigator.pop(d, t.text.trim()), child: const Text('Kaydet')),
+              ],
+            ));
+    t.dispose();
+    if (ad != null && ad.isNotEmpty && ad != p.etiket) await _yap('paylasimAd', id: p.id, etiket: ad);
+  }
+
   Future<void> _sil(PaylasimKaydi p) async {
     final ok = await showDialog<bool>(
         context: context,
@@ -114,6 +133,10 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                                   },
                             icon: const Icon(Icons.copy),
                             label: const Text('Kopyala')),
+                        TextButton.icon(
+                            onPressed: _mesgul ? null : () => _adDegistir(p),
+                            icon: const Icon(Icons.drive_file_rename_outline),
+                            label: const Text('Adını değiştir')),
                         TextButton.icon(
                             onPressed: _mesgul ? null : () => _sil(p),
                             icon: const Icon(Icons.delete_outline),

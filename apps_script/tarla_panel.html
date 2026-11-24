@@ -8,9 +8,25 @@
   :root { --mavi:#1d4ed8; --soluk:#64748b; --amber:#b45309; --kenar:#e2e8f0; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:#0f172a; background:#f8fafc; }
-  header { background:#14532d; color:#fff; padding:12px 14px; }
-  header h1 { margin:0; font-size:18px; }
-  header div { font-size:12.5px; opacity:.85; margin-top:2px; }
+  header { background:#3D7A55; color:#fff; position:sticky; top:0; z-index:5; }
+  .cubuk { display:flex; align-items:center; gap:8px; padding:12px 10px; }
+  .cubuk h1 { margin:0; font-size:19px; font-weight:600; flex:1; }
+  .geri { background:none; border:0; color:#fff; font-size:24px; width:40px; height:40px; cursor:pointer; }
+  #ust { font-size:12px; opacity:.85; padding:0 14px 8px; }
+  .sekmeler { display:flex; overflow-x:auto; }
+  .sekme { flex:1; text-align:center; padding:10px 12px 12px; font-size:15px; color:rgba(255,255,255,.75); cursor:pointer; white-space:nowrap;
+    border-bottom:3px solid transparent; }
+  .sekme.secili { color:#fff; font-weight:700; border-bottom-color:#fff; }
+  .menu { display:flex; align-items:center; gap:14px; background:#f1f5f0; border:1px solid var(--kenar); border-radius:14px; padding:14px;
+    margin-bottom:10px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .menu .ik { width:46px; height:46px; border-radius:23px; background:#e3efe6; display:flex; align-items:center; justify-content:center;
+    font-size:22px; color:#14532d; flex:none; }
+  .menu b { display:block; font-size:16.5px; }
+  .menu span { font-size:13.5px; color:var(--soluk); }
+  .menu .ok { margin-left:auto; color:var(--soluk); font-size:22px; }
+  h3 { font-size:15px; color:#14532d; margin:14px 2px 6px; }
+  .rozet { display:inline-block; background:#dbeafe; color:#1d4ed8; font-weight:700; font-size:12px; border-radius:6px; padding:2px 8px; margin:3px 4px 0 0; }
+  .sag { text-align:right; } .yesil { color:#15803D; font-weight:800; } .amb { color:var(--amber); font-weight:800; }
   main { max-width:1100px; margin:0 auto; padding:10px 12px 40px; }
   .cipler { display:flex; gap:6px; overflow-x:auto; padding:4px 0 8px; }
   .cip { border:1px solid var(--kenar); background:#fff; border-radius:16px; padding:6px 12px; font-size:13.5px; white-space:nowrap; cursor:pointer; }
@@ -18,10 +34,15 @@
   .kart { background:#fff; border:1px solid var(--kenar); border-radius:12px; padding:10px; margin-bottom:10px; }
   .bilgi { background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:8px 10px; font-size:13px; margin-bottom:10px; }
   .uyari { color:var(--amber); font-size:12.5px; }
-  #haritaKap { position:relative; overflow:auto; border-radius:10px; background:#eef2ee; height:62vh; touch-action:pan-x pan-y; }
-  #harita { display:block; }
-  .araclar { position:absolute; right:8px; top:8px; display:flex; flex-direction:column; gap:6px; z-index:2; }
-  .araclar button { width:38px; height:38px; border-radius:19px; border:1px solid var(--kenar); background:#fff; font-size:20px; }
+  #haritaKap { position:relative; overflow:hidden; border-radius:10px; background:#eef2ee; width:100%; aspect-ratio:0.82;
+    max-height:78vh; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #haritaKap.tam { position:fixed; inset:0; z-index:9; border-radius:0; max-height:none; aspect-ratio:auto; }
+  #harita, #yazilar { position:absolute; inset:0; width:100%; height:100%; display:block; }
+  #yazilar { pointer-events:none; }
+  .araclar { position:absolute; right:6px; top:6px; display:flex; flex-direction:column; gap:6px; z-index:2; }
+  .araclar button { width:40px; height:40px; border-radius:20px; border:1px solid var(--kenar); background:#fff; font-size:18px;
+    box-shadow:0 1px 3px rgba(0,0,0,.15); }
+  .ipucu { font-size:12px; color:var(--soluk); margin-top:6px; }
   .lejant { display:flex; flex-wrap:wrap; gap:6px 12px; font-size:12.5px; margin-top:8px; }
   .lejant span i { display:inline-block; width:12px; height:12px; border-radius:3px; margin-right:4px; vertical-align:-1px; }
   table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -45,7 +66,8 @@
 </style>
 </head>
 <body>
-<header><h1>Tarla Haritası</h1><div id="ust">Yükleniyor…</div></header>
+<header><div class="cubuk"><button class="geri" id="geri" onclick="geri()" style="visibility:hidden">←</button><h1 id="baslik">Tarla Haritası</h1></div>
+<div id="ust">Yükleniyor…</div><div class="sekmeler" id="sekmeler"></div></header>
 <main>
   <div id="icerik" class="yukleniyor">Harita yükleniyor…</div>
 </main>
@@ -68,7 +90,8 @@ var RENK = { 'Buğday':'#E0A526','Arpa':'#C9B458','Şeker pancarı':'#8E3B8A','S
   'Sudan otu':'#8BC34A','Kimyon':'#9E7C5A','Kişniş':'#7FA67F','Nadas':'#B8A88A','Deneme alanı':'#00BCD4','Islah edilen alan':'#795548',
   'Ağaçlık alan':'#2E7D32','Boş alan':'#D6D6D6' };
 
-var S = { paket: [], sezonParsel: [], parselSinir: [], yetki: 'gor', etiket: '', sezon: null, ciftlik: null, olcek: 1, yazi: true };
+var S = { paket: [], sezonParsel: [], parselSinir: [], ekim: [], ekimPlani: [], cks: [], yetki: 'gor', etiket: '', sezon: null, ciftlik: null,
+  yazi: true, ekran: 'ana', sekme: 'harita', pCiftlik: null, tam: false };
 
 // ---------- yardımcılar ----------
 function kucuk(s) { return String(s || '').replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase(); }
@@ -147,7 +170,7 @@ function parselOku(j) {
 }
 function sezonOku(j) {
   return { sezon: j.sezon, kaynak: j.kaynak || '', tur: j.tur || 'kmz', giris: false,
-    ciftlikler: (j.ciftlikler || []).map(function (c) { return { ad: c.ad, parseller: (c.parseller || []).map(parselOku) }; }) };
+    ciftlikler: (j.ciftlikler || []).map(function (c) { return { ad: c.ad, gorseller: c.gorseller || [], parseller: (c.parseller || []).map(parselOku) }; }) };
 }
 function parselGirisi(sezon, cf, parsel) {
   var d = null;
@@ -195,7 +218,7 @@ function katmanda(katman, cf, ad) {
 function girisSezonu(taban, ad, katman) {
   return { sezon: ad, giris: true, tur: katman ? katman.tur : 'giris', kaynak: (katman ? katman.kaynak + ' + ' : '') + 'haritadan girilen bilgiler',
     ciftlikler: taban.ciftlikler.map(function (c) {
-      return { ad: c.ad, parseller: c.parseller.map(function (p) {
+      return { ad: c.ad, gorseller: c.gorseller, parseller: c.parseller.map(function (p) {
         var g = parselGirisi(ad, c.ad, p.ad), k = katmanda(katman, c.ad, p.ad);
         if (g) {
           var bagli = [], gelen = [];
@@ -219,7 +242,7 @@ function girisSezonu(taban, ad, katman) {
 }
 function kmzUzerine(kmz) {
   return { sezon: kmz.sezon, giris: false, tur: 'kmz', kaynak: kmz.kaynak, ciftlikler: kmz.ciftlikler.map(function (c) {
-    return { ad: c.ad, parseller: c.parseller.map(function (p) {
+    return { ad: c.ad, gorseller: c.gorseller, parseller: c.parseller.map(function (p) {
       var g = parselGirisi(kmz.sezon, c.ad, p.ad);
       if (g && (icerikOku(g.urun).parcalar.length > 1 || p.tip === 'girilmedi')) {
         var y = girisParseli(p, g, [], []);
@@ -246,7 +269,7 @@ function sinirUygula(kmz) {
       if (!c.parseller.some(function (p) { return p.ad === a[1]; }))
         l.push({ ad: a[1], tip: 'girilmedi', urunler: [], koord: m[key], not: 'Haritadan eklendi', cesitler: [], bolgeler: [], bolme: [], baglar: [] });
     });
-    return { ad: c.ad, parseller: l };
+    return { ad: c.ad, gorseller: c.gorseller, parseller: l };
   }) });
 }
 function sezonlar() {
@@ -307,101 +330,350 @@ function bolgePoligon(k, b) {
 }
 function merkez(k) { var x = 0, y = 0; k.forEach(function (p) { x += p[0]; y += p[1]; }); return [x / k.length, y / k.length]; }
 
-// ---------- ekran ----------
-function guncelSezon() { var l = sezonlar(); return l.filter(function (x) { return x.sezon === S.sezon; })[0] || l[0]; }
+// ---------- Excel / ÇKS (uygulamadaki karşılaştırma mantığı) ----------
+var EXCEL2025 = [['Şekersüt','Silajlık mısır',670],['Şekersüt','Buğday',1700],['Şekersüt','Şeker pancarı',700],['Aslım','Silajlık mısır',140],
+  ['Aslım','Şeker pancarı',900],['Aslım','Arpa',1340],['Aslım','Buğday',520],['Aslım','Tritikale',200],['Aslım','Yonca',1360],
+  ['Taşağıl','Patates',400],['Ormanlık','Şeker pancarı',230],['Fidanlık','Buğday',130],['Fidanlık','Arpa',600]];
+function uretimYili(s) { return s.indexOf('-') >= 0 ? s.split('-').pop() : s; }
+function ekle(m, k, v) { m[k] = (m[k] || 0) + v; }
+function sezonExcel(s, cf) {
+  var m = {};
+  if (!s.giris) { S.ekim.forEach(function (r) { var pl = sayiOku(r[2]); if (ciftlikAnahtari(r[0]) === ciftlikAnahtari(cf) && pl > 0) ekle(m, urunAnahtari(String(r[1])), pl); }); return m; }
+  S.ekimPlani.forEach(function (r) { var pl = sayiOku(r[3]); if (String(r[0]) === uretimYili(s.sezon) && ciftlikAnahtari(r[1]) === ciftlikAnahtari(cf) && pl > 0) ekle(m, urunAnahtari(String(r[2])), pl); });
+  if (Object.keys(m).length || uretimYili(s.sezon) !== '2025') return m;
+  EXCEL2025.forEach(function (x) { if (ciftlikAnahtari(x[0]) === ciftlikAnahtari(cf)) ekle(m, urunAnahtari(x[1]), x[2]); });
+  return m;
+}
+function excelKaynak(s) { return !s.giris ? '2026-2027 Ekim Planı (Excel)' : uretimYili(s.sezon) === '2025' ? 'Tarımsal Faaliyet › ÇİFTLİK BAZINDA, 2025 yılı (Excel)' : uretimYili(s.sezon) + ' Excel ekim planı'; }
+function urunToplami(c) { var m = {}; c.parseller.forEach(function (p) { p.urunler.forEach(function (u) { ekle(m, urunAnahtari(u[0]), u[1] || 0); }); }); return m; }
+function cksKayit(r) { return { sezon: String(r[0] || ''), ciftlik: String(r[1] || ''), mevki: String(r[2] || ''), ada: String(r[3] || ''), parsel: String(r[4] || ''),
+  urun: String(r[5] || ''), alan: sayiOku(r[6]), eslesen: String(r[7] || '') }; }
+function sezonCks(s, cf) { return S.cks.map(cksKayit).filter(function (x) { return x.sezon === s.sezon && ciftlikAnahtari(x.ciftlik) === ciftlikAnahtari(cf); }); }
+function parselCks(s, cf, ad) { return S.cks.map(cksKayit).filter(function (x) { return (!x.sezon || x.sezon === s.sezon) && ciftlikAnahtari(x.ciftlik) === ciftlikAnahtari(cf) &&
+  x.eslesen.split(',').some(function (e) { return kucuk(e).trim() === kucuk(ad).trim(); }); }); }
+function yakin(a, b) { return Math.abs(a - b) <= Math.max(5, b * 0.03); }
+
+// ---------- ekranlar (uygulamadaki menüler) ----------
+function guncelSezon() { var l = sezonlar(); return l.filter(function (x) { return x.sezon === S.sezon; })[0] || l[l.length - 1]; }
+function menu(ik, b, alt, tik) { return '<div class="menu" onclick="' + tik + '"><div class="ik">' + ik + '</div><div><b>' + esc(b) + '</b><span>' + esc(alt) + '</span></div><div class="ok">›</div></div>'; }
+function geri() {
+  if (S.tam) { tamEkran(); return; }
+  if (S.ekran === 'ciftlikParsel') S.ekran = 'sezon'; else S.ekran = 'ana';
+  ciz(); window.scrollTo(0, 0);
+}
+function git(ekran, ek) { for (var k in (ek || {})) S[k] = ek[k]; S.ekran = ekran; ciz(); window.scrollTo(0, 0); }
 function ciz() {
-  var l = sezonlar();
-  if (!l.length) { document.getElementById('icerik').innerHTML = '<div class="kart">Harita verisi yok.</div>'; return; }
-  if (!S.sezon || !l.some(function (x) { return x.sezon === S.sezon; })) S.sezon = l[l.length - 1].sezon;
+  var l = sezonlar(), kok = document.getElementById('icerik');
+  kok.className = '';
+  if (!l.length) { kok.innerHTML = '<div class="kart">Harita verisi yok.</div>'; return; }
+  var geriB = document.getElementById('geri'), bas = document.getElementById('baslik'), sek = document.getElementById('sekmeler');
+  geriB.style.visibility = S.ekran === 'ana' ? 'hidden' : 'visible'; sek.innerHTML = '';
+  if (S.ekran === 'ana') { bas.textContent = 'Tarla Haritası'; kok.innerHTML = anaEkran(l); return; }
+  if (S.ekran === 'yil') { bas.textContent = 'Yıllara göre karşılaştırma'; kok.innerHTML = yilEkrani(l); return; }
   var s = guncelSezon();
+  if (S.ekran === 'ciftlikParsel') {
+    var c0 = s.ciftlikler.filter(function (x) { return x.ad === S.pCiftlik; })[0];
+    bas.textContent = S.pCiftlik + ' parselleri'; kok.innerHTML = c0 ? ciftlikParselleri(s, c0) : ''; return;
+  }
+  bas.textContent = 'Tarla Haritası ' + s.sezon;
+  sek.innerHTML = [['harita', 'Harita'], ['parseller', 'Parseller'], ['karsi', 'Karşılaştırma'], ['cks', 'ÇKS']].map(function (t) {
+    return '<div class="sekme' + (S.sekme === t[0] ? ' secili' : '') + '" onclick="S.sekme=\'' + t[0] + '\';ciz()">' + t[1] + '</div>'; }).join('');
+  if (S.sekme === 'harita') return haritaSekmesi(s, kok);
+  kok.innerHTML = S.sekme === 'parseller' ? parselSekmesi(s) : S.sekme === 'karsi' ? karsiSekmesi(s) : cksSekmesi(s);
+}
+function anaEkran(l) {
+  var h = '<div class="bilgi">Her sezon ayrı bir bölümdür; içinde Harita, Parseller, Karşılaştırma ve ÇKS sekmeleri yer alır. Parsel çizimleri ve sezonların ürünleri Google Earth KMZ haritasından alınır; 2023-2024 sezonu o yılın parsel düzeniyle gösterilir. ' +
+    (S.yetki === 'duzenle' ? 'Parsele dokunarak ürün, dekar ve tohum girebilirsiniz.' : 'Yalnızca görüntüleme yetkiniz var.') + '</div>';
+  l.forEach(function (x) {
+    var ps = []; x.ciftlikler.forEach(function (c) { c.parseller.forEach(function (p) { if (p.tip !== 'diger') ps.push(p); }); });
+    var gir = ps.filter(function (p) { return p.urunler.length; }).length, cks = S.cks.filter(function (r) { return String(r[0]) === x.sezon; }).length, ex = 0;
+    x.ciftlikler.forEach(function (c) { var m = sezonExcel(x, c.ad); for (var k in m) ex += m[k]; });
+    var alt = [uretimYili(x.sezon) + ' üretim yılı', x.giris ? 'Haritadan girilen: ' + gir + ' / ' + ps.length + ' parsel' : 'KMZ haritası (' + x.kaynak + ')',
+      ex > 0 ? 'Excel: ' + sayi(ex) + ' da' : 'Excel kaydı yok'].concat(cks ? ['ÇKS: ' + cks + ' kayıt'] : []).join(' · ');
+    h += menu(x.giris ? '✎' : '▦', x.sezon + ' sezonu', alt, "git('sezon',{sezon:'" + x.sezon + "',sekme:'harita'})");
+  });
+  h += menu('⇄', 'Yıllara göre ekim karşılaştırması', l.map(function (x) { return x.sezon; }).join(' · ') + ' — çiftlik ve ürün alanları, parsel geçmişi', "git('yil')");
+  return h;
+}
+function haritaSekmesi(s, kok) {
   var cfler = s.ciftlikler.filter(function (c) { return c.parseller.some(function (p) { return p.koord.length > 2; }); });
   if (!S.ciftlik || !cfler.some(function (c) { return c.ad === S.ciftlik; })) S.ciftlik = cfler.length ? cfler[0].ad : null;
   var c = cfler.filter(function (x) { return x.ad === S.ciftlik; })[0];
-  var h = '';
-  h += '<div class="cipler">' + l.map(function (x) { return '<span class="cip' + (x.sezon === s.sezon ? ' secili' : '') + '" onclick="sezonSec(\'' + x.sezon + '\')">' + x.sezon + '</span>'; }).join('') + '</div>';
-  h += '<div class="cipler">' + cfler.map(function (x) { return '<span class="cip' + (c && x.ad === c.ad ? ' secili' : '') + '" onclick="ciftlikSec(\'' + esc(x.ad) + '\')">' + esc(x.ad) + '</span>'; }).join('') + '</div>';
+  var h = '<div class="cipler">' + cfler.map(function (x) { return '<span class="cip' + (c && x.ad === c.ad ? ' secili' : '') + '" onclick="ciftlikSec(\'' + esc(x.ad) + '\')">' + esc(x.ad) + '</span>'; }).join('') + '</div>';
+  if (!c) { kok.innerHTML = h + '<div class="kart">Bu sezonda çizili parsel yok.</div>'; return; }
   var duz = S.yetki === 'duzenle' && s.giris;
-  h += '<div class="bilgi">' + esc(s.sezon) + ' sezonu · kaynak: ' + esc(s.kaynak) + '<br>' +
-    (S.yetki !== 'duzenle' ? 'Yalnızca görüntüleme yetkiniz var.' : duz ? 'Parsele dokunarak ürün, dekar ve tohum girebilirsiniz.' :
-      'Bu sezon (KMZ esas haritası) yalnızca görüntülenir; giriş için diğer sezonları seçin.') + '</div>';
-  if (!c) { h += '<div class="kart">Bu sezonda çizili parsel yok.</div>'; document.getElementById('icerik').innerHTML = h; return; }
-  h += '<div class="kart"><div id="haritaKap"><div class="araclar"><button onclick="yakinlas(1.5)">+</button><button onclick="yakinlas(1/1.5)">−</button>' +
-    '<button title="Yazılar" onclick="S.yazi=!S.yazi;ciz()" style="font-size:14px">Aa</button></div>' + svg(c) + '</div>';
-  var top = {};
-  c.parseller.forEach(function (p) { p.urunler.forEach(function (u) { var k = urunAnahtari(u[0]); top[k] = (top[k] || 0) + (u[1] || 0); }); });
-  h += '<div class="lejant">' + Object.keys(top).map(function (k) { return '<span><i style="background:' + renk(k) + '"></i>' + esc(k) + (top[k] > 0 ? ' ' + sayi(top[k]) + ' da' : '') + '</span>'; }).join('') + '</div></div>';
-  h += '<div class="kart"><table><tr><th>Parsel</th><th>Ürün</th><th>Dekar</th></tr>' + c.parseller.map(function (p, i) {
-    return '<tr class="tik" onclick="parselAc(' + i + ')"><td>' + esc(p.ad) + '</td><td>' + esc(urunYazi(p)) + (p.not ? '<div class="uyari">' + esc(p.not) + '</div>' : '') +
-      '</td><td>' + (dekar(p) ? sayi(dekar(p)) : '—') + '</td></tr>';
-  }).join('') + '</table></div>';
-  document.getElementById('icerik').className = '';
-  document.getElementById('icerik').innerHTML = h;
+  h += '<div style="font-size:19px;font-weight:800;margin:4px 2px 0">' + esc(c.ad) + '</div><div style="font-size:13px;color:var(--soluk);margin:0 2px 8px">' + esc(s.sezon) + ' sezonu · kaynak: ' + esc(s.kaynak) + '</div>';
+  h += '<div class="kart" style="padding:6px"><div id="haritaKap"' + (S.tam ? ' class="tam"' : '') + '><svg id="harita" xmlns="http://www.w3.org/2000/svg"><g id="sahne"></g></svg><svg id="yazilar" xmlns="http://www.w3.org/2000/svg"></svg>' +
+    '<div class="araclar"><button title="Tam ekran" onclick="tamEkran()">⛶</button><button title="Sığdır" onclick="sifirla()">⟲</button><button title="Yazılar" onclick="S.yazi=!S.yazi;yazilar()" style="font-size:14px">Aa</button></div></div></div>';
+  h += '<div class="ipucu">' + (duz ? 'Parsele dokunarak ' + esc(s.sezon) + ' sezonu için ürün, dekar ve tohum girebilirsiniz. ' : S.yetki !== 'duzenle' ? 'Parsele dokununca bilgisi açılır. ' : 'Bu sezon (KMZ esas haritası) yalnızca görüntülenir. ') +
+    'İki parmakla yakınlaştırabilir, tek parmakla kaydırabilir, sağ üstteki düğmeyle tam ekran açabilirsiniz.</div>';
+  var top = urunToplami(c), tur = {}; (c.gorseller || []).forEach(function (g) { tur[g.tur] = 1; });
+  var cksVar = c.parseller.some(function (p) { return parselCks(s, c.ad, p.ad).length; });
+  h += '<div class="lejant">' + (cksVar ? '<span><i style="background:#fff;border:2px solid #1d4ed8"></i>Mavi kenarlı: ÇKS\'de bildirildi</span>' : '') +
+    (tur.hat || tur.og ? '<span><i style="background:#EF6C00;height:3px"></i>Enerji / su hattı</span>' : '') + (tur.kuyu ? '<span><i style="background:#0277BD;border-radius:6px"></i>Kuyu</span>' : '') + '</div>';
+  h += '<div class="lejant">' + Object.keys(top).map(function (k) { return '<span><i style="background:' + renk(k) + '"></i>' + esc(k) + (top[k] > 0 ? ': ' + sayi(top[k]) + ' da' : '') + '</span>'; }).join('') + '</div>';
+  kok.innerHTML = h;
+  haritaKur(c, s);
+}
+function parselKarti(s, c, p, i) {
+  var cks = parselCks(s, c.ad, p.ad), oz = {};
+  cks.forEach(function (x) { if (!oz[x.urun]) oz[x.urun] = [0, 0]; oz[x.urun][0] += x.alan || 0; oz[x.urun][1]++; });
+  var r = p.urunler.length ? renk(p.urunler[0][0]) : (p.tip === 'bos' || p.tip === 'girilmedi' ? '#D6D6D6' : '#90A4AE');
+  return '<div class="kart" style="cursor:pointer" onclick="S.ciftlik=\'' + esc(c.ad) + '\';parselAc(' + i + ')"><div><i style="display:inline-block;width:12px;height:12px;background:' + r + ';margin-right:8px"></i><b>' + esc(p.ad) + '</b></div>' +
+    '<div style="margin-top:2px">' + esc(urunYazi(p)) + '</div>' +
+    Object.keys(oz).map(function (k) { return '<span class="rozet">ÇKS\'de bildirildi: ' + esc(k) + ' · ' + sayi(oz[k][0]) + ' da (' + oz[k][1] + ' kayıt)</span>'; }).join('') +
+    (p.not ? '<div class="uyari">' + esc(p.not) + '</div>' : '') + '</div>';
+}
+function parselSekmesi(s) {
+  var h = '<h3>Çiftlikler</h3>';
+  s.ciftlikler.forEach(function (c) {
+    var top = 0, m = s.giris ? urunToplami(c) : sezonExcel(s, c.ad); for (var k in m) top += m[k];
+    var ck = c.parseller.filter(function (p) { return parselCks(s, c.ad, p.ad).length; }).length;
+    h += menu('▦', c.ad, c.parseller.length + ' parsel · ' + (s.giris ? 'Girilen' : 'Excel') + ': ' + sayi(top) + ' da ekili' + (ck ? ' · ' + ck + " parsel ÇKS'de bildirildi" : ''),
+      "git('ciftlikParsel',{pCiftlik:'" + esc(c.ad) + "'})");
+  });
+  return h;
+}
+function ciftlikParselleri(s, c) { return c.parseller.map(function (p, i) { return parselKarti(s, c, p, i); }).join(''); }
+function karsiSekmesi(s) {
+  var sat = [], exVar = false, gir = 0;
+  s.ciftlikler.forEach(function (c) {
+    var g = urunToplami(c), ex = sezonExcel(s, c.ad), k = {};
+    if (Object.keys(ex).length) exVar = true;
+    sezonCks(s, c.ad).forEach(function (x) { if (x.alan != null) ekle(k, urunAnahtari(x.urun), x.alan); });
+    var tum = {}; [g, ex, k].forEach(function (m) { for (var u in m) tum[u] = 1; });
+    Object.keys(tum).forEach(function (u) { sat.push([c.ad, u, g[u], ex[u], k[u]]); });
+    c.parseller.forEach(function (p) { if (p.tip === 'girilmedi') gir++; });
+  });
+  var h = '<div class="bilgi">' + (s.giris ? esc(s.sezon) + ' sezonu, haritada parsellere girilen ürün ve alanlardan oluşur. ' : 'KMZ esas haritası. ') +
+    'Esas alınan kaynak Excel: ' + esc(excelKaynak(s)) + '.' + (exVar ? '' : ' Excel dosyalarında bu yıl için henüz kayıt yok.') + '</div>';
+  if (gir) h += '<div class="uyari">Ürün girilmemiş parsel: ' + gir + '</div>';
+  h += '<h3>Excel esaslı ekim alanları (da)</h3><div class="kart"><table><tr><th>Çiftlik · Ürün</th><th class="sag">Excel</th><th class="sag">Harita</th><th class="sag">ÇKS</th><th class="sag">Fark</th></tr>' +
+    sat.map(function (r) {
+      var g = r[2], pl = r[3], k = r[4];
+      var fark = g == null || pl == null || g <= 0 ? '—' : yakin(g, pl) ? '<span class="yesil">✓</span>' : '<span class="amb">' + (g - pl >= 0 ? '+' : '−') + sayi(Math.abs(g - pl)) + '</span>';
+      return '<tr><td>' + esc(r[0] + ' · ' + r[1]) + '</td><td class="sag">' + (pl == null ? '—' : sayi(pl)) + '</td><td class="sag' + (g > 0 && pl != null && !yakin(g, pl) ? ' amb' : '') + '">' +
+        (g == null ? '—' : g > 0 ? sayi(g) : 'ekili') + '</td><td class="sag' + (k != null && pl != null && !yakin(k, pl) ? ' amb' : '') + '">' + (k == null ? '—' : sayi(k)) + '</td><td class="sag">' + fark + '</td></tr>';
+    }).join('') + '</table></div>';
+  // Münavebe: önceki sezonla aynı parselde aynı ürün
+  var l = sezonlar(), i = l.map(function (x) { return x.sezon; }).indexOf(s.sezon), once = i > 0 ? l[i - 1] : null;
+  if (s.giris && once) {
+    h += '<h3>Münavebe (' + esc(once.sezon) + ' → ' + esc(s.sezon) + ')</h3>';
+    s.ciftlikler.forEach(function (c) {
+      var oc = once.ciftlikler.filter(function (x) { return x.ad === c.ad; })[0];
+      c.parseller.forEach(function (p) {
+        if (!p.urunler.length) return;
+        var op = oc && oc.parseller.filter(function (x) { return x.ad === p.ad; })[0], ou = op ? op.urunler.map(function (u) { return urunAnahtari(u[0]); }) : [];
+        var ust = p.urunler.map(function (u) { return urunAnahtari(u[0]); }).filter(function (u) { return ou.indexOf(u) >= 0; });
+        var hata = ust.filter(function (u) { return ['Yonca', 'Korunga', 'Çayır'].indexOf(u) < 0 && ['Nadas', 'Deneme alanı', 'Islah edilen alan', 'Ağaçlık alan', 'Boş alan'].indexOf(u) < 0; });
+        h += '<div class="kart"><b>' + (hata.length ? '⚠ ' : '✓ ') + esc(c.ad + ' · ' + p.ad) + '</b><div style="font-size:13px">' + esc((ou.length ? ou.join(' + ') : 'ürün yok') + ' → ' + urunYazi(p)) + '</div>' +
+          (hata.length ? '<div class="uyari">Aynı ürün üst üste ekiliyor: ' + esc(hata.join(', ')) + '.</div>' : '') + '</div>';
+      });
+    });
+  }
+  return h;
+}
+function cksSekmesi(s) {
+  var h = '<div class="bilgi">ÇKS (Çiftçi Kayıt Sistemi) beyanları: ' + esc(s.sezon) + ' sezonu.</div>';
+  s.ciftlikler.forEach(function (c) {
+    var l = sezonCks(s, c.ad); if (!l.length) return;
+    var top = l.reduce(function (a, x) { return a + (x.alan || 0); }, 0);
+    h += '<h3>' + esc(c.ad) + ' · ' + l.length + ' kayıt · ' + sayi(top) + ' da</h3><div class="kart"><table><tr><th>Ada / parsel</th><th>Ürün</th><th class="sag">Alan</th><th>Haritada</th></tr>' +
+      l.map(function (x) { return '<tr><td>' + esc([x.ada ? 'Ada ' + x.ada : '', x.parsel ? 'Parsel ' + x.parsel : ''].filter(Boolean).join(' / ')) + (x.mevki ? '<div style="font-size:11.5px;color:var(--soluk)">' + esc(x.mevki) + '</div>' : '') +
+        '</td><td>' + esc(x.urun) + '</td><td class="sag">' + (x.alan == null ? '—' : sayi(x.alan)) + '</td><td>' + esc(x.eslesen || '—') + '</td></tr>'; }).join('') + '</table></div>';
+  });
+  if (h.indexOf('<h3>') < 0) h += '<div class="kart">Bu sezon için ÇKS kaydı yok.</div>';
+  return h;
+}
+function yilEkrani(l) {
+  var cfler = {}; l.forEach(function (s) { s.ciftlikler.forEach(function (c) { cfler[c.ad] = 1; }); });
+  var h = '<div class="bilgi">Alanlar Excel dosyalarından; Excel kaydı olmayan sezonda haritadan girilen alanlar (*) gösterilir.</div>';
+  Object.keys(cfler).forEach(function (cf) {
+    var m = {};
+    l.forEach(function (s, i) {
+      var ex = sezonExcel(s, cf), yildiz = false;
+      if (!Object.keys(ex).length) { var c = s.ciftlikler.filter(function (x) { return ciftlikAnahtari(x.ad) === ciftlikAnahtari(cf); })[0]; if (c) { ex = urunToplami(c); yildiz = true; } }
+      for (var u in ex) if (ex[u] > 0) { m[u] = m[u] || {}; m[u][i] = sayi(ex[u]) + (yildiz ? '*' : ''); }
+    });
+    if (!Object.keys(m).length) return;
+    h += '<h3>' + esc(cf) + '</h3><div class="kart" style="overflow-x:auto"><table><tr><th>Ürün</th>' + l.map(function (s) { return '<th class="sag">' + esc(s.sezon) + '</th>'; }).join('') + '</tr>' +
+      Object.keys(m).map(function (u) { return '<tr><td><i style="display:inline-block;width:10px;height:10px;background:' + renk(u) + ';margin-right:6px"></i>' + esc(u) + '</td>' +
+        l.map(function (_, i) { return '<td class="sag">' + (m[u][i] || '—') + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>';
+  });
+  return h;
 }
 function urunYazi(p) {
   if (!p.urunler.length) return p.tip === 'bos' ? 'Boş alan' : p.tip === 'girilmedi' ? 'Girilmedi' : 'Ürün belirtilmemiş';
   return p.urunler.map(function (u, i) { var c = p.cesitler[i]; return u[0] + (c ? ' (' + c + ')' : '') + (u[1] > 0 ? ' ' + sayi(u[1]) + ' da' : '') + (p.baglar[i] ? ' → ' + p.baglar[i] : ''); }).join(' + ');
 }
 function dekar(p) { if (p.beyan) return p.beyan; var t = 0; p.urunler.forEach(function (u) { t += u[1] || 0; }); return t; }
-function svg(c) {
+
+// ---------- harita: parmakla yakınlaştırma/kaydırma, sabit boyutlu yazılar (uygulamadaki gibi) ----------
+var H = null; // { c, G, gor, W, Hh, T:{s,x,y}, etiketler }
+var GORSEL_RENK = { kuyu:'#0277BD', direk:'#37474F', og:'#D32F2F', pivot:'#455A64', nokta:'#D32F2F' };
+function icinde(n, k) { var ic = false; for (var i = 0, j = k.length - 1; i < k.length; j = i++) { var a = k[i], b = k[j];
+  if ((a[1] > n[1]) !== (b[1] > n[1]) && n[0] < (b[0] - a[0]) * (n[1] - a[1]) / (b[1] - a[1]) + a[0]) ic = !ic; } return ic; }
+function kenarUzak(n, k) { var m = Infinity; for (var i = 0; i < k.length; i++) { var a = k[i], b = k[(i + 1) % k.length], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+  var t = l2 === 0 ? 0 : Math.max(0, Math.min(1, ((n[0] - a[0]) * dx + (n[1] - a[1]) * dy) / l2)), x = a[0] + t * dx - n[0], y = a[1] + t * dy - n[1]; m = Math.min(m, Math.sqrt(x * x + y * y)); } return m; }
+/** Yazı noktası: üstteki küçük parsellerin dışında, kenarlardan en uzak iç nokta (uygulamadaki gibi). */
+function yaziNoktasi(g, G) {
+  var k = g.k, alt = G.filter(function (y) { return y !== g && y.alan < g.alan; }).map(function (y) { return y.k; });
+  var q0 = kutu(k), en = null, skor = -1, n = 28;
+  for (var i = 0; i <= n; i++) for (var j = 0; j <= n; j++) {
+    var q = [q0[0] + (q0[2] - q0[0]) * i / n, q0[1] + (q0[3] - q0[1]) * j / n];
+    if (!icinde(q, k) || alt.some(function (u) { return icinde(q, u); })) continue;
+    var d = kenarUzak(q, k); alt.forEach(function (u) { d = Math.min(d, kenarUzak(q, u)); });
+    if (d > skor) { skor = d; en = q; }
+  }
+  return en || merkez(k);
+}
+function haritaKur(c, sz) {
+  sz = sz || guncelSezon();
+  var kap = document.getElementById('haritaKap'), W = kap.clientWidth, Hh = kap.clientHeight;
   var cizili = c.parseller.filter(function (p) { return p.koord.length > 2; });
   var tum = []; cizili.forEach(function (p) { tum = tum.concat(p.koord); });
   var lat0 = tum.reduce(function (a, b) { return a + b[1]; }, 0) / tum.length, kx = Math.cos(lat0 * Math.PI / 180);
-  var G = cizili.map(function (p) { return { p: p, k: p.koord.map(function (x) { return [x[0] * kx, x[1]]; }) }; });
-  var xs = [], ys = []; G.forEach(function (g) { g.k.forEach(function (n) { xs.push(n[0]); ys.push(n[1]); }); });
+  var G = cizili.map(function (p) { var k = p.koord.map(function (x) { return [x[0] * kx, x[1]]; }); return { p: p, i: c.parseller.indexOf(p), k: k, alan: alan(k) }; });
+  var gor = (c.gorseller || []).filter(function (x) { return x.koord && x.koord.length; }).map(function (x) { return { g: x, k: x.koord.map(function (y) { return [y[0] * kx, y[1]]; }) }; });
+  var xs = [], ys = []; G.forEach(function (g) { g.k.forEach(function (n) { xs.push(n[0]); ys.push(n[1]); }); }); gor.forEach(function (g) { g.k.forEach(function (n) { xs.push(n[0]); ys.push(n[1]); }); });
   var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-  var W = 1000, olc = W / (x1 - x0), H = (y1 - y0) * olc;
-  function n(p) { return ((p[0] - x0) * olc).toFixed(1) + ',' + ((y1 - p[1]) * olc).toFixed(1); }
-  function yol(k) { return k.map(n).join(' '); }
-  G.sort(function (a, b) { return alan(b.k) - alan(a.k); });
-  var o = '<svg id="harita" xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 ' + (W + 20) + ' ' + (H + 20) + '" style="width:' + (100 * S.olcek) + '%"><defs>';
-  var govde = '', yazi = '', fs = Math.max(11, W / 60);
+  var olc = 0.94 * Math.min(W / (x1 - x0), Hh / (y1 - y0)), ox = (W - (x1 - x0) * olc) / 2, oy = (Hh - (y1 - y0) * olc) / 2;
+  function d(p) { return [ox + (p[0] - x0) * olc, Hh - (oy + (p[1] - y0) * olc)]; }
+  function yol(k) { return k.map(function (p) { var q = d(p); return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' '); }
+  G.sort(function (a, b) { return b.alan - a.alan; });
+  var o = '<defs>', govde = '', et = [];
   G.forEach(function (g, gi) {
-    var p = g.p, idx = c.parseller.indexOf(p), dokun = ' onclick="parselAc(' + idx + ',PARCA)" style="cursor:pointer"';
+    var p = g.p, veri = ' data-i="' + g.i + '" data-p="';
     o += '<clipPath id="k' + gi + '"><polygon points="' + yol(g.k) + '"/></clipPath>';
-    var etiket = [];
+    function alt(i) { var u = p.urunler[i]; return [u && u[1] > 0 ? sayi(u[1]) + ' da' : '', p.cesitler[i] || ''].filter(Boolean).join(' · '); }
     if (p.bolgeler.length && p.bolgeler.length === p.urunler.length - 1) {
-      govde += '<polygon points="' + yol(g.k) + '" fill="' + renk(p.urunler[p.urunler.length - 1][0]) + '" fill-opacity=".62"' + dokun.replace('PARCA', p.urunler.length - 1) + '/>';
+      var son = p.urunler.length - 1;
+      govde += '<polygon points="' + yol(g.k) + '" fill="' + renk(p.urunler[son][0]) + '" fill-opacity=".6"' + veri + son + '"/>';
       p.bolgeler.forEach(function (b, i) {
         var bp = bolgePoligon(g.k, b); if (bp.length < 3) return;
-        govde += '<polygon clip-path="url(#k' + gi + ')" points="' + yol(bp) + '" fill="' + renk(p.urunler[i][0]) + '" fill-opacity=".78" stroke="#fff" stroke-width="1.5" vector-effect="non-scaling-stroke"' + dokun.replace('PARCA', i) + '/>';
-        etiket.push([merkez(bp), i]);
+        govde += '<polygon clip-path="url(#k' + gi + ')" points="' + yol(bp) + '" fill="' + renk(p.urunler[i][0]) + '" fill-opacity=".75" stroke="#fff" stroke-width="1.5"' + veri + i + '"/>';
+        et.push({ n: d(merkez(bp)), satir: [[kisa(p.urunler[i][0]), 0.85, 600]].concat(alt(i) ? [[alt(i), 0.75, 400]] : []), oncelik: g.alan * 0.3 });
       });
-      etiket.push([merkez(g.k), p.urunler.length - 1, true]);
+      et.push({ n: d(yaziNoktasi(g, G)), satir: [[p.ad, 1, 800], [kisa(p.urunler[son][0]), 0.92, 600]].concat(alt(son) ? [[alt(son), 0.8, 400]] : []), oncelik: g.alan });
     } else if (p.urunler.length > 1) {
       var cz = p.bolme.length === p.urunler.length - 1 ? p.bolme : otomatikCizgiler(g.k, p.urunler.map(function (u) { return u[1]; }));
       parcala(g.k, cz).forEach(function (pp, i) {
         if (pp.length < 3) return;
-        govde += '<polygon points="' + yol(pp) + '" fill="' + renk(p.urunler[i][0]) + '" fill-opacity=".62" stroke="#fff" stroke-width="1.2" vector-effect="non-scaling-stroke"' + dokun.replace('PARCA', i) + '/>';
-        etiket.push([merkez(pp), i, i === 0]);
+        govde += '<polygon points="' + yol(pp) + '" fill="' + renk(p.urunler[i][0]) + '" fill-opacity=".6" stroke="#fff" stroke-width="1.2"' + veri + i + '"/>';
+        var ic = yaziNoktasi({ k: pp, alan: alan(pp) }, []);
+        et.push({ n: d(ic), satir: (i === 0 ? [[p.ad, 1, 800]] : []).concat([[kisa(p.urunler[i][0]) + (p.baglar[i] ? ' → ' + p.baglar[i] : ''), 0.92, 600]]).concat(alt(i) ? [[alt(i), 0.8, 400]] : []), oncelik: g.alan * (i === 0 ? 1 : 0.5) });
       });
     } else {
       var r = p.urunler.length ? renk(p.urunler[0][0]) : (p.tip === 'bos' || p.tip === 'girilmedi' ? '#D6D6D6' : '#90A4AE');
-      govde += '<polygon points="' + yol(g.k) + '" fill="' + r + '" fill-opacity=".62"' + dokun.replace('PARCA', 'null') + '/>';
-      etiket.push([merkez(g.k), 0, true]);
+      govde += '<polygon points="' + yol(g.k) + '" fill="' + r + '" fill-opacity=".6"' + veri + 'null"/>';
+      var a0 = alt(0), da = dekar(p);
+      et.push({ n: d(yaziNoktasi(g, G)), satir: [[p.ad, 1, 800], [p.urunler.length ? kisa(p.urunler[0][0]) : (p.tip === 'girilmedi' ? 'Girilmedi' : (p.tip === 'bos' ? 'Boş alan' : '')), 0.92, 600]]
+        .concat(p.urunler.length && (da || p.cesitler[0]) ? [[[da ? sayi(da) + ' da' : '', p.cesitler[0] || ''].filter(Boolean).join(' · '), 0.8, 400]] : []), oncelik: g.alan });
     }
-    govde += '<polygon points="' + yol(g.k) + '" fill="none" stroke="#333" stroke-width="1" vector-effect="non-scaling-stroke" pointer-events="none"/>';
-    if (!S.yazi) return;
-    etiket.forEach(function (e) {
-      var m = n(e[0]).split(','), i = e[1], u = p.urunler[i], satir = [];
-      if (e[2]) satir.push(['<tspan font-weight="800">' + esc(p.ad) + '</tspan>']);
-      if (u) satir.push([esc(kisa(u[0])) + (u[1] > 0 ? ' ' + sayi(u[1]) + ' da' : '')]);
-      else if (e[2]) satir.push([p.tip === 'girilmedi' ? 'Girilmedi' : '']);
-      if (u && p.cesitler[i]) satir.push([esc(p.cesitler[i])]);
-      yazi += '<text x="' + m[0] + '" y="' + (m[1] - (satir.length - 1) * fs * 0.55) + '" font-size="' + fs + '" text-anchor="middle" pointer-events="none" ' +
-        'paint-order="stroke" stroke="#fff" stroke-width="3" stroke-linejoin="round">' +
-        satir.map(function (s, j) { return '<tspan x="' + m[0] + '" dy="' + (j ? fs * 1.1 : 0) + '">' + s[0] + '</tspan>'; }).join('') + '</text>';
-    });
+    var ck = parselCks(sz, c.ad, p.ad).length;
+    govde += '<polygon points="' + yol(g.k) + '" fill="none" stroke="' + (ck ? '#1d4ed8' : 'rgba(0,0,0,.55)') + '" stroke-width="' + (ck ? 3 : 1) + '" pointer-events="none"/>';
   });
-  return o + '</defs>' + govde + yazi + '</svg>';
+  gor.forEach(function (x) {
+    var r = GORSEL_RENK[x.g.tur] || '#EF6C00', cizgi = x.g.tur === 'hat' || x.g.tur === 'og' || x.g.tur === 'pivot';
+    if (cizgi && x.k.length > 1) govde += '<polyline points="' + yol(x.k) + '" fill="none" stroke="' + r + '" stroke-width="' + (x.g.tur === 'og' ? 2.2 : 1.4) + '" pointer-events="none"/>';
+    else { var m = d(x.k[0]); govde += x.g.tur === 'direk' ? '<rect x="' + (m[0] - 3) + '" y="' + (m[1] - 3) + '" width="6" height="6" fill="' + r + '" pointer-events="none"/>'
+      : '<circle cx="' + m[0] + '" cy="' + m[1] + '" r="3.5" fill="' + r + '" stroke="#fff" stroke-width="1" pointer-events="none"/>'; }
+  });
+  var sahne = document.getElementById('sahne');
+  sahne.innerHTML = o + '</defs>' + govde;
+  sahne.querySelectorAll('polygon,polyline,rect,circle').forEach(function (e) { e.setAttribute('vector-effect', 'non-scaling-stroke'); });
+  et.sort(function (a, b) { return b.oncelik - a.oncelik; });
+  var eskiT = H && H.c && H.c.ad === c.ad && H.W === W ? H.T : null;
+  H = { c: c, W: W, Hh: Hh, T: eskiT || { s: 1, x: 0, y: 0 }, et: et };
+  uygula();
+  if (!kap.dataset.kuruldu) { dokunmaKur(kap); kap.dataset.kuruldu = '1'; }
 }
-function yakinlas(f) {
-  var kap = document.getElementById('haritaKap'), cx = (kap.scrollLeft + kap.clientWidth / 2) / kap.scrollWidth, cy = (kap.scrollTop + kap.clientHeight / 2) / kap.scrollHeight;
-  S.olcek = Math.max(1, Math.min(8, S.olcek * f));
-  document.getElementById('harita').style.width = (100 * S.olcek) + '%';
-  kap.scrollLeft = cx * kap.scrollWidth - kap.clientWidth / 2; kap.scrollTop = cy * kap.scrollHeight - kap.clientHeight / 2;
+function uygula() {
+  var T = H.T; document.getElementById('sahne').setAttribute('transform', 'matrix(' + T.s + ',0,0,' + T.s + ',' + T.x + ',' + T.y + ')');
+  yazilar();
 }
+function yazilar() {
+  var el = document.getElementById('yazilar'); if (!S.yazi) { el.innerHTML = ''; return; }
+  var T = H.T, fs = H.W > 700 ? 13 : 11.5, dolu = [], o = '';
+  H.et.forEach(function (e) {
+    var x = e.n[0] * T.s + T.x, y = e.n[1] * T.s + T.y;
+    var sat = e.satir.filter(function (s) { return s[0]; }); if (!sat.length) return;
+    var gen = Math.max.apply(null, sat.map(function (s) { return s[0].length * fs * s[1] * 0.56; })) + 6;
+    var yuk = sat.reduce(function (a, s) { return a + fs * s[1] * 1.15; }, 0) + 2;
+    var r = [x - gen / 2, y - yuk / 2, x + gen / 2, y + yuk / 2];
+    if (r[2] < 0 || r[0] > H.W || r[3] < 0 || r[1] > H.Hh) return;
+    if (dolu.some(function (q) { return r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]; })) return;
+    dolu.push(r);
+    var yy = r[1] + 1;
+    o += '<rect x="' + r[0].toFixed(1) + '" y="' + r[1].toFixed(1) + '" width="' + gen.toFixed(1) + '" height="' + yuk.toFixed(1) + '" rx="4" fill="rgba(255,255,255,.82)"/>';
+    o += '<text text-anchor="middle">' + sat.map(function (s) {
+      var h = fs * s[1] * 1.15; yy += h;
+      return '<tspan x="' + x.toFixed(1) + '" y="' + (yy - h * 0.25).toFixed(1) + '" font-size="' + (fs * s[1]).toFixed(1) + '" font-weight="' + s[2] + '" fill="' + (s[2] >= 800 ? '#000' : s[2] >= 600 ? '#222' : '#555') + '">' + esc(s[0]) + '</tspan>';
+    }).join('') + '</text>';
+  });
+  el.innerHTML = o;
+}
+function sinirla() {
+  var T = H.T; T.s = Math.max(1, Math.min(12, T.s));
+  T.x = Math.min(0, Math.max(H.W - H.W * T.s, T.x)); T.y = Math.min(0, Math.max(H.Hh - H.Hh * T.s, T.y));
+}
+function yakinlasNokta(f, px, py) { var T = H.T, s2 = Math.max(1, Math.min(12, T.s * f)); f = s2 / T.s; T.x = px - (px - T.x) * f; T.y = py - (py - T.y) * f; T.s = s2; sinirla(); uygula(); }
+function sifirla() { H.T = { s: 1, x: 0, y: 0 }; uygula(); }
+function tamEkran() {
+  S.tam = !S.tam; document.body.style.overflow = S.tam ? 'hidden' : '';
+  document.getElementById('haritaKap').classList.toggle('tam', S.tam);
+  var c = H.c; H = null; haritaKur(c);
+}
+function dokunmaKur(kap) {
+  var p = {}, bas = null, iki = null, sonDokunus = 0;
+  function yerel(e) { var r = kap.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  kap.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('.araclar')) return;
+    kap.setPointerCapture(e.pointerId); p[e.pointerId] = yerel(e);
+    var l = Object.keys(p);
+    if (l.length === 1) bas = { n: p[e.pointerId], t: Date.now(), T: { s: H.T.s, x: H.T.x, y: H.T.y }, kaydi: false };
+    if (l.length === 2) { var a = p[l[0]], b = p[l[1]]; iki = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], T: { s: H.T.s, x: H.T.x, y: H.T.y } }; if (bas) bas.kaydi = true; }
+  });
+  kap.addEventListener('pointermove', function (e) {
+    if (!p[e.pointerId]) return; p[e.pointerId] = yerel(e);
+    var l = Object.keys(p);
+    if (l.length >= 2 && iki) {
+      var a = p[l[0]], b = p[l[1]], dd = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      var s2 = Math.max(1, Math.min(12, iki.T.s * dd / iki.d)), f = s2 / iki.T.s;
+      H.T = { s: s2, x: m[0] - (iki.m[0] - iki.T.x) * f, y: m[1] - (iki.m[1] - iki.T.y) * f }; sinirla(); uygula();
+    } else if (l.length === 1 && bas) {
+      var n = p[l[0]], dx = n[0] - bas.n[0], dy = n[1] - bas.n[1];
+      if (Math.hypot(dx, dy) > 6) bas.kaydi = true;
+      if (bas.kaydi) { H.T = { s: bas.T.s, x: bas.T.x + dx, y: bas.T.y + dy }; sinirla(); uygula(); }
+    }
+  });
+  function birak(e) {
+    if (!p[e.pointerId]) return;
+    var n = p[e.pointerId]; delete p[e.pointerId];
+    var l = Object.keys(p);
+    if (l.length === 1) { bas = { n: p[l[0]], t: Date.now(), T: { s: H.T.s, x: H.T.x, y: H.T.y }, kaydi: true }; iki = null; return; }
+    if (l.length === 0) {
+      if (bas && !bas.kaydi && Date.now() - bas.t < 600 && e.type === 'pointerup') {
+        var simdi = Date.now();
+        if (simdi - sonDokunus < 300) { sonDokunus = 0; clearTimeout(dokunmaKur.z); yakinlasNokta(2, n[0], n[1]); }
+        else {
+          sonDokunus = simdi; var cx = e.clientX, cy = e.clientY;
+          clearTimeout(dokunmaKur.z);
+          dokunmaKur.z = setTimeout(function () {
+            var hedef = document.elementsFromPoint(cx, cy).filter(function (x) { return x.dataset && x.dataset.i != null; })[0];
+            if (hedef) parselAc(+hedef.dataset.i, hedef.dataset.p === 'null' ? null : +hedef.dataset.p);
+          }, 280);
+        }
+      }
+      bas = null; iki = null;
+    }
+  }
+  kap.addEventListener('pointerup', birak); kap.addEventListener('pointercancel', birak);
+  kap.addEventListener('wheel', function (e) { e.preventDefault(); var n = yerel(e); yakinlasNokta(e.deltaY < 0 ? 1.2 : 1 / 1.2, n[0], n[1]); }, { passive: false });
+}
+window.addEventListener('resize', function () { if (H && H.c && document.getElementById('haritaKap')) { var c = H.c; H = null; haritaKur(c); } });
 function sezonSec(s) { S.sezon = s; ciz(); }
-function ciftlikSec(c) { S.ciftlik = c; S.olcek = 1; ciz(); }
+function ciftlikSec(c) { S.ciftlik = c; ciz(); }
 
 // ---------- parsel sayfası ----------
 var ACIK = null;
@@ -494,6 +766,7 @@ function yukle() {
   google.script.run.withSuccessHandler(function (r) {
     if (!r || !r.ok) { hata = (r && r.hata) || 'Veri alınamadı.'; if (r && r.kapali) hata = 'Bu paylaşım kapatıldı.'; return bitti(); }
     S.sezonParsel = r.sezonParsel || []; S.parselSinir = r.parselSinir || []; S.yetki = r.yetki; S.etiket = r.etiket; SINIR = r.sezonParselSiniri || 400;
+    S.ekim = r.ekim || []; S.ekimPlani = r.ekimPlani || []; S.cks = r.cks || [];
     document.getElementById('ust').textContent = r.etiket + ' · ' + (r.yetki === 'duzenle' ? 'düzenleme yetkisi' : 'yalnızca görüntüleme');
     bitti();
   }).withFailureHandler(function (e) { hata = 'Veri alınamadı: ' + e.message; bitti(); }).tarlaPanelVeri(ANAHTAR);
