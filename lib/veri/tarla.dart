@@ -164,6 +164,11 @@ String urunAnahtari(String u) {
   if (k.contains('arpa')) return 'Arpa';
   if (k.contains('yonca')) return 'Yonca';
   if (k.contains('patates')) return 'Patates';
+  if (k.contains('deneme')) return 'Deneme alanı';
+  if (k.contains('ıslah')) return 'Islah edilen alan';
+  if (k.contains('ağaç')) return 'Ağaçlık alan';
+  if (k.contains('boş alan') || k == 'boş') return 'Boş alan';
+  if (k.contains('nadas')) return 'Nadas';
   return u;
 }
 
@@ -520,8 +525,12 @@ Map<String, double> yilPlani(List<EkimPlanSatir> l, String yil, String ciftlik) 
 /// Haritadan seçilebilen ürünler.
 const secilebilirUrunler = [
   'Buğday', 'Arpa', 'Şeker pancarı', 'Silajlık mısır', 'Silajlık mısır (2. ürün)', 'Yonca', 'Patates',
-  'Tritikale', 'Fiğ', 'Nadas',
+  'Tritikale', 'Fiğ', 'Nadas', 'Deneme alanı', 'Islah edilen alan', 'Ağaçlık alan', 'Boş alan',
 ];
+
+/// Ekim dışı alan türleri: münavebe uyarısı verilmez.
+const ekimDisiAlanlar = {'Nadas', 'Deneme alanı', 'Islah edilen alan', 'Ağaçlık alan', 'Boş alan'};
+bool ekimDisi(String urun) => ekimDisiAlanlar.contains(urunAnahtari(urun));
 
 
 /// Tarla Haritası bölümleri: 2024-2025 (haritadan giriş), KMZ sezonu (2025-2026),

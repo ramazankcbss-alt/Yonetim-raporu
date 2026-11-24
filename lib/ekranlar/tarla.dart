@@ -285,6 +285,11 @@ const _renkler = {
   'Silajlık mısır (2. ürün)': Color(0xFF7CC47F),
   'Yonca': Color(0xFF1E7FA8),
   'Patates': Color(0xFFA0522D),
+  'Nadas': Color(0xFFB8A88A),
+  'Deneme alanı': Color(0xFF90A4AE),
+  'Islah edilen alan': Color(0xFF9CAF88),
+  'Ağaçlık alan': Color(0xFF2E5E3A),
+  'Boş alan': Color(0xFFD6D6D6),
 };
 /// Kullanıcının seçtiği ürün renkleri (cihazda saklanır).
 class UrunRenkleri extends ChangeNotifier {
@@ -414,7 +419,7 @@ class _HaritaState extends State<_Harita> {
     final urunler = [...excel.keys, ...cinsler.where((u) => !excel.containsKey(u)), ...plan.keys.where((u) => !excel.containsKey(u) && !cinsler.contains(u))];
     final toplam = excel.values.fold<double>(0, (a, b) => a + b);
     final girilmeyen = cizili.where((p) => p.girilmedi).length;
-    void dokun(TarlaParsel p) => _parselIslem(context, widget.s, c, p);
+    void dokun(TarlaParsel p, int? parca) => _parselIslem(context, widget.s, c, p, parca: parca);
     return ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
       SizedBox(
         height: 44,
@@ -459,7 +464,7 @@ class _HaritaState extends State<_Harita> {
                           maxOlcek: 10,
                           yazi: 13,
                           dekar: true,
-                          onDokun: (p) => _parselIslem(context, s2, c2, p),
+                          onDokun: (p, parca) => _parselIslem(context, s2, c2, p, parca: parca),
                           cizgiKaydet: (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
                           cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran)),
                     );
@@ -786,7 +791,8 @@ class _HaritaGorunum extends StatefulWidget {
 
   /// Etikette alan da yazılsın mı (yalnızca haritadan girilen yeni sezonda).
   final bool dekar;
-  final void Function(TarlaParsel)? onDokun;
+  /// Dokunulan parsel ve (bölünmüş parselde) parça sırası.
+  final void Function(TarlaParsel, int?)? onDokun;
 
   /// Bölünmüş parsellerde ayırma çizgisini doğrudan haritada çizip kaydetme.
   final Future<void> Function(TarlaParsel p, List<(double, double)> cizgiler)? cizgiKaydet;
@@ -950,11 +956,20 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
   }
 
   /// Dokunulan noktadaki en küçük parsel.
-  TarlaParsel? _bul(Offset n, Size size) {
+  (TarlaParsel, int?)? _bul(Offset n, Size size) {
     final d = _g.donusum(size);
     for (final x in _g.sirali.reversed) {
       final yol = Path()..addPolygon([for (final c in _g.poligon[x]!) d(c)], true);
-      if (yol.contains(n)) return x;
+      if (!yol.contains(n)) continue;
+      // Bölünmüş parselde dokunulan parça.
+      final parcalar = _g.parca[x];
+      if (parcalar != null) {
+        for (var i = 0; i < parcalar.length; i++) {
+          if (parcalar[i].length < 3) continue;
+          if ((Path()..addPolygon([for (final c in parcalar[i]) d(c)], true)).contains(n)) return (x, i);
+        }
+      }
+      return (x, null);
     }
     return null;
   }
@@ -1003,7 +1018,7 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                     ? null
                     : (e) {
                         final x = _bul(e.localPosition, k.biggest);
-                        if (x != null) widget.onDokun!(x);
+                        if (x != null) widget.onDokun!(x.$1, x.$2);
                       },
                 child: resim,
               );
@@ -1163,6 +1178,28 @@ class _YaziCizer extends CustomPainter {
     final dolu = <Rect>[];
     for (final x in g.sirali) {
       final n = MatrixUtils.transformPoint(m, d(g.yaziNoktasi[x]!));
+      final parcalar = g.parca[x];
+      if (parcalar != null && parcalar.length == x.urunler.length) {
+        // Bölünmüş parsel: ad kendi noktasında, her parçanın ürünü/dekarı kendi parçasının ortasında.
+        _etiket(canvas, size, dolu, n, [TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800))]);
+        for (var i = 0; i < parcalar.length; i++) {
+          final k = parcalar[i];
+          if (k.length < 3) continue;
+          final o = (k.map((e) => e.$1).reduce((a, b) => a + b) / k.length, k.map((e) => e.$2).reduce((a, b) => a + b) / k.length);
+          final alt = [
+            if (dekar && _dekarGoster(x, i) != null) '${sayi(_dekarGoster(x, i))} da',
+            if (x.cesit(i) != null) x.cesit(i)!,
+            if (x.bag(i) != null) '→ ${x.bag(i)}',
+          ].join(' · ');
+          _etiket(canvas, size, dolu, MatrixUtils.transformPoint(m, d(o)), [
+            TextSpan(
+                text: _kisaUrun(x.urunler[i].$1),
+                style: TextStyle(fontSize: yazi * 0.92, color: Colors.black87, fontWeight: FontWeight.w600)),
+            if (alt.isNotEmpty) TextSpan(text: '\n$alt', style: TextStyle(fontSize: yazi * 0.8, color: Colors.black54)),
+          ]);
+        }
+        continue;
+      }
       final tp = TextPainter(
         text: TextSpan(children: [
           TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
@@ -1195,6 +1232,18 @@ class _YaziCizer extends CustomPainter {
       canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), Paint()..color = Colors.white.withValues(alpha: 0.8));
       tp.paint(canvas, n - Offset(tp.width / 2, tp.height / 2));
     }
+  }
+
+  void _etiket(Canvas canvas, Size size, List<Rect> dolu, Offset n, List<TextSpan> metin) {
+    if (!(Offset.zero & size).contains(n)) return;
+    final tp = TextPainter(
+        text: TextSpan(children: metin), textAlign: TextAlign.center, textDirection: TextDirection.ltr)
+      ..layout(maxWidth: yazi * 11);
+    final r = Rect.fromCenter(center: n, width: tp.width + 8, height: tp.height + 4);
+    if (dolu.any((o) => o.overlaps(r))) return;
+    dolu.add(r);
+    canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), Paint()..color = Colors.white.withValues(alpha: 0.8));
+    tp.paint(canvas, n - Offset(tp.width / 2, tp.height / 2));
   }
 
   /// Haritada gösterilen dekar: girilen değer; yoksa parselin beyan/ölçülen alanı, o da yoksa çizimden
@@ -1977,12 +2026,23 @@ class _CksState extends State<_Cks> {
 
 /// Parsel için işlem penceresi. Girişler her zaman yeni sezona kaydedilir
 /// (2025-2026 haritasında dokunulursa 2026-2027'ye).
-Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p) async {
+Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, {int? parca}) async {
   if (p.tip == 'diger') {
     bildir(context, '${p.ad}: ekim alanı değil, ürün girilemez.');
     return;
   }
   final hedef = s.giris ? s.sezon : sonrakiSezon(s.sezon);
+  // Bölünmüş parselde parçaya dokunulduysa doğrudan o parçanın ürün/dekar/tohum girişi açılır.
+  if (parca != null && s.giris) {
+    final v0 = VeriDeposu.ben.veri;
+    final g0 = v0 == null ? null : parselGirisi(VeriDeposu.ben.sezonParselleri(v0), hedef, c.ad, p.ad);
+    final ic0 = g0 == null ? null : ParselIcerik.oku(g0.urun);
+    if (ic0 != null && ic0.bolunmus && parca < ic0.parcalar.length) {
+      final tumu = await _parcaDuzenle(context, hedef, c, p, ic0, parca);
+      if (!tumu || !context.mounted) return;
+    }
+  }
+  if (!context.mounted) return;
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -2002,7 +2062,8 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
         ];
         final once = s.giris ? oncekiUrunler(s, c.ad, p.ad) : [for (final u in p.urunler) urunAnahtari(u.$1)];
         final onceSezon = s.giris ? s.onceki?.sezon : s.sezon;
-        final ayni = ic != null && ic.parcalar.any((x) => once.contains(urunAnahtari(x.$1)) && !cokYillik(x.$1));
+        final ayni = ic != null &&
+            ic.parcalar.any((x) => once.contains(urunAnahtari(x.$1)) && !cokYillik(x.$1) && !ekimDisi(x.$1));
         final cokYil = ic == null
             ? const <String>[]
             : [
@@ -2069,6 +2130,24 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
                 icon: const Icon(Icons.straighten),
                 label: const Text('Dekar değiştir'),
               ),
+              if (ic != null && ic.bolunmus) ...[
+                const SizedBox(height: 8),
+                const Text('Parçalar (dokunarak ürün, dekar ve tohum girin):',
+                    style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+                for (final (i, x) in ic.parcalar.indexed)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(color: urunAdRengi(x.$1), borderRadius: BorderRadius.circular(4))),
+                    title: Text('${i + 1}. parça: ${x.$1}${x.$2 == null ? '' : ' · ${_da(x.$2)}'}'
+                        '${ic.cesit(i) == null ? '' : ' (${ic.cesit(i)})'}${ic.bag(i) == null ? '' : ' → ${ic.bag(i)}'}'),
+                    trailing: const Icon(Icons.edit_outlined, size: 20),
+                    onTap: () => _parcaDuzenle(context, hedef, c, p, ic, i, tumuDugmesi: false),
+                  ),
+              ],
               if (ic != null) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
@@ -2319,6 +2398,101 @@ class _ParcaBaglaGirState extends State<_ParcaBaglaGir> {
           FilledButton(onPressed: () => Navigator.pop(context, (_i, _hedef)), child: const Text('Kaydet')),
         ],
       );
+}
+
+/// Bölünmüş parselin tek parçasının ürün, dekar ve tohumunu düzenler.
+/// Dönüş: kullanıcı "Parselin tümü" dediyse true.
+Future<bool> _parcaDuzenle(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, ParselIcerik ic, int i,
+    {bool tumuDugmesi = true}) async {
+  final r = await showDialog<Object>(
+      context: context,
+      builder: (_) => _ParcaDuzenleGir(
+          baslik: '${p.ad} · ${i + 1}. parça',
+          urun: ic.parcalar[i].$1,
+          dekar: ic.parcalar[i].$2,
+          tohum: ic.cesit(i),
+          tumuDugmesi: tumuDugmesi));
+  if (r == 'tumu') return true;
+  if (r is! (String, double, String?) || !context.mounted) return false;
+  final (urun, dekar, tohum) = r;
+  final l = [for (final (j, x) in ic.parcalar.indexed) j == i ? (urun, dekar) : (x.$1, x.$2 ?? 0.0)];
+  final cesitler = [for (var j = 0; j < l.length; j++) j == i ? tohum : ic.cesit(j)];
+  final metin = ParselIcerik.bolunmusMetin(l, ic.cizgiler, ic.baglar, cesitler);
+  if (metin.length > 60) {
+    bildir(context, 'Kayıt çok uzun; tohum ya da ürün adını kısaltın.');
+    return false;
+  }
+  await _kaydet(context, sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
+  return false;
+}
+
+class _ParcaDuzenleGir extends StatefulWidget {
+  const _ParcaDuzenleGir({required this.baslik, required this.urun, this.dekar, this.tohum, this.tumuDugmesi = true});
+  final String baslik, urun;
+  final double? dekar;
+  final String? tohum;
+  final bool tumuDugmesi;
+  @override
+  State<_ParcaDuzenleGir> createState() => _ParcaDuzenleGirState();
+}
+
+class _ParcaDuzenleGirState extends State<_ParcaDuzenleGir> {
+  late String _urun = widget.urun;
+  late final _da = TextEditingController(
+      text: widget.dekar == null || widget.dekar == 0 ? '' : sayi(widget.dekar, ondalik: widget.dekar! % 1 == 0 ? 0 : 1));
+  late final _tohum = TextEditingController(text: widget.tohum ?? '');
+
+  @override
+  void dispose() {
+    _da.dispose();
+    _tohum.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final d = _dekarOku(_da.text);
+    final urunler = [...secilebilirUrunler, if (!secilebilirUrunler.contains(widget.urun)) widget.urun];
+    return AlertDialog(
+      title: Text(widget.baslik),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          DropdownButtonFormField<String>(
+            initialValue: _urun,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Ürün / alan türü'),
+            items: [for (final u in urunler) DropdownMenuItem(value: u, child: Text(u))],
+            onChanged: (x) => setState(() => _urun = x ?? _urun),
+          ),
+          TextField(
+            controller: _da,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Dekar'),
+            onChanged: (_) => setState(() {}),
+          ),
+          TextField(
+            controller: _tohum,
+            maxLength: 24,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Tohum / çeşit (isteğe bağlı)'),
+          ),
+        ]),
+      ),
+      actions: [
+        if (widget.tumuDugmesi)
+          TextButton(onPressed: () => Navigator.pop(context, 'tumu'), child: const Text('Parselin tümü')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+        FilledButton(
+            onPressed: d == null || d <= 0
+                ? null
+                : () {
+                    final t = _tohum.text.trim().replaceAll(RegExp(r'[#@>:+/;]'), '');
+                    Navigator.pop(context, (_urun, d, t.isEmpty ? null : t));
+                  },
+            child: const Text('Kaydet')),
+      ],
+    );
+  }
 }
 
 /// Ekilen tohum / çeşit adını girer (her parça için ayrı). Öneriler Tarımsal Faaliyet planındaki çeşitlerden.
@@ -2782,7 +2956,7 @@ class _GirisKarsilastirma extends StatelessWidget {
         () {
           // Üst üste ekilen ürünler; çok yıllık olanlar (yonca) uyarı değil, kaçıncı yılı yazılır.
           final ust = [for (final u in p.urunler) if (once.contains(urunAnahtari(u.$1))) urunAnahtari(u.$1)];
-          final hata = ust.where((u) => !cokYillik(u)).toList();
+          final hata = ust.where((u) => !cokYillik(u) && !ekimDisi(u)).toList();
           final yillar = [
             for (final u in {...ust.where(cokYillik)})
               () {
