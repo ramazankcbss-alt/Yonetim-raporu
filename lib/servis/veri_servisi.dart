@@ -183,7 +183,7 @@ class VeriDeposu extends ChangeNotifier {
     final u = Uri.parse(l);
     // Web paneli linki (panel=tarla) uygulamaya yapıştırılırsa veri adresi olarak kullanılır.
     final adres = u.replace(queryParameters: {
-      ...u.queryParameters..remove('panel'),
+      ...Map.of(u.queryParameters)..remove('panel'),
       'gun': '400',
     });
     final govde = sahteIstek != null
