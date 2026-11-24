@@ -204,6 +204,8 @@ class VeriDeposu extends ChangeNotifier {
       throw VeriHatasi('Bağlantıdan anlaşılmayan bir cevap geldi.');
     }
     if (j['ok'] != true) {
+      // Paylaşım kapatıldıysa önbellekteki harita verisi de silinir.
+      if (j['paylasimKapali'] == true) await _paylasimKapandi();
       throw VeriHatasi((j['hata'] ?? 'Veri alınamadı.').toString());
     }
     final v = RaporVerisi.json(j);
@@ -218,7 +220,33 @@ class VeriDeposu extends ChangeNotifier {
     _yerelParsel.removeWhere((e) => e.$1.isBefore(baslangic));
     _yerelSinir.removeWhere((e) => e.$1.isBefore(baslangic));
     final kanca = veriGeldi;
-    if (kanca != null) unawaited(kanca(v, ham));
+    if (kanca != null && v.paylasim == null) unawaited(kanca(v, ham));
+  }
+
+  /// Paylaşım linkiyle açılmış uygulamada mı (yalnızca Tarla Haritası).
+  Paylasim? get paylasim => veri?.paylasim;
+
+  /// Kayıtlı link bir paylaşım linki mi (paylaşım anahtarları "p" ile başlar; veri gelmeden de bilinir).
+  bool get paylasimLinki => paylasim != null || (link?.contains('anahtar=p') ?? false);
+
+  Future<void> _paylasimKapandi() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(_kOnbellek);
+    await p.remove(_kOnbellekZaman);
+    veri = null;
+    sonAlinma = null;
+    paylasimKapali = true;
+    notifyListeners();
+  }
+
+  /// Paylaşım sahibince kapatıldı (önbellek silindi).
+  bool paylasimKapali = false;
+
+  /// Tarla Haritası paylaşımı (yalnızca sahibin uygulamasından): ekle, yetki, kapat, aç, sil.
+  Future<String> paylasimYonet(String tur, {String id = '', String etiket = '', String yetki = 'gor'}) async {
+    final j = await _islem(tur, {'id': id, 'etiket': etiket, 'yetki': yetki});
+    await yenile();
+    return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
 
   /// Yeni veri alındığında çağrılır (uygulamada haftalık raporu Drive
@@ -317,6 +345,7 @@ class VeriDeposu extends ChangeNotifier {
       throw VeriHatasi('İşlem sırasında anlaşılmayan bir cevap geldi.');
     }
     if (j is! Map<String, dynamic> || j['ok'] != true) {
+      if (j is Map && j['paylasimKapali'] == true) await _paylasimKapandi();
       final h = j is Map ? j['hata'] : null;
       throw VeriHatasi((h ?? 'İşlem yapılamadı.').toString());
     }
@@ -330,7 +359,7 @@ class VeriDeposu extends ChangeNotifier {
   /// Uygulama açılışında: son eşitlemeden 3 saat geçtiyse kaynak tabloları
   /// (canlı hayvan, işletme raporları, tarım) arka planda rapora çeker.
   Future<void> otomatikEsitle() async {
-    if (link == null || esitleniyor || sahteGonder != null) return;
+    if (link == null || esitleniyor || sahteGonder != null || paylasim != null) return;
     final p = await SharedPreferences.getInstance();
     final son = p.getInt('son_otomatik_esitle');
     final simdi = DateTime.now().millisecondsSinceEpoch;

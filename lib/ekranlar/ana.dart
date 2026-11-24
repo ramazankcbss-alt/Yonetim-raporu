@@ -10,6 +10,7 @@ import 'bilesenler.dart';
 import 'gunluk.dart';
 import 'haftalik.dart';
 import 'kurulum.dart';
+import 'paylasim.dart';
 import 'rapor.dart';
 import 'tarim.dart';
 
@@ -23,7 +24,10 @@ class Kapi extends StatelessWidget {
       listenable: VeriDeposu.ben,
       builder: (context, _) => VeriDeposu.ben.link == null
           ? const KurulumEkrani(ilk: true)
-          : const AnaEkran(),
+          // Paylaşım linkiyle kurulduysa yalnızca Tarla Haritası açılır.
+          : VeriDeposu.ben.paylasimLinki
+              ? const PaylasimKabugu()
+              : const AnaEkran(),
     );
   }
 }

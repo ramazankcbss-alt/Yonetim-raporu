@@ -426,6 +426,33 @@ class SezonParsel {
   }
 }
 
+/// Paylaşım linkiyle açılmış uygulama: yalnızca Tarla Haritası ([yetki]: 'gor' ya da 'duzenle').
+class Paylasim {
+  const Paylasim({required this.kapsam, required this.yetki, this.etiket = ''});
+  final String kapsam, yetki, etiket;
+  bool get duzenler => yetki == 'duzenle';
+
+  static Paylasim? oku(Object? v) => v is Map
+      ? Paylasim(kapsam: '${v['kapsam'] ?? 'tarla'}', yetki: '${v['yetki'] ?? 'gor'}', etiket: '${v['etiket'] ?? ''}')
+      : null;
+}
+
+/// Uygulama sahibinin açtığı paylaşım (Tarla Haritası).
+class PaylasimKaydi {
+  const PaylasimKaydi(
+      {required this.id, required this.etiket, required this.yetki, required this.acik, this.olusturma = '',
+      this.degisiklik = '', this.link = ''});
+  final String id, etiket, yetki, olusturma, degisiklik, link;
+  final bool acik;
+  bool get duzenler => yetki == 'duzenle';
+
+  static PaylasimKaydi? oku(Object? v) => v is Map && v['id'] != null
+      ? PaylasimKaydi(
+          id: '${v['id']}', etiket: '${v['etiket'] ?? ''}', yetki: '${v['yetki'] ?? 'gor'}', acik: v['acik'] == true,
+          olusturma: '${v['olusturma'] ?? ''}', degisiklik: '${v['degisiklik'] ?? ''}', link: '${v['link'] ?? ''}')
+      : null;
+}
+
 /// Tarla Haritası'nda yeniden çizilen ya da yeni eklenen parsel sınırı (sezondan bağımsız).
 class ParselSinir {
   const ParselSinir({required this.ciftlik, required this.parsel, this.koord = const [], this.tarih = '', this.durum = ''});
@@ -1064,6 +1091,8 @@ class RaporVerisi {
     this.sezonParsel = const [],
     this.sezonParselSiniri = 60,
     this.parselSinir = const [],
+    this.paylasim,
+    this.paylasimlar = const [],
     this.besi = const [],
     this.isler = const [],
     this.akis = const [],
@@ -1112,6 +1141,12 @@ class RaporVerisi {
 
   /// Parsel_Sınırları: yeniden çizilen / yeni eklenen parsel sınırları.
   final List<ParselSinir> parselSinir;
+
+  /// Paylaşım linkiyle açıldıysa paylaşımın kapsamı ve yetkisi (sahibin uygulamasında null).
+  final Paylasim? paylasim;
+
+  /// Sahibin açtığı paylaşımlar.
+  final List<PaylasimKaydi> paylasimlar;
 
   /// Sunucunun Sezon_Parselleri "Ürün" alanında sakladığı en çok karakter (eski sürüm: 60).
   final int sezonParselSiniri;
@@ -1188,6 +1223,8 @@ class RaporVerisi {
       sezonParsel: oku('sezonParsel', SezonParsel.oku),
       sezonParselSiniri: sayiOku(j['sezonParselSiniri'])?.round() ?? 60,
       parselSinir: oku('parselSinir', ParselSinir.oku),
+      paylasim: Paylasim.oku(j['paylasim']),
+      paylasimlar: oku('paylasimlar', PaylasimKaydi.oku),
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
       akis: oku('isakisi', AkisKaydi.oku),

@@ -85,6 +85,12 @@ function doGet(e) {
     return json_({ ok: false, hata: 'Kurulum yapılmamış: Apps Script\'te "kurulum" fonksiyonunu çalıştırın.' });
   }
   if (p.anahtar !== anahtar) {
+    // Tarla Haritası paylaşımı: yalnızca harita verisi gider.
+    var pay = paylasimBul_(p.anahtar);
+    if (pay === 'kapali') return json_({ ok: false, paylasimKapali: true, hata: 'Bu paylaşım kapatıldı.' });
+    if (pay) {
+      try { return json_(tarlaVeri_(pay)); } catch (err) { return json_({ ok: false, hata: 'Veri okunamadı: ' + err }); }
+    }
     return json_({ ok: false, hata: 'Anahtar hatalı. Bağlantı linkini kurulum e-postasından yeniden kopyalayın.' });
   }
   try {
@@ -216,6 +222,7 @@ function veriTopla_(gun) {
     // Tarımsal Faaliyet › ÇİFTLİK BAZINDA: ekim alanı, verim, satış, maliyet, net kazanç
     tarimsalUretim: (function () { try { return tarimsalUretimOku_(); } catch (err) { return null; } })(),
     sezonParselSiniri: 400,
+    paylasimlar: paylasimListesi_(),
     parselSinir: basitOku_('Parsel_Sınırları', 5, tz),
     // Ürün teslimat ve satışları (günlük toplamlar): TarKop pancar, patates fire listesi,
     // Ürün_Teslimatları sayfasına uygulamadan girilen kayıtlar. Plaka/satıcı no yok.
@@ -345,10 +352,18 @@ function doPost(e) {
   var p = (e && e.parameter) || {};
   var anahtar = PropertiesService.getScriptProperties().getProperty('ANAHTAR');
   if (!anahtar || p.anahtar !== anahtar) {
-    return json_({ ok: false, hata: 'Anahtar hatalı.' });
+    var pay = anahtar ? paylasimBul_(p.anahtar) : null;
+    if (pay === 'kapali') return json_({ ok: false, paylasimKapali: true, hata: 'Bu paylaşım kapatıldı.' });
+    if (!pay) return json_({ ok: false, hata: 'Anahtar hatalı.' });
+    try {
+      return json_(paylasimIslem_(pay, JSON.parse((e && e.postData && e.postData.contents) || '{}')));
+    } catch (err) {
+      return json_({ ok: false, hata: 'İşlem yapılamadı: ' + err });
+    }
   }
   try {
     var govde = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (String(govde.tur).indexOf('paylasim') === 0) return json_(paylasimYonet_(govde));
     if (govde.tur === 'esitle') return json_(esitle_());
     // KVKK: kişi, olay, mesaj ve danışmanlık işlemleri kapatıldı.
     if (['mesaj', 'kisi', 'olay', 'danismanlik', 'danismanlikDuzenle', 'danismanlikSil']
@@ -1549,8 +1564,89 @@ function sezonParsel_(g) {
   var alan = sayi_(g.alan);
   if (alan !== '' && alan < 0) return { ok: false, hata: 'Alan okunamadı.' };
   var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
-  sh.appendRow([sezon, cf, parsel, urun, alan, Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
+  sh.appendRow([sezon, cf, parsel, urun, alan, Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif',
+    g.giren ? 'Paylaşım: ' + g.giren : '']);
   return { ok: true, mesaj: sezon + ' sezonuna kaydedildi: ' + parsel + ' · ' + urun + (alan === '' ? '' : ' ' + alan + ' da') };
+}
+
+// ---------------------------------------------------------------------------
+// Tarla Haritası paylaşımı. Her paylaşımın ayrı anahtarı vardır; ana anahtar paylaşılmaz.
+// Paylaşım linkiyle yalnızca Tarla Haritası verisi okunur (rapor, mali, hayvan, araç verisi gitmez);
+// "düzenle" yetkisinde yalnızca parsel ürünü/alanı ve parsel sınırı kaydedilebilir.
+// Etiket olarak kişi adı değil görev/birim yazılır (KVKK). Kapatılan paylaşımın linki hemen çalışmaz olur.
+// ---------------------------------------------------------------------------
+function paylasimlar_() {
+  try { return JSON.parse(PropertiesService.getScriptProperties().getProperty('PAYLASIMLAR') || '[]'); }
+  catch (e) { return []; }
+}
+
+function paylasimKaydet_(l) {
+  PropertiesService.getScriptProperties().setProperty('PAYLASIMLAR', JSON.stringify(l));
+}
+
+/** Anahtara ait paylaşım; kapatılmışsa 'kapali', yoksa null. */
+function paylasimBul_(anahtar) {
+  if (!anahtar) return null;
+  var x = paylasimlar_().filter(function (p) { return p.anahtar === anahtar; })[0];
+  if (!x) return null;
+  return x.acik ? x : 'kapali';
+}
+
+function paylasimLinki_(p) {
+  return ScriptApp.getService().getUrl() + '?anahtar=' + p.anahtar;
+}
+
+/** Uygulamanın sahibine giden liste (link dahil). */
+function paylasimListesi_() {
+  return paylasimlar_().map(function (p) {
+    return { id: p.id, etiket: p.etiket, yetki: p.yetki, acik: p.acik, olusturma: p.olusturma,
+      degisiklik: p.degisiklik || '', link: paylasimLinki_(p) };
+  });
+}
+
+function paylasimYonet_(g) {
+  var l = paylasimlar_();
+  var tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  var simdi = Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy HH:mm');
+  var yetki = g.yetki === 'duzenle' ? 'duzenle' : 'gor';
+  if (g.tur === 'paylasimEkle') {
+    var etiket = String(g.etiket || '').trim().slice(0, 40);
+    if (!etiket) return { ok: false, hata: 'Paylaşım adı (görev/birim) girin.' };
+    var p = { id: Utilities.getUuid().slice(0, 8), etiket: etiket, yetki: yetki, acik: true, olusturma: simdi,
+      anahtar: 'p' + Utilities.getUuid().replace(/-/g, '') };
+    l.push(p);
+    paylasimKaydet_(l);
+    return { ok: true, mesaj: etiket + ' için paylaşım açıldı.', paylasimlar: paylasimListesi_() };
+  }
+  var x = l.filter(function (p) { return p.id === g.id; })[0];
+  if (!x) return { ok: false, hata: 'Paylaşım bulunamadı.' };
+  if (g.tur === 'paylasimYetki') { x.yetki = yetki; }
+  else if (g.tur === 'paylasimKapat') { x.acik = false; }
+  else if (g.tur === 'paylasimAc') { x.acik = true; }
+  else if (g.tur === 'paylasimSil') { l = l.filter(function (p) { return p.id !== g.id; }); }
+  else return { ok: false, hata: 'Bilinmeyen işlem.' };
+  x.degisiklik = simdi;
+  paylasimKaydet_(l);
+  return { ok: true, mesaj: 'Paylaşım güncellendi.', paylasimlar: paylasimListesi_() };
+}
+
+/** Paylaşım linkine giden veri: yalnızca Tarla Haritası'nın kullandığı alanlar. */
+function tarlaVeri_(pay) {
+  var v = veriTopla_(400);
+  var o = { ok: true, surum: v.surum, olusturma: v.olusturma,
+    paylasim: { kapsam: 'tarla', yetki: pay.yetki, etiket: pay.etiket } };
+  ['ekim', 'hasat', 'cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel']
+    .forEach(function (k) { o[k] = v[k]; });
+  return o;
+}
+
+/** Paylaşım linkiyle gelen işlem: yalnızca düzenleme yetkisinde, yalnızca tarla kayıtları. */
+function paylasimIslem_(pay, g) {
+  var izinli = ['sezonParsel', 'sezonParselGeriAl', 'parselSinir', 'parselSinirGeriAl'];
+  if (izinli.indexOf(g.tur) < 0) return { ok: false, hata: 'Bu işlem paylaşımda yapılamaz.' };
+  if (pay.yetki !== 'duzenle') return { ok: false, hata: 'Bu paylaşımda yalnızca görüntüleme yetkisi var.' };
+  g.giren = pay.etiket;
+  return g.tur.indexOf('sezonParsel') === 0 ? sezonParsel_(g) : parselSinir_(g);
 }
 
 /** Tarla Haritası'nda KMZ'den gelen parsel sınırının yeniden çizilmesi ya da haritaya yeni parsel
@@ -1583,7 +1679,8 @@ function parselSinir_(g) {
     return { ok: false, hata: 'Sınır koordinatları okunamadı.' };
   }
   var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
-  sh.appendRow([cf, parsel, k, Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
+  sh.appendRow([cf, parsel, k, Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif',
+    g.giren ? 'Paylaşım: ' + g.giren : '']);
   return { ok: true, mesaj: parsel + ' sınırı kaydedildi.' };
 }
 

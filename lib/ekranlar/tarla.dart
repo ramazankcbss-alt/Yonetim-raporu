@@ -13,6 +13,7 @@ import '../veri/model.dart';
 import '../veri/tarla.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
+import 'paylasim.dart';
 
 /// Tarla Haritası: Google Earth (KMZ) ekiliş haritası; parseller,
 /// alanlar ve tarım icmaliyle (ekim alanları, hasat, günlük faaliyet)
@@ -67,6 +68,17 @@ class _TarlaEkranState extends State<TarlaEkran> {
                             'yapılan girişler KMZ bilgisinin önüne geçer; KMZ\'de farklı yazan parsellerde uyarı notu görünür.'),
                     const SizedBox(height: 8),
                     for (final x in hepsi) _sezonKarti(context, l, x, v),
+                    if (VeriDeposu.ben.paylasim case final p?)
+                      BilgiKutusu(
+                          yazi: 'Paylaşılan harita (${p.etiket}) · '
+                              '${p.duzenler ? 'düzenleme yetkisi' : 'yalnızca görüntüleme'}')
+                    else
+                      _MenuKarti(
+                        baslik: 'Paylaşım',
+                        alt: 'Tarla Haritası\'nı iş arkadaşınızla paylaşın: görüntüleme / düzenleme yetkisi, istediğiniz zaman kapatma',
+                        ikon: Icons.share_outlined,
+                        dokun: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PaylasimEkrani())),
+                      ),
                     _MenuKarti(
                       baslik: 'Yıllara göre ekim karşılaştırması',
                       alt: '${hepsi.map((x) => x.sezon).join(' · ')} — çiftlik ve ürün alanları, parsel geçmişi',
@@ -460,7 +472,7 @@ class _HaritaState extends State<_Harita> {
             aspectRatio: 0.82,
             child: _HaritaGorunum(
                 p: cizili, g: c.gorseller, cks: cksAdlari, maxOlcek: 6, dekar: true, onDokun: dokun,
-                cizgiKaydet: (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz),
+                cizgiKaydet: _yalnizGor ? null : (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz),
                 cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, widget.s, c, p, cz, oran),
                 bolgeEkle: (p, b, pay) => _bolgeEkle(context, widget.s, c, p, b, pay),
                 sinirKaydet: widget.s.tur == 'ayri' ? null : (p, k, da) => _sinirKaydet(context, c, p, k, da),
@@ -489,7 +501,7 @@ class _HaritaState extends State<_Harita> {
                           yazi: 13,
                           dekar: true,
                           onDokun: (p, parca) => _parselIslem(context, s2, c2, p, parca: parca),
-                          cizgiKaydet: (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
+                          cizgiKaydet: _yalnizGor ? null : (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
                           cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran),
                           bolgeEkle: (p, b, pay) => _bolgeEkle(context, s2, c2, p, b, pay),
                           sinirKaydet: s2.tur == 'ayri' ? null : (p, k, da) => _sinirKaydet(context, c2, p, k, da),
@@ -2567,7 +2579,27 @@ class _CksState extends State<_Cks> {
 
 /// Parsel için işlem penceresi. Girişler her zaman yeni sezona kaydedilir
 /// (2025-2026 haritasında dokunulursa 2026-2027'ye).
+/// Paylaşım linkiyle yalnızca görüntüleme yetkisi.
+bool get _yalnizGor => VeriDeposu.ben.paylasim != null && !VeriDeposu.ben.paylasim!.duzenler;
+
 Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, {int? parca}) async {
+  if (_yalnizGor) {
+    await showModalBottomSheet<void>(
+        context: context,
+        builder: (_) => Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text('${c.ad} · ${p.ad}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                Text('${s.sezon} sezonu', style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+                const SizedBox(height: 8),
+                Text(p.urunYazi, style: const TextStyle(fontSize: 15)),
+                if (p.not.isNotEmpty) Text(p.not, style: const TextStyle(fontSize: 12.5, color: Renk.amber)),
+                const SizedBox(height: 8),
+                const Text('Bu paylaşımda yalnızca görüntüleme yetkisi var.', style: TextStyle(fontSize: 12, color: Renk.soluk)),
+              ]),
+            ));
+    return;
+  }
   if (p.tip == 'diger') {
     bildir(context, '${p.ad}: ekim alanı değil, ürün girilemez.');
     return;
