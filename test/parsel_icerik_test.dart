@@ -59,10 +59,9 @@ void main() {
     final ic = ParselIcerik.oku(metin);
     expect(ic.parcalar, [('Deneme alanı', 5.0), ('Ağaçlık alan', 3.0), ('Buğday', 40.0)]);
     expect(ic.cizgiler, isEmpty);
-    expect(ic.bolgeler, [
-      ('D', [10.0, 10.0, 40.0, 30.0]),
-      ('C', [60.0, 50.0, 15.0, 20.0]),
-    ]);
+    expect([for (final b in ic.bolgeler) b.$1], ['D', 'C']);
+    expect(ic.bolgeler[0].$2, [10.0, 10.0, 40.0, 30.0]);
+    expect(ic.bolgeler[1].$2, [60.0, 50.0, 15.0, 20.0]);
     final p = ParselIcerik.oku('Boş alan:2+Arpa:20/BP10,10,30,10,20,40');
     expect(p.bolgeler.single.$1, 'P');
     expect(p.bolgeler.single.$2.length, 6);
