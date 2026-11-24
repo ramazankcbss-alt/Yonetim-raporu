@@ -1173,7 +1173,7 @@ class _YaziCizer extends CustomPainter {
               (
                 _kisaUrun(u.$1),
                 [
-                  if (dekar && _urunDekari(x, i) != null) '${sayi(_urunDekari(x, i))} da',
+                  if (dekar && _dekarGoster(x, i) != null) '${sayi(_dekarGoster(x, i))} da',
                   if (x.cesit(i) != null) x.cesit(i)!,
                 ].join(' · '),
               )
@@ -1195,6 +1195,21 @@ class _YaziCizer extends CustomPainter {
       canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(4)), Paint()..color = Colors.white.withValues(alpha: 0.8));
       tp.paint(canvas, n - Offset(tp.width / 2, tp.height / 2));
     }
+  }
+
+  /// Haritada gösterilen dekar: girilen değer; yoksa parselin beyan/ölçülen alanı, o da yoksa çizimden
+  /// hesaplanan alan. Çok ürünlü parselde parçaların çizimdeki alan payıyla bölüştürülür.
+  double? _dekarGoster(TarlaParsel x, int i) {
+    final d = x.urunler[i].$2;
+    if (d > 0) return d;
+    if (x.urunler.length == 1 && x.not.endsWith('ile birleştirildi')) return null;
+    final cizim = (g.alan[x] ?? 0).abs();
+    final toplam = x.beyan ?? x.olculen ?? (cizim > 0 ? cizim * 111320 * 111320 / 1000 : null);
+    if (toplam == null || toplam <= 0) return null;
+    if (x.urunler.length == 1) return toplam.roundToDouble();
+    final parcalar = g.parca[x];
+    if (parcalar == null || i >= parcalar.length || parcalar[i].length < 3 || cizim <= 0) return null;
+    return (toplam * _alan(parcalar[i]).abs() / cizim).roundToDouble();
   }
 
   /// Ürünün dekarı: girilen değer; tek ürünlü KMZ parselinde parselin beyan/ölçülen alanı.
