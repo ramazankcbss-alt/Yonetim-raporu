@@ -1035,6 +1035,7 @@ class RaporVerisi {
     this.ekimDuzeltme = const [],
     this.resmiParsel = const [],
     this.sezonParsel = const [],
+    this.sezonParselSiniri = 60,
     this.besi = const [],
     this.isler = const [],
     this.akis = const [],
@@ -1080,6 +1081,9 @@ class RaporVerisi {
   final List<EkimDuzeltme> ekimDuzeltme;
   final List<ResmiParsel> resmiParsel;
   final List<SezonParsel> sezonParsel;
+
+  /// Sunucunun Sezon_Parselleri "Ürün" alanında sakladığı en çok karakter (eski sürüm: 60).
+  final int sezonParselSiniri;
   final List<BesiSatir> besi;
   final List<Is> isler;
   final List<AkisKaydi> akis;
@@ -1151,6 +1155,7 @@ class RaporVerisi {
       ekimDuzeltme: oku('ekimDuzeltme', EkimDuzeltme.oku),
       resmiParsel: oku('resmiParsel', ResmiParsel.oku),
       sezonParsel: oku('sezonParsel', SezonParsel.oku),
+      sezonParselSiniri: sayiOku(j['sezonParselSiniri'])?.round() ?? 60,
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
       akis: oku('isakisi', AkisKaydi.oku),

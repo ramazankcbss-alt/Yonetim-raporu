@@ -215,6 +215,7 @@ function veriTopla_(gun) {
     ekimPlani: (function () { try { return ekimPlaniOku_(); } catch (err) { return []; } })(),
     // Tarımsal Faaliyet › ÇİFTLİK BAZINDA: ekim alanı, verim, satış, maliyet, net kazanç
     tarimsalUretim: (function () { try { return tarimsalUretimOku_(); } catch (err) { return null; } })(),
+    sezonParselSiniri: 400,
     // Ürün teslimat ve satışları (günlük toplamlar): TarKop pancar, patates fire listesi,
     // Ürün_Teslimatları sayfasına uygulamadan girilen kayıtlar. Plaka/satıcı no yok.
     urunTeslimat: (function () { try { return urunTeslimatlari_(); } catch (err) { return { hata: String(err) }; } })(),
@@ -1540,7 +1541,8 @@ function sezonParsel_(g) {
     if (deg) rg.setValues(v);
   }
   if (g.tur === 'sezonParselGeriAl') return { ok: true, mesaj: 'Parsel girişi geri alındı.' };
-  var urun = String(g.urun || '').slice(0, 60);
+  // Bölünmüş parsel, tohum adı ve çizilen bölgeler için 400 karakter (uygulama sezonParselSiniri ile bilir).
+  var urun = String(g.urun || '').slice(0, 400);
   if (!urun) return { ok: false, hata: 'Ürün eksik.' };
   var alan = sayi_(g.alan);
   if (alan !== '' && alan < 0) return { ok: false, hata: 'Alan okunamadı.' };

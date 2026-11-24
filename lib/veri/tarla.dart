@@ -13,7 +13,7 @@ import 'model.dart';
 class TarlaParsel {
   const TarlaParsel({required this.ad, required this.tip, required this.urunler, this.beyan, this.olculen,
       this.etiket = '', this.not = '', this.koord = const [], this.bolme = const [], this.baglar = const [],
-      this.cesitler = const []});
+      this.cesitler = const [], this.bolgeler = const []});
   final String ad, tip, etiket, not;
   final List<(String, double)> urunler;
 
@@ -28,6 +28,9 @@ class TarlaParsel {
   /// Ekilen tohum / çeşit adı (ürün sırasıyla; null: girilmemiş).
   final List<String?> cesitler;
   String? cesit(int i) => i < cesitler.length && (cesitler[i] ?? '').isNotEmpty ? cesitler[i] : null;
+
+  /// Parsel içinde çizilen bölgeler; ürünler: önce her bölge, sonda parselin kalanı.
+  final List<ParselBolge> bolgeler;
   final double? beyan, olculen;
   final List<(double, double)> koord;
 
@@ -335,13 +338,20 @@ SezonParsel? parselGirisi(List<SezonParsel> l, String sezon, String ciftlik, Str
   return d;
 }
 
+/// Parsel içinde çizilen bölge (yüzdeler parselin çevreleyen kutusuna göre, 0–100):
+/// ('D', [x1, y1, x2, y2]) dikdörtgen, ('C', [mx, my, rx, ry]) daire/elips, ('P', [x, y, x, y, …]) çokgen.
+typedef ParselBolge = (String, List<double>);
+
 /// Sezon_Parselleri "Ürün" sütununun içeriği.
 /// - "Arpa" → tek ürün (alan "Alan (da)" sütununda)
 /// - "Arpa:120+Buğday:120" → parsel parçalara bölünmüş
 /// - "Arpa@7. pivot" → bu parsel "7. pivot" ile birleştirilmiş (alan ana parselde)
 class ParselIcerik {
   const ParselIcerik(this.parcalar,
-      {this.birlesik, this.cizgiler = const [], this.baglar = const [], this.cesitler = const []});
+      {this.birlesik, this.cizgiler = const [], this.baglar = const [], this.cesitler = const [], this.bolgeler = const []});
+
+  /// Parsel içinde çizilen bölgeler ("…/BD10,10,40,40;C60,50,15,20"); parçalar: bölgeler, sonra kalan.
+  final List<ParselBolge> bolgeler;
 
   /// Tohum / çeşit adı ("Buğday#Altındane"); parça sırasıyla, null: girilmemiş.
   final List<String?> cesitler;
@@ -383,9 +393,16 @@ class ParselIcerik {
     }
     final bolu = t.indexOf('/');
     final govde = bolu < 0 ? t : t.substring(0, bolu);
+    final ek = bolu < 0 ? '' : t.substring(bolu + 1);
+    final bolgeler = <ParselBolge>[
+      if (ek.startsWith('B'))
+        for (final b in ek.substring(1).split(';'))
+          if (b.length > 1 && 'DCP'.contains(b[0]))
+            (b[0], [for (final x in b.substring(1).split(',')) if (double.tryParse(x) case final d?) d]),
+    ];
     final cizgiler = <(double, double)>[
-      if (bolu >= 0)
-        for (final c in t.substring(bolu + 1).split(';'))
+      if (bolu >= 0 && !ek.startsWith('B'))
+        for (final c in ek.split(';'))
           if (c.split(',') case [final a, final k])
             if (double.tryParse(a) case final aa?)
               if (double.tryParse(k) case final kk?) (aa, kk),
@@ -404,19 +421,27 @@ class ParselIcerik {
     }
     return ParselIcerik(parcalar,
         cizgiler: cizgiler,
+        bolgeler: bolgeler,
         baglar: baglar.any((b) => b != null) ? baglar : const [],
         cesitler: cesitler.any((c) => c != null) ? cesitler : const []);
   }
 
   /// Bölünmüş parsel için kayıt metni ("Arpa:120+Buğday:120").
   static String bolunmusMetin(List<(String, double)> l,
-          [List<(double, double)> cizgiler = const [], List<String?> baglar = const [], List<String?> cesitler = const []]) =>
+          [List<(double, double)> cizgiler = const [],
+          List<String?> baglar = const [],
+          List<String?> cesitler = const [],
+          List<ParselBolge> bolgeler = const []]) =>
       [
         for (final (i, x) in l.indexed)
           '${urunMetni(x.$1, i < cesitler.length ? cesitler[i] : null)}'
               '${i < baglar.length && baglar[i] != null ? '>${baglar[i]}' : ''}:${x.$2 % 1 == 0 ? x.$2.toInt() : x.$2}'
       ].join('+') +
-      (cizgiler.isEmpty ? '' : '/${cizgiler.map((c) => '${c.$1.round()},${c.$2.round()}').join(';')}');
+      (bolgeler.isNotEmpty
+          ? '/B${bolgeler.map((b) => '${b.$1}${b.$2.map((x) => x.round()).join(',')}').join(';')}'
+          : cizgiler.isEmpty
+              ? ''
+              : '/${cizgiler.map((c) => '${c.$1.round()},${c.$2.round()}').join(';')}');
 }
 
 /// "2025-2026" → "2024-2025".
@@ -471,7 +496,7 @@ TarlaParsel _girisParseli(TarlaParsel p, SezonParsel g, List<String> bagli, {Lis
   final ek = gelen.fold<double>(0, (a, x) => a + x.$3);
   return TarlaParsel(
       ad: y.ad, tip: y.tip, urunler: y.urunler, beyan: (y.beyan ?? 0) + ek, koord: y.koord, bolme: y.bolme, baglar: y.baglar,
-      cesitler: y.cesitler,
+      cesitler: y.cesitler, bolgeler: y.bolgeler,
       not: [
         if (y.not.isNotEmpty) y.not,
         for (final x in gelen) '${x.$1} parselinden bağlı parça: ${x.$2} ${x.$3 % 1 == 0 ? x.$3.toInt() : x.$3} da',
@@ -495,7 +520,8 @@ TarlaParsel _girisParseliTemel(TarlaParsel p, SezonParsel g, List<String> bagli)
     final kendi = l.fold<double>(0, (a, x) => a + x.$2) - giden;
     return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: l, beyan: giden > 0 ? kendi : (g.alan ?? kendi),
         koord: p.koord, not: 'Parçalara bölündü', bolme: ic.cizgiler.length == l.length - 1 ? ic.cizgiler : const [],
-        baglar: ic.baglar, cesitler: ic.cesitler);
+        baglar: ic.baglar, cesitler: ic.cesitler,
+        bolgeler: ic.bolgeler.length == l.length - 1 ? ic.bolgeler : const []);
   }
   return TarlaParsel(ad: p.ad, tip: 'ekili', urunler: [(ic.urun, g.alan ?? 0)], beyan: g.alan, koord: p.koord,
       cesitler: ic.cesitler,
@@ -592,7 +618,8 @@ TarlaSezonu kmzUzerine(TarlaSezonu kmz, List<SezonParsel> l, {TarlaSezonu? oncek
               () {
                 final y = _girisParseli(p, g, const []);
                 return TarlaParsel(ad: p.ad, tip: p.tip, urunler: y.urunler, beyan: p.beyan ?? y.beyan, olculen: p.olculen,
-                    etiket: p.etiket, not: p.not, koord: p.koord, bolme: y.bolme, baglar: y.baglar, cesitler: y.cesitler);
+                    etiket: p.etiket, not: p.not, koord: p.koord, bolme: y.bolme, baglar: y.baglar, cesitler: y.cesitler,
+                    bolgeler: y.bolgeler);
               }()
             else
               p,

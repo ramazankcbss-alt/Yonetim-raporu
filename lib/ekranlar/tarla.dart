@@ -459,7 +459,8 @@ class _HaritaState extends State<_Harita> {
             child: _HaritaGorunum(
                 p: cizili, g: c.gorseller, cks: cksAdlari, maxOlcek: 6, dekar: true, onDokun: dokun,
                 cizgiKaydet: (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz),
-                cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, widget.s, c, p, cz, oran)),
+                cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, widget.s, c, p, cz, oran),
+                bolgeEkle: (p, b, pay) => _bolgeEkle(context, widget.s, c, p, b, pay)),
           ),
           Positioned(
             right: 6,
@@ -484,7 +485,8 @@ class _HaritaState extends State<_Harita> {
                           dekar: true,
                           onDokun: (p, parca) => _parselIslem(context, s2, c2, p, parca: parca),
                           cizgiKaydet: (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
-                          cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran)),
+                          cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran),
+                          bolgeEkle: (p, b, pay) => _bolgeEkle(context, s2, c2, p, b, pay)),
                     );
                   },
                 ),
@@ -635,6 +637,74 @@ double _kenarUzakligi(_N n, List<_N> k) {
   return (nx, ny, mn + (mx - mn) * cz.$2.clamp(0, 100) / 100);
 }
 
+/// Çokgenin çevreleyen kutusu (x0, y0, x1, y1).
+(double, double, double, double) _kutu(List<_N> k) {
+  final xs = k.map((e) => e.$1), ys = k.map((e) => e.$2);
+  return (xs.reduce(math.min), ys.reduce(math.min), xs.reduce(math.max), ys.reduce(math.max));
+}
+
+/// Kayıtlı bölge (parsel kutusuna göre yüzde) → düzlem çokgeni.
+List<_N> _bolgePoligon(List<_N> k, ParselBolge b) {
+  final (x0, y0, x1, y1) = _kutu(k);
+  final w = x1 - x0, h = y1 - y0, v = b.$2;
+  _N n(double px, double py) => (x0 + px / 100 * w, y0 + py / 100 * h);
+  switch (b.$1) {
+    case 'D' when v.length >= 4:
+      return [n(v[0], v[1]), n(v[2], v[1]), n(v[2], v[3]), n(v[0], v[3])];
+    case 'C' when v.length >= 4:
+      return [
+        for (var i = 0; i < 48; i++)
+          n(v[0] + v[2] * math.cos(i * math.pi / 24), v[1] + v[3] * math.sin(i * math.pi / 24))
+      ];
+    case 'P' when v.length >= 6:
+      return [for (var i = 0; i + 1 < v.length; i += 2) n(v[i], v[i + 1])];
+  }
+  return const [];
+}
+
+/// Düzlem çokgeni → parsel kutusuna göre yüzde (tek tip: 'D', 'C' ya da 'P').
+ParselBolge _bolgeKodla(List<_N> k, String tip, List<_N> noktalar) {
+  final (x0, y0, x1, y1) = _kutu(k);
+  final w = x1 - x0, h = y1 - y0;
+  double px(double x) => (x - x0) / w * 100, py(double y) => (y - y0) / h * 100;
+  if (tip == 'C') {
+    // noktalar: [merkez, çevredeki nokta]
+    final r = math.sqrt(math.pow(noktalar[1].$1 - noktalar[0].$1, 2) + math.pow(noktalar[1].$2 - noktalar[0].$2, 2));
+    return ('C', [px(noktalar[0].$1), py(noktalar[0].$2), r / w * 100, r / h * 100]);
+  }
+  if (tip == 'D') {
+    return ('D', [
+      px(math.min(noktalar[0].$1, noktalar[1].$1)), py(math.min(noktalar[0].$2, noktalar[1].$2)),
+      px(math.max(noktalar[0].$1, noktalar[1].$1)), py(math.max(noktalar[0].$2, noktalar[1].$2)),
+    ]);
+  }
+  return ('P', [for (final n in noktalar) ...[px(n.$1), py(n.$2)]]);
+}
+
+/// Parselin bölgelere ve kalana düşen alan payları (ızgara örneklemesiyle; bölgeler, sonda kalan).
+List<double> _bolgePaylari(List<_N> k, List<List<_N>> bolgeler) {
+  final (x0, y0, x1, y1) = _kutu(k);
+  final say = List<int>.filled(bolgeler.length + 1, 0);
+  var toplam = 0;
+  const n = 70;
+  for (var i = 0; i < n; i++) {
+    for (var j = 0; j < n; j++) {
+      final p = (x0 + (i + 0.5) / n * (x1 - x0), y0 + (j + 0.5) / n * (y1 - y0));
+      if (!_icinde(p, k)) continue;
+      toplam++;
+      var hangi = bolgeler.length;
+      for (var b = 0; b < bolgeler.length; b++) {
+        if (bolgeler[b].length > 2 && _icinde(p, bolgeler[b])) {
+          hangi = b;
+          break;
+        }
+      }
+      say[hangi]++;
+    }
+  }
+  return [for (final x in say) toplam == 0 ? 0.0 : x / toplam];
+}
+
 /// İki noktadan geçen çizgi → (açı°, konum %) bu çokgene göre.
 (double, double) _cizgiAl(List<_N> k, _N p, _N q) {
   final aci = math.atan2(q.$2 - p.$2, q.$1 - p.$1) * 180 / math.pi;
@@ -719,7 +789,10 @@ class _Geometri {
     for (final x in p) {
       poligon[x] = [for (final c in x.koord) (c.$1 * kx, c.$2)];
       alan[x] = _alan(poligon[x]!);
-      if (x.urunler.length > 1 && poligon[x]!.length > 2) {
+      if (x.bolgeler.isNotEmpty && x.urunler.length == x.bolgeler.length + 1 && poligon[x]!.length > 2) {
+        bolge[x] = [for (final b in x.bolgeler) _bolgePoligon(poligon[x]!, b)];
+        bolgePay[x] = _bolgePaylari(poligon[x]!, bolge[x]!);
+      } else if (x.urunler.length > 1 && poligon[x]!.length > 2) {
         final cz = x.bolme.length == x.urunler.length - 1
             ? x.bolme
             : _otomatikCizgiler(poligon[x]!, [for (final u in x.urunler) u.$2]);
@@ -747,6 +820,10 @@ class _Geometri {
 
   /// Parçalara bölünmüş parsellerin parçaları (ürün sırasıyla).
   final parca = <TarlaParsel, List<List<_N>>>{};
+
+  /// Parsel içinde çizilen bölgeler (düzlem çokgenleri) ve bölge/kalan alan payları.
+  final bolge = <TarlaParsel, List<List<_N>>>{};
+  final bolgePay = <TarlaParsel, List<double>>{};
   final yaziNoktasi = <TarlaParsel, _N>{};
 
   /// KMZ görselleri (kuyu, direk, hatlar) düzlem koordinatında.
@@ -801,7 +878,7 @@ class _Geometri {
 /// Yakınlaştırılabilir harita: parseller yakınlaşır, yazılar sabit boyutta
 /// kalır; üst üste gelen yazılar gizlenir, yakınlaştırınca görünür.
 class _HaritaGorunum extends StatefulWidget {
-  const _HaritaGorunum({required this.p, this.g = const [], required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun, this.cizgiKaydet, this.cizgiIleBol});
+  const _HaritaGorunum({required this.p, this.g = const [], required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun, this.cizgiKaydet, this.cizgiIleBol, this.bolgeEkle});
   final List<TarlaParsel> p;
   final List<TarlaGorsel> g;
   final Set<String> cks;
@@ -818,6 +895,9 @@ class _HaritaGorunum extends StatefulWidget {
   /// Bölünmemiş parselin üzerinden çizgi çekilince: parseli bu çizgiyle iki parçaya böler.
   /// [oran]: çizginin 1. yanındaki alanın parsele oranı.
   final Future<void> Function(TarlaParsel p, (double, double) cizgi, double oran)? cizgiIleBol;
+
+  /// Parsel içine dikdörtgen, daire ya da noktalarla çizilen bölge: [pay] bölgenin parsele oranı.
+  final Future<void> Function(TarlaParsel p, ParselBolge bolge, double pay)? bolgeEkle;
   @override
   State<_HaritaGorunum> createState() => _HaritaGorunumState();
 }
@@ -835,6 +915,52 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
       _g = _Geometri(widget.p, widget.g);
       if (!ayniCizim) _ctl.value = Matrix4.identity();
     }
+  }
+
+  // Çizim kipi: 'cizgi' (ayırma çizgisi), 'kare', 'daire', 'nokta' (dokunarak köşe).
+  String _sekil = 'cizgi';
+  final List<Offset> _noktalar = [];
+  Size _sonBoyut = Size.zero;
+
+  Future<void> _sekilBitir(Size size, {List<Offset>? noktalar}) async {
+    final a = _bas, b = _son;
+    setState(() => _bas = _son = null);
+    final t = _g.tersDonusum(size);
+    List<_N> duz;
+    List<_N> kod;
+    if (_sekil == 'nokta') {
+      if (noktalar == null || noktalar.length < 3) return;
+      kod = duz = [for (final x in noktalar) t(x)];
+    } else {
+      if (a == null || b == null || (a - b).distance < 12) return;
+      final p = t(a), q = t(b);
+      kod = [p, q];
+      if (_sekil == 'kare') {
+        duz = [(p.$1, p.$2), (q.$1, p.$2), (q.$1, q.$2), (p.$1, q.$2)];
+      } else {
+        final r = math.sqrt(math.pow(q.$1 - p.$1, 2) + math.pow(q.$2 - p.$2, 2));
+        duz = [for (var i = 0; i < 48; i++) (p.$1 + r * math.cos(i * math.pi / 24), p.$2 + r * math.sin(i * math.pi / 24))];
+      }
+    }
+    final o = (duz.map((e) => e.$1).reduce((x, y) => x + y) / duz.length, duz.map((e) => e.$2).reduce((x, y) => x + y) / duz.length);
+    TarlaParsel? hedef;
+    for (final x in _g.sirali.reversed) {
+      if (x.tip == 'diger') continue;
+      if (_icinde(_sekil == 'daire' ? kod.first : o, _g.poligon[x]!)) {
+        hedef = x;
+        break;
+      }
+    }
+    if (hedef == null || widget.bolgeEkle == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Şekli bir parselin içine çizin (ortası parselin içinde kalmalı).')));
+      return;
+    }
+    final k = _g.poligon[hedef]!;
+    final b0 = _bolgeKodla(k, _sekil == 'kare' ? 'D' : (_sekil == 'daire' ? 'C' : 'P'), kod);
+    final pay = _bolgePaylari(k, [_bolgePoligon(k, b0)]).first;
+    setState(_noktalar.clear);
+    await widget.bolgeEkle!(hedef, b0, pay);
   }
 
   // Çizim kipi: bölünmüş parselin üzerinden çekilen çizgi.
@@ -979,6 +1105,16 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
     for (final x in _g.sirali.reversed) {
       final yol = Path()..addPolygon([for (final c in _g.poligon[x]!) d(c)], true);
       if (!yol.contains(n)) continue;
+      // Bölge çizilmiş parselde dokunulan bölge; değilse kalan (son parça).
+      final bolgeler = _g.bolge[x];
+      if (bolgeler != null) {
+        for (var i = 0; i < bolgeler.length; i++) {
+          if (bolgeler[i].length > 2 && (Path()..addPolygon([for (final c in bolgeler[i]) d(c)], true)).contains(n)) {
+            return (x, i);
+          }
+        }
+        return (x, bolgeler.length);
+      }
       // Bölünmüş parselde dokunulan parça.
       final parcalar = _g.parca[x];
       if (parcalar != null) {
@@ -1013,7 +1149,16 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
             child: LayoutBuilder(builder: (context, k) {
               final resim = CustomPaint(
                   size: Size.infinite,
-                  painter: _PoligonCizer(_g, widget.cks, cizim: _bas == null || _son == null ? null : (_bas!, _son!)));
+                  painter: _PoligonCizer(_g, widget.cks,
+                      cizim: _bas == null || _son == null ? null : (_bas!, _son!), sekil: _sekil, noktalar: [..._noktalar]));
+              _sonBoyut = k.biggest;
+              if (_cizim && _sekil == 'nokta') {
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: (e) => setState(() => _noktalar.add(e.localPosition)),
+                  child: resim,
+                );
+              }
               if (_cizim) {
                 // Çizim kipinde parmak hareketi hemen çizgiye ayrılır (sayfa kaymaz, harita kaymaz).
                 return RawGestureDetector(
@@ -1024,7 +1169,7 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                       (r) => r
                         ..onStart = ((e) => setState(() => _bas = _son = e.localPosition))
                         ..onUpdate = ((e) => setState(() => _son = e.localPosition))
-                        ..onEnd = ((_) => _cizgiBitir(k.biggest)),
+                        ..onEnd = ((_) => _sekil == 'cizgi' ? _cizgiBitir(k.biggest) : _sekilBitir(k.biggest)),
                     ),
                   },
                   child: resim,
@@ -1078,11 +1223,45 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                 child: Padding(
                   padding: const EdgeInsets.all(10),
                   child: _bekleyen == null
-                      ? const Text(
-                          'Ayırmak istediğiniz parselin üzerinden parmağınızla bir çizgi çekin. İki renkli parselde çizgi yer '
-                          'değiştirir; tek ürünlü parselde parsel iki parçaya bölünür. '
-                          'Yakınlaştırma gerekiyorsa önce "Çizimi bitir" deyip yakınlaştırın, sonra kalemle tekrar başlayın.',
-                          style: TextStyle(fontSize: 12.5))
+                      ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                          SegmentedButton<String>(
+                            showSelectedIcon: false,
+                            segments: const [
+                              ButtonSegment(value: 'cizgi', label: Text('Çizgi'), icon: Icon(Icons.horizontal_rule)),
+                              ButtonSegment(value: 'kare', label: Text('Kare'), icon: Icon(Icons.crop_square)),
+                              ButtonSegment(value: 'daire', label: Text('Daire'), icon: Icon(Icons.circle_outlined)),
+                              ButtonSegment(value: 'nokta', label: Text('Nokta'), icon: Icon(Icons.polyline_outlined)),
+                            ],
+                            selected: {_sekil},
+                            onSelectionChanged: (x) => setState(() {
+                              _sekil = x.first;
+                              _noktalar.clear();
+                            }),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                              switch (_sekil) {
+                                'kare' => 'Parselin içinde bir köşeden karşı köşeye parmağınızı sürükleyin; dikdörtgen bölge olur.',
+                                'daire' => 'Bölgenin ortasına basıp dışa doğru sürükleyin; daire bölge olur.',
+                                'nokta' => 'Bölgenin köşelerine sırayla dokunun (en az 3 nokta), sonra "Bölgeyi kapat".',
+                                _ => 'Ayırmak istediğiniz parselin üzerinden bir çizgi çekin. İki renkli parselde çizgi yer '
+                                    'değiştirir; tek ürünlü parselde parsel iki parçaya bölünür.',
+                              },
+                              style: const TextStyle(fontSize: 12.5)),
+                          if (_sekil == 'nokta')
+                            Wrap(spacing: 8, children: [
+                              TextButton.icon(
+                                  onPressed: _noktalar.isEmpty ? null : () => setState(_noktalar.removeLast),
+                                  icon: const Icon(Icons.undo),
+                                  label: const Text('Son noktayı sil')),
+                              FilledButton.icon(
+                                  onPressed: _noktalar.length < 3
+                                      ? null
+                                      : () => _sekilBitir(_sonBoyut, noktalar: [..._noktalar]),
+                                  icon: const Icon(Icons.check),
+                                  label: Text('Bölgeyi kapat (${_noktalar.length})')),
+                            ]),
+                        ])
                       : Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                           Text('${_bekleyen!.$1.ad}: ${_bekleyen!.$1.urunler.map((u) => u.$1).join(' / ')}',
                               style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -1119,17 +1298,39 @@ class _HemenPan extends PanGestureRecognizer {
 }
 
 class _PoligonCizer extends CustomPainter {
-  _PoligonCizer(this.g, this.cks, {this.cizim});
+  _PoligonCizer(this.g, this.cks, {this.cizim, this.sekil = 'cizgi', this.noktalar = const []});
   final _Geometri g;
   final Set<String> cks;
   final (Offset, Offset)? cizim;
+
+  /// Çizim önizlemesi: 'cizgi', 'kare', 'daire', 'nokta'.
+  final String sekil;
+  final List<Offset> noktalar;
   @override
   void paint(Canvas canvas, Size size) {
     final d = g.donusum(size);
     for (final x in g.sirali) {
       final yol = Path()..addPolygon([for (final c in g.poligon[x]!) d(c)], true);
       final parcalar = g.parca[x];
-      if (parcalar != null) {
+      final bolgeler = g.bolge[x];
+      if (bolgeler != null) {
+        // Bölgeler parselle kesişimi kadar, kalan parselin geri kalanı kadar boyanır.
+        var kalan = yol;
+        for (var i = 0; i < bolgeler.length; i++) {
+          if (bolgeler[i].length < 3) continue;
+          final by = Path()..addPolygon([for (final c in bolgeler[i]) d(c)], true);
+          final kesisim = Path.combine(PathOperation.intersect, yol, by);
+          canvas.drawPath(kesisim, Paint()..color = urunAdRengi(x.urunler[i].$1).withValues(alpha: 0.75));
+          canvas.drawPath(
+              kesisim,
+              Paint()
+                ..color = Colors.white
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 1.5);
+          kalan = Path.combine(PathOperation.difference, kalan, by);
+        }
+        canvas.drawPath(kalan, Paint()..color = urunAdRengi(x.urunler.last.$1).withValues(alpha: 0.6));
+      } else if (parcalar != null) {
         for (var i = 0; i < parcalar.length && i < x.urunler.length; i++) {
           if (parcalar[i].length < 3) continue;
           final py = Path()..addPolygon([for (final c in parcalar[i]) d(c)], true);
@@ -1171,11 +1372,26 @@ class _PoligonCizer extends CustomPainter {
         }
       }
     }
+    final kalem = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
     if (cizim case (final a, final b)) {
-      canvas.drawLine(a, b, Paint()
-        ..color = Colors.red
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round);
+      switch (sekil) {
+        case 'kare':
+          canvas.drawRect(Rect.fromPoints(a, b), kalem);
+        case 'daire':
+          canvas.drawCircle(a, (b - a).distance, kalem);
+        default:
+          canvas.drawLine(a, b, kalem);
+      }
+    }
+    if (sekil == 'nokta' && noktalar.isNotEmpty) {
+      canvas.drawPath(Path()..addPolygon(noktalar, noktalar.length > 2), kalem);
+      for (final n in noktalar) {
+        canvas.drawCircle(n, 5, Paint()..color = Colors.red);
+      }
     }
   }
 
@@ -1196,6 +1412,33 @@ class _YaziCizer extends CustomPainter {
     final dolu = <Rect>[];
     for (final x in g.sirali) {
       final n = MatrixUtils.transformPoint(m, d(g.yaziNoktasi[x]!));
+      final bolgeler = g.bolge[x];
+      if (bolgeler != null) {
+        String alt(int i) => [
+              if (dekar && _dekarGoster(x, i) != null) '${sayi(_dekarGoster(x, i))} da',
+              if (x.cesit(i) != null) x.cesit(i)!,
+            ].join(' · ');
+        final son = x.urunler.length - 1;
+        _etiket(canvas, size, dolu, n, [
+          TextSpan(text: x.ad, style: TextStyle(fontSize: yazi, color: Colors.black, fontWeight: FontWeight.w800)),
+          TextSpan(
+              text: '\n${_kisaUrun(x.urunler[son].$1)}',
+              style: TextStyle(fontSize: yazi * 0.92, color: Colors.black87, fontWeight: FontWeight.w600)),
+          if (alt(son).isNotEmpty) TextSpan(text: '\n${alt(son)}', style: TextStyle(fontSize: yazi * 0.8, color: Colors.black54)),
+        ]);
+        for (var i = 0; i < bolgeler.length; i++) {
+          final k = bolgeler[i];
+          if (k.length < 3) continue;
+          final o = (k.map((e) => e.$1).reduce((a, b) => a + b) / k.length, k.map((e) => e.$2).reduce((a, b) => a + b) / k.length);
+          _etiket(canvas, size, dolu, MatrixUtils.transformPoint(m, d(o)), [
+            TextSpan(
+                text: _kisaUrun(x.urunler[i].$1),
+                style: TextStyle(fontSize: yazi * 0.85, color: Colors.black87, fontWeight: FontWeight.w600)),
+            if (alt(i).isNotEmpty) TextSpan(text: '\n${alt(i)}', style: TextStyle(fontSize: yazi * 0.75, color: Colors.black54)),
+          ]);
+        }
+        continue;
+      }
       final parcalar = g.parca[x];
       if (parcalar != null && parcalar.length == x.urunler.length) {
         // Bölünmüş parsel: ad kendi noktasında, her parçanın ürünü/dekarı kendi parçasının ortasında.
@@ -1274,6 +1517,8 @@ class _YaziCizer extends CustomPainter {
     final toplam = x.beyan ?? x.olculen ?? (cizim > 0 ? cizim * 111320 * 111320 / 1000 : null);
     if (toplam == null || toplam <= 0) return null;
     if (x.urunler.length == 1) return toplam.roundToDouble();
+    final pay = g.bolgePay[x];
+    if (pay != null) return i < pay.length ? (toplam * pay[i]).roundToDouble() : null;
     final parcalar = g.parca[x];
     if (parcalar == null || i >= parcalar.length || parcalar[i].length < 3 || cizim <= 0) return null;
     return (toplam * _alan(parcalar[i]).abs() / cizim).roundToDouble();
@@ -2263,12 +2508,9 @@ Future<void> _bol(BuildContext context, String sezon, TarlaCiftlik c, TarlaParse
   if (l == null || !context.mounted) return;
   final eski = ic != null && ic.bolunmus && ic.cizgiler.length == l.length - 1 ? ic.cizgiler : const <(double, double)>[];
   final ayniSayi = ic != null && ic.parcalar.length == l.length;
-  final metin = ParselIcerik.bolunmusMetin(
-      l, eski, ayniSayi ? ic.baglar : const [], ayniSayi ? ic.cesitler : const []);
-  if (metin.length > 60) {
-    bildir(context, 'Ürün adları çok uzun; en fazla 3 parça girin ya da "Diğer" ürün adını kısaltın.');
-    return;
-  }
+  final metin = ParselIcerik.bolunmusMetin(l, eski, ayniSayi ? ic.baglar : const [], ayniSayi ? ic.cesitler : const [],
+      ayniSayi ? ic.bolgeler : const []);
+  if (!_sigarMi(context, metin)) return;
   await _kaydet(context, sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
 }
 
@@ -2307,11 +2549,8 @@ Future<void> _birlestir(BuildContext context, String sezon, TarlaCiftlik c, Tarl
 Future<void> _cizgiKaydet(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, List<(double, double)> cz) async {
   final hedef = s.sezon;
   final l = [for (final u in p.urunler) (u.$1, u.$2)];
-  final metin = ParselIcerik.bolunmusMetin(l, cz, p.baglar, p.cesitler);
-  if (metin.length > 60) {
-    bildir(context, 'Kayıt çok uzun; ürün adlarını kısaltın ya da parça sayısını azaltın.');
-    return;
-  }
+  final metin = ParselIcerik.bolunmusMetin(l, cz, p.baglar, p.cesitler, p.bolgeler);
+  if (!_sigarMi(context, metin)) return;
   await _kaydet(context, hedef, c, p, metin, p.beyan ?? l.fold<double>(0, (a, x) => a + x.$2));
 }
 
@@ -2334,10 +2573,7 @@ Future<void> _cizgiIleBol(
     return;
   }
   final metin = ParselIcerik.bolunmusMetin(l, [cz]);
-  if (metin.length > 60) {
-    bildir(context, 'Kayıt çok uzun; ürün adlarını kısaltın.');
-    return;
-  }
+  if (!_sigarMi(context, metin)) return;
   await _kaydet(context, s.sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
 }
 
@@ -2358,11 +2594,8 @@ Future<void> _parcaBagla(BuildContext context, String sezon, TarlaCiftlik c, Tar
     if (hu != null && !hu.bolunmus && hu.birlesik == null && hu.urun.isNotEmpty) urunler[i] = (hu.urun, urunler[i].$2);
   }
   final baglar = [for (var j = 0; j < urunler.length; j++) j == i ? hedefParsel : ic.bag(j)];
-  final metin = ParselIcerik.bolunmusMetin(urunler, ic.cizgiler, baglar, ic.cesitler);
-  if (metin.length > 60) {
-    bildir(context, 'Kayıt çok uzun (ürün ve parsel adları); daha kısa ad kullanın.');
-    return;
-  }
+  final metin = ParselIcerik.bolunmusMetin(urunler, ic.cizgiler, baglar, ic.cesitler, ic.bolgeler);
+  if (!_sigarMi(context, metin)) return;
   await _kaydet(context, sezon, c, p, metin, urunler.fold<double>(0, (a, x) => a + x.$2));
 }
 
@@ -2435,11 +2668,8 @@ Future<bool> _parcaDuzenle(BuildContext context, String sezon, TarlaCiftlik c, T
   final (urun, dekar, tohum) = r;
   final l = [for (final (j, x) in ic.parcalar.indexed) j == i ? (urun, dekar) : (x.$1, x.$2 ?? 0.0)];
   final cesitler = [for (var j = 0; j < l.length; j++) j == i ? tohum : ic.cesit(j)];
-  final metin = ParselIcerik.bolunmusMetin(l, ic.cizgiler, ic.baglar, cesitler);
-  if (metin.length > 60) {
-    bildir(context, 'Kayıt çok uzun; tohum ya da ürün adını kısaltın.');
-    return false;
-  }
+  final metin = ParselIcerik.bolunmusMetin(l, ic.cizgiler, ic.baglar, cesitler, ic.bolgeler);
+  if (!_sigarMi(context, metin)) return false;
   await _kaydet(context, sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
   return false;
 }
@@ -2545,16 +2775,13 @@ Future<void> _tohumGir(
     alan = null;
   } else if (ic.bolunmus) {
     final l = [for (final x in ic.parcalar) (x.$1, x.$2 ?? 0.0)];
-    metin = ParselIcerik.bolunmusMetin(l, ic.cizgiler, ic.baglar, sonuc);
+    metin = ParselIcerik.bolunmusMetin(l, ic.cizgiler, ic.baglar, sonuc, ic.bolgeler);
     alan = l.fold<double>(0, (a, x) => a + x.$2);
   } else {
     metin = ParselIcerik.urunMetni(ic.urun, sonuc.first);
     alan = g?.alan;
   }
-  if (metin.length > 60) {
-    bildir(context, 'Kayıt çok uzun; tohum adını kısaltın.');
-    return;
-  }
+  if (!_sigarMi(context, metin)) return;
   await _kaydet(context, sezon, c, p, metin, alan);
 }
 
@@ -2612,6 +2839,120 @@ class _TohumGirState extends State<_TohumGir> {
               child: const Text('Kaydet')),
         ],
       );
+}
+
+/// Parsel içine çizilen bölgeyi kaydeder: bölgenin ürünü/dekarı ve parselin kalanının ürünü/dekarı sorulur.
+Future<void> _bolgeEkle(BuildContext context, TarlaSezonu s, TarlaCiftlik c, TarlaParsel p, ParselBolge b, double pay) async {
+  final eskiBolge = p.bolgeler.isNotEmpty && p.urunler.length == p.bolgeler.length + 1;
+  final toplam = p.beyan ?? p.olculen ?? p.urunler.fold<double>(0, (a, x) => a + x.$2);
+  final eskiBolgeDa = eskiBolge
+      ? [for (var i = 0; i < p.bolgeler.length; i++) p.urunler[i].$2].fold<double>(0, (a, x) => a + x)
+      : 0.0;
+  final kalanUrun = p.urunler.isEmpty ? null : (eskiBolge ? p.urunler.last.$1 : p.urunler.first.$1);
+  double? yuvarla(double v) => v <= 0 ? null : (v * 10).round() / 10;
+  final r = await showDialog<((String, double), (String, double))>(
+      context: context,
+      builder: (_) => _BolgeGir(
+            baslik: p.ad,
+            bolgeDa: toplam > 0 ? yuvarla(toplam * pay) : null,
+            kalanUrun: kalanUrun,
+            toplam: toplam > 0 ? toplam - eskiBolgeDa : null,
+          ));
+  if (r == null || !context.mounted) return;
+  final (yeni, kalan) = r;
+  final l = <(String, double)>[
+    if (eskiBolge) for (var i = 0; i < p.bolgeler.length; i++) p.urunler[i],
+    yeni,
+    kalan,
+  ];
+  final n = eskiBolge ? p.bolgeler.length : 0;
+  final cesitler = <String?>[for (var i = 0; i < n; i++) p.cesit(i), null, eskiBolge ? p.cesit(p.urunler.length - 1) : null];
+  final baglar = <String?>[for (var i = 0; i < n; i++) p.bag(i), null, eskiBolge ? p.bag(p.urunler.length - 1) : null];
+  final metin = ParselIcerik.bolunmusMetin(l, const [], baglar, cesitler, [if (eskiBolge) ...p.bolgeler, b]);
+  if (!_sigarMi(context, metin)) return;
+  await _kaydet(context, s.sezon, c, p, metin, l.fold<double>(0, (a, x) => a + x.$2));
+}
+
+class _BolgeGir extends StatefulWidget {
+  const _BolgeGir({required this.baslik, this.bolgeDa, this.kalanUrun, this.toplam});
+  final String baslik;
+  final double? bolgeDa, toplam;
+  final String? kalanUrun;
+  @override
+  State<_BolgeGir> createState() => _BolgeGirState();
+}
+
+class _BolgeGirState extends State<_BolgeGir> {
+  String _bolgeUrun = 'Deneme alanı';
+  late String _kalanUrun = widget.kalanUrun != null && secilebilirUrunler.contains(urunAnahtari(widget.kalanUrun!))
+      ? urunAnahtari(widget.kalanUrun!)
+      : secilebilirUrunler.first;
+  late final _bDa = TextEditingController(text: widget.bolgeDa == null ? '' : sayi(widget.bolgeDa, ondalik: widget.bolgeDa! % 1 == 0 ? 0 : 1));
+  late final _kDa = TextEditingController(
+      text: widget.toplam == null || widget.bolgeDa == null
+          ? ''
+          : sayi(math.max(0, widget.toplam! - widget.bolgeDa!), ondalik: 0));
+
+  @override
+  void dispose() {
+    _bDa.dispose();
+    _kDa.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final b = _dekarOku(_bDa.text), k = _dekarOku(_kDa.text);
+    Widget urunSec(String deger, ValueChanged<String> sec, String etiket) => DropdownButtonFormField<String>(
+          initialValue: deger,
+          isExpanded: true,
+          decoration: InputDecoration(labelText: etiket),
+          items: [for (final u in secilebilirUrunler) DropdownMenuItem(value: u, child: Text(u))],
+          onChanged: (x) => setState(() => sec(x ?? deger)),
+        );
+    return AlertDialog(
+      title: Text('${widget.baslik} · çizilen bölge'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          urunSec(_bolgeUrun, (x) => _bolgeUrun = x, 'Bölgenin ürünü / alan türü'),
+          TextField(
+            controller: _bDa,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Bölgenin dekarı', helperText: 'Öneri, çizdiğiniz alana göre'),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          urunSec(_kalanUrun, (x) => _kalanUrun = x, 'Parselin kalanının ürünü'),
+          TextField(
+            controller: _kDa,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Kalanın dekarı'),
+            onChanged: (_) => setState(() {}),
+          ),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+        FilledButton(
+            onPressed: b == null || b <= 0 || k == null || k < 0
+                ? null
+                : () => Navigator.pop(context, ((_bolgeUrun, b), (_kalanUrun, k))),
+            child: const Text('Kaydet')),
+      ],
+    );
+  }
+}
+
+/// Kayıt sunucunun "Ürün" alanına sığıyor mu (eski Apps Script 60 karakter saklar).
+bool _sigarMi(BuildContext context, String metin) {
+  final sinir = VeriDeposu.ben.veri?.sezonParselSiniri ?? 60;
+  if (metin.length <= sinir) return true;
+  bildir(
+      context,
+      sinir <= 60
+          ? 'Bu kayıt uzun (bölge/tohum bilgisi). Kaydetmek için Apps Script kodunun güncellenmesi gerekiyor.'
+          : 'Kayıt çok uzun; ürün, tohum ya da bölge sayısını azaltın.');
+  return false;
 }
 
 Future<void> _kaydet(BuildContext context, String sezon, TarlaCiftlik c, TarlaParsel p, String urun, double? alan) async {

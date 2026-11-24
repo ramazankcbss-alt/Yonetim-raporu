@@ -49,4 +49,24 @@ void main() {
     expect(m.cesit(0), 'Magnum');
     expect(m.birlesik, '7. pivot');
   });
+
+  test('çizilen bölgeler (dikdörtgen, daire, noktalar) kaydedilip okunur', () {
+    final metin = ParselIcerik.bolunmusMetin([('Deneme alanı', 5), ('Ağaçlık alan', 3), ('Buğday', 40)], [], [], [], [
+      ('D', [10, 10, 40, 30]),
+      ('C', [60, 50, 15, 20]),
+    ]);
+    expect(metin, 'Deneme alanı:5+Ağaçlık alan:3+Buğday:40/BD10,10,40,30;C60,50,15,20');
+    final ic = ParselIcerik.oku(metin);
+    expect(ic.parcalar, [('Deneme alanı', 5.0), ('Ağaçlık alan', 3.0), ('Buğday', 40.0)]);
+    expect(ic.cizgiler, isEmpty);
+    expect(ic.bolgeler, [
+      ('D', [10.0, 10.0, 40.0, 30.0]),
+      ('C', [60.0, 50.0, 15.0, 20.0]),
+    ]);
+    final p = ParselIcerik.oku('Boş alan:2+Arpa:20/BP10,10,30,10,20,40');
+    expect(p.bolgeler.single.\$1, 'P');
+    expect(p.bolgeler.single.\$2.length, 6);
+    // Eski çizgi kaydı bozulmaz.
+    expect(ParselIcerik.oku('Arpa:10+Buğday:20/37,52').cizgiler, [(37.0, 52.0)]);
+  });
 }
