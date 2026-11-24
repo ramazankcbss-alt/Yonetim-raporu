@@ -82,8 +82,9 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
             body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 90), children: [
               const BilgiKutusu(
                   yazi: 'Paylaşım linki tarayıcıda Tarla Haritası web panelini açar (uygulama kurmak gerekmez). Rapor, mali, '
-                      'hayvan ve araç verileri gitmez. "Düzenleme" yetkisinde parsellere ürün, dekar ve tohum girilir; parsel '
-                      'bölme ve sınır değişikliği yalnızca sizin uygulamanızdan yapılır. Girişler tabloda paylaşım adıyla '
+                      'hayvan ve araç verileri gitmez. "Düzenleme" yetkisinde Tarla Haritası\'nda sizin yapabildiğiniz her işlem '
+                      '(ürün/dekar/tohum, bölme, birleştirme, çizgi ve şekille bölge, sınır düzenleme, yeni parsel) yapılabilir; '
+                      '"Görüntüleme" yetkisinde hiçbir şey değiştirilemez. Girişler tabloda paylaşım adıyla '
                       'işaretlenir. Paylaşımı kapattığınızda link hemen çalışmaz olur. KVKK: paylaşım adına kişi adı değil '
                       'görev/birim yazın.'),
               if (_mesgul) const LinearProgressIndicator(),
