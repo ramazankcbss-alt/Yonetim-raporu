@@ -576,13 +576,60 @@ bool ekimDisi(String urun) => ekimDisiAlanlar.contains(urunAnahtari(urun));
 
 /// Tarla Haritası bölümleri: 2024-2025 (haritadan giriş), KMZ sezonu (2025-2026),
 /// 2026-2027 (haritadan giriş). Hepsi KMZ sezonunun parsel çizimlerini kullanır.
-List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l) {
+List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l, {List<ParselSinir> sinirlar = const []}) {
   if (paket.isEmpty) return const [];
+  if (sinirlar.isNotEmpty) paket = [for (final k in paket) sinirUygula(k, sinirlar)];
   final kmz = paket.first;
   final eski = girisSezonu(kmz, l, sezon: oncekiSezon(kmz.sezon), ilkSezon: true, sonraki: kmz);
   // KMZ sezonunun öncesi 2024-2025 (münavebe ve çok yıllık ürün yılı için).
   final orta = [for (final (i, k) in paket.indexed) kmzUzerine(k, l, onceki: i == 0 ? eski : null)];
   return [eski, ...orta, girisSezonu(kmz, l, onceki: orta.first)];
+}
+
+/// Geçerli parsel sınırları: (çiftlik, parsel) → (boylam, enlem) noktaları. Son "Aktif" kayıt geçerlidir,
+/// "Geri alındı" kaydı parseli KMZ sınırına döndürür.
+Map<(String, String), List<(double, double)>> gecerliSinirlar(List<ParselSinir> l) {
+  final m = <(String, String), List<(double, double)>>{};
+  for (final x in l) {
+    final k = (x.ciftlik, x.parsel);
+    if (x.aktif && x.koord.length > 2) {
+      m[k] = _sinirOnbellek.putIfAbsent(
+          '${x.ciftlik}|${x.parsel}|${x.koord.length}|${x.koord.first}|${x.koord.last}', () => x.koord);
+    } else if (x.durum == 'Geri alındı') {
+      m.remove(k);
+    }
+  }
+  return m;
+}
+
+// Aynı sınır her yenilemede aynı liste olsun (harita yakınlaştırması sıfırlanmasın).
+final _sinirOnbellek = <String, List<(double, double)>>{};
+
+/// Yeniden çizilen sınırları KMZ parsellerine uygular; KMZ'de olmayan parseller haritaya eklenir.
+TarlaSezonu sinirUygula(TarlaSezonu kmz, List<ParselSinir> l) {
+  final m = gecerliSinirlar(l);
+  if (m.isEmpty) return kmz;
+  TarlaParsel yeni(TarlaParsel p, List<(double, double)> k) => TarlaParsel(
+      ad: p.ad, tip: p.tip, urunler: p.urunler, beyan: p.beyan, olculen: p.olculen, etiket: p.etiket, not: p.not,
+      koord: k, bolme: p.bolme, baglar: p.baglar, cesitler: p.cesitler, bolgeler: p.bolgeler);
+  return TarlaSezonu(
+    sezon: kmz.sezon,
+    kaynak: kmz.kaynak,
+    tarih: kmz.tarih,
+    onceki: kmz.onceki,
+    sonraki: kmz.sonraki,
+    giris: kmz.giris,
+    ciftlikler: [
+      for (final c in kmz.ciftlikler)
+        TarlaCiftlik(ad: c.ad, tesis: c.tesis, notlar: c.notlar, gorseller: c.gorseller, parseller: [
+          for (final p in c.parseller)
+            if (m[(c.ad, p.ad)] case final k?) yeni(p, k) else p,
+          for (final e in m.entries)
+            if (e.key.$1 == c.ad && !c.parseller.any((p) => p.ad == e.key.$2))
+              TarlaParsel(ad: e.key.$2, tip: 'girilmedi', urunler: const [], koord: e.value, not: 'Haritadan eklendi'),
+        ]),
+    ],
+  );
 }
 
 /// Çok yıllık ürünler: üst üste ekim münavebe hatası sayılmaz, kaçıncı yılı gösterilir.
@@ -614,10 +661,10 @@ TarlaSezonu kmzUzerine(TarlaSezonu kmz, List<SezonParsel> l, {TarlaSezonu? oncek
       for (final c in kmz.ciftlikler)
         TarlaCiftlik(ad: c.ad, tesis: c.tesis, notlar: c.notlar, gorseller: c.gorseller, parseller: [
           for (final p in c.parseller)
-            if (parselGirisi(l, kmz.sezon, c.ad, p.ad) case final g? when ParselIcerik.oku(g.urun).bolunmus)
+            if (parselGirisi(l, kmz.sezon, c.ad, p.ad) case final g? when ParselIcerik.oku(g.urun).bolunmus || p.girilmedi)
               () {
                 final y = _girisParseli(p, g, const []);
-                return TarlaParsel(ad: p.ad, tip: p.tip, urunler: y.urunler, beyan: p.beyan ?? y.beyan, olculen: p.olculen,
+                return TarlaParsel(ad: p.ad, tip: p.girilmedi ? y.tip : p.tip, urunler: y.urunler, beyan: p.beyan ?? y.beyan, olculen: p.olculen,
                     etiket: p.etiket, not: p.not, koord: p.koord, bolme: y.bolme, baglar: y.baglar, cesitler: y.cesitler,
                     bolgeler: y.bolgeler);
               }()

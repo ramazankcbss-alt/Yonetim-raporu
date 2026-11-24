@@ -216,6 +216,7 @@ function veriTopla_(gun) {
     // Tarımsal Faaliyet › ÇİFTLİK BAZINDA: ekim alanı, verim, satış, maliyet, net kazanç
     tarimsalUretim: (function () { try { return tarimsalUretimOku_(); } catch (err) { return null; } })(),
     sezonParselSiniri: 400,
+    parselSinir: basitOku_('Parsel_Sınırları', 5, tz),
     // Ürün teslimat ve satışları (günlük toplamlar): TarKop pancar, patates fire listesi,
     // Ürün_Teslimatları sayfasına uygulamadan girilen kayıtlar. Plaka/satıcı no yok.
     urunTeslimat: (function () { try { return urunTeslimatlari_(); } catch (err) { return { hata: String(err) }; } })(),
@@ -358,6 +359,7 @@ function doPost(e) {
     if (govde.tur === 'cksYukle') return json_(cksYukle_(govde));
     if (govde.tur === 'ekimDuzelt' || govde.tur === 'ekimDuzeltGeriAl') return json_(ekimDuzelt_(govde));
     if (govde.tur === 'sezonParsel' || govde.tur === 'sezonParselGeriAl') return json_(sezonParsel_(govde));
+    if (govde.tur === 'parselSinir' || govde.tur === 'parselSinirGeriAl') return json_(parselSinir_(govde));
     if (govde.tur === 'teslimatEkle' || govde.tur === 'teslimatSil') return json_(teslimatKaydet_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
@@ -1549,6 +1551,40 @@ function sezonParsel_(g) {
   var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
   sh.appendRow([sezon, cf, parsel, urun, alan, Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
   return { ok: true, mesaj: sezon + ' sezonuna kaydedildi: ' + parsel + ' · ' + urun + (alan === '' ? '' : ' ' + alan + ' da') };
+}
+
+/** Tarla Haritası'nda KMZ'den gelen parsel sınırının yeniden çizilmesi ya da haritaya yeni parsel
+ * eklenmesi. Sınır sezondan bağımsızdır (tüm sezonlarda kullanılır); parsel başına tek aktif satır.
+ * Koordinatlar "boylam,enlem boylam,enlem …" biçimindedir; kişi adı tutulmaz. */
+function parselSinir_(g) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var ad = 'Parsel_Sınırları';
+  var sh = ss.getSheetByName(ad);
+  if (!sh) {
+    sh = ss.insertSheet(ad);
+    sh.appendRow(['Çiftlik', 'Parsel', 'Koordinatlar', 'Tarih', 'Durum']);
+    sh.setFrozenRows(1);
+  }
+  var cf = String(g.ciftlik || '').slice(0, 60), parsel = String(g.parsel || '').slice(0, 80);
+  if (!cf || !parsel) return { ok: false, hata: 'Çiftlik ya da parsel eksik.' };
+  var son = sh.getLastRow();
+  if (son >= 2) {
+    var rg = sh.getRange(2, 1, son - 1, 5), v = rg.getValues(), deg = false;
+    v.forEach(function (r) {
+      if (String(r[0]) === cf && String(r[1]) === parsel && r[4] === 'Aktif') {
+        r[4] = g.tur === 'parselSinirGeriAl' ? 'Geri alındı' : 'Güncellendi'; deg = true;
+      }
+    });
+    if (deg) rg.setValues(v);
+  }
+  if (g.tur === 'parselSinirGeriAl') return { ok: true, mesaj: parsel + ' için KMZ sınırına dönüldü.' };
+  var k = String(g.koord || '').trim();
+  if (!/^-?\d+(\.\d+)?,-?\d+(\.\d+)?( -?\d+(\.\d+)?,-?\d+(\.\d+)?){2,}$/.test(k) || k.length > 45000) {
+    return { ok: false, hata: 'Sınır koordinatları okunamadı.' };
+  }
+  var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
+  sh.appendRow([cf, parsel, k, Utilities.formatDate(new Date(), tz, 'dd.MM.yyyy'), 'Aktif']);
+  return { ok: true, mesaj: parsel + ' sınırı kaydedildi.' };
 }
 
 /** Tarla Haritası karşılaştırmasındaki bir farkı uygulamadan düzeltir ya da

@@ -426,6 +426,33 @@ class SezonParsel {
   }
 }
 
+/// Tarla Haritası'nda yeniden çizilen ya da yeni eklenen parsel sınırı (sezondan bağımsız).
+class ParselSinir {
+  const ParselSinir({required this.ciftlik, required this.parsel, this.koord = const [], this.tarih = '', this.durum = ''});
+  final String ciftlik, parsel, tarih, durum;
+
+  /// (boylam, enlem) noktaları.
+  final List<(double, double)> koord;
+  bool get aktif => durum == 'Aktif';
+
+  static List<(double, double)> koordOku(String t) => [
+        for (final n in t.trim().split(RegExp(r'\s+')))
+          if (n.split(',') case [final a, final b])
+            if (double.tryParse(a) case final x?)
+              if (double.tryParse(b) case final y?) (x, y),
+      ];
+
+  static String koordYaz(List<(double, double)> k) =>
+      k.map((c) => '${c.$1.toStringAsFixed(6)},${c.$2.toStringAsFixed(6)}').join(' ');
+
+  static ParselSinir? oku(Object? v) {
+    final r = _liste(v);
+    String m(int i) => i < r.length ? _metin(r[i]) : '';
+    if (r.length < 3 || m(0).isEmpty || m(1).isEmpty) return null;
+    return ParselSinir(ciftlik: m(0), parsel: m(1), koord: koordOku(m(2)), tarih: m(3), durum: m(4));
+  }
+}
+
 /// Ekim Planı dosyası: bir yılın çiftlik/ürün planı.
 class EkimPlanSatir {
   const EkimPlanSatir({required this.yil, required this.ciftlik, required this.urun, required this.plan});
@@ -1036,6 +1063,7 @@ class RaporVerisi {
     this.resmiParsel = const [],
     this.sezonParsel = const [],
     this.sezonParselSiniri = 60,
+    this.parselSinir = const [],
     this.besi = const [],
     this.isler = const [],
     this.akis = const [],
@@ -1081,6 +1109,9 @@ class RaporVerisi {
   final List<EkimDuzeltme> ekimDuzeltme;
   final List<ResmiParsel> resmiParsel;
   final List<SezonParsel> sezonParsel;
+
+  /// Parsel_Sınırları: yeniden çizilen / yeni eklenen parsel sınırları.
+  final List<ParselSinir> parselSinir;
 
   /// Sunucunun Sezon_Parselleri "Ürün" alanında sakladığı en çok karakter (eski sürüm: 60).
   final int sezonParselSiniri;
@@ -1156,6 +1187,7 @@ class RaporVerisi {
       resmiParsel: oku('resmiParsel', ResmiParsel.oku),
       sezonParsel: oku('sezonParsel', SezonParsel.oku),
       sezonParselSiniri: sayiOku(j['sezonParselSiniri'])?.round() ?? 60,
+      parselSinir: oku('parselSinir', ParselSinir.oku),
       besi: oku('besi', BesiSatir.oku),
       isler: oku('isler', Is.oku),
       akis: oku('isakisi', AkisKaydi.oku),

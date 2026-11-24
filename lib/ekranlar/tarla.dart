@@ -54,7 +54,7 @@ class _TarlaEkranState extends State<TarlaEkran> {
             listenable: VeriDeposu.ben,
             builder: (context, _) {
               final v = VeriDeposu.ben.veri ?? widget.veri;
-              final hepsi = tarlaSezonlari(l, VeriDeposu.ben.sezonParselleri(v));
+              final hepsi = tarlaSezonlari(l, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v));
               return Scaffold(
                 appBar: AppBar(title: const Text('Tarla Haritası')),
                 body: GonderAlani(
@@ -118,7 +118,7 @@ class _YilKarsilastirma extends StatelessWidget {
         listenable: VeriDeposu.ben,
         builder: (context, _) {
           final v = VeriDeposu.ben.veri ?? ilk;
-          final sezonlar = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v));
+          final sezonlar = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v));
           final ciftlikler = <String>{for (final s in sezonlar) for (final c in s.ciftlikler) c.ad}.toList();
           // (sezon, çiftlik) → ürün → (dekar, haritadan mı)
           Map<String, (double, bool)> alanlar(TarlaSezonu s, String c) {
@@ -234,7 +234,7 @@ class _SezonEkrani extends StatelessWidget {
   final RaporVerisi ilk;
 
   TarlaSezonu _bul(RaporVerisi v) {
-    final l = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v));
+    final l = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v));
     return l.firstWhere((x) => x.sezon == sezon, orElse: () => l.first);
   }
 
@@ -460,7 +460,10 @@ class _HaritaState extends State<_Harita> {
                 p: cizili, g: c.gorseller, cks: cksAdlari, maxOlcek: 6, dekar: true, onDokun: dokun,
                 cizgiKaydet: (p, cz) => _cizgiKaydet(context, widget.s, c, p, cz),
                 cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, widget.s, c, p, cz, oran),
-                bolgeEkle: (p, b, pay) => _bolgeEkle(context, widget.s, c, p, b, pay)),
+                bolgeEkle: (p, b, pay) => _bolgeEkle(context, widget.s, c, p, b, pay),
+                sinirKaydet: (p, k, da) => _sinirKaydet(context, c, p, k, da),
+                sinirGeriAl: (p) => _sinirGeriAl(context, c, p),
+                degisenSinir: _degisenSinirlar(widget.v, c)),
           ),
           Positioned(
             right: 6,
@@ -486,7 +489,10 @@ class _HaritaState extends State<_Harita> {
                           onDokun: (p, parca) => _parselIslem(context, s2, c2, p, parca: parca),
                           cizgiKaydet: (p, cz) => _cizgiKaydet(context, s2, c2, p, cz),
                           cizgiIleBol: (p, cz, oran) => _cizgiIleBol(context, s2, c2, p, cz, oran),
-                          bolgeEkle: (p, b, pay) => _bolgeEkle(context, s2, c2, p, b, pay)),
+                          bolgeEkle: (p, b, pay) => _bolgeEkle(context, s2, c2, p, b, pay),
+                          sinirKaydet: (p, k, da) => _sinirKaydet(context, c2, p, k, da),
+                          sinirGeriAl: (p) => _sinirGeriAl(context, c2, p),
+                          degisenSinir: _degisenSinirlar(VeriDeposu.ben.veri ?? widget.v, c2)),
                     );
                   },
                 ),
@@ -592,6 +598,15 @@ class _HaritaState extends State<_Harita> {
 
 /// Düzlem koordinatı (boylam × cos(enlem), enlem).
 typedef _N = (double, double);
+
+/// Düzlem çokgeninin yaklaşık alanı (dekar).
+double _dekarAlan(List<_N> k) => k.length < 3 ? 0 : _alan(k) * 111320 * 111320 / 1000;
+
+/// Ekranda yeterince uzun kenarların orta noktaları (köşe eklemek için): (kenarın ilk köşesi, nokta).
+List<(int, Offset)> _ortaNoktalar(List<Offset> e, double olcek) => [
+      for (var i = 0; i < e.length; i++)
+        if ((e[i] - e[(i + 1) % e.length]).distance * olcek > 44) (i, (e[i] + e[(i + 1) % e.length]) / 2)
+    ];
 
 double _alan(List<_N> k) {
   var a = 0.0;
@@ -786,7 +801,7 @@ class _Geometri {
   _Geometri(List<TarlaParsel> p, [List<TarlaGorsel> g = const []]) {
     final tum = [for (final x in p) ...x.koord];
     final lat0 = tum.map((c) => c.$2).reduce((a, b) => a + b) / tum.length;
-    final kx = math.cos(lat0 * math.pi / 180);
+    kx = math.cos(lat0 * math.pi / 180);
     for (final x in p) {
       poligon[x] = [for (final c in x.koord) (c.$1 * kx, c.$2)];
       alan[x] = _alan(poligon[x]!);
@@ -831,6 +846,9 @@ class _Geometri {
   late final List<(TarlaGorsel, List<_N>)> gorsel;
   late final List<TarlaParsel> sirali;
   late final double minX, maxX, minY, maxY;
+
+  /// Boylam düzeltmesi: düzlem x = boylam × kx.
+  late final double kx;
 
   _N _nokta(TarlaParsel x) {
     final k = poligon[x]!;
@@ -879,7 +897,7 @@ class _Geometri {
 /// Yakınlaştırılabilir harita: parseller yakınlaşır, yazılar sabit boyutta
 /// kalır; üst üste gelen yazılar gizlenir, yakınlaştırınca görünür.
 class _HaritaGorunum extends StatefulWidget {
-  const _HaritaGorunum({required this.p, this.g = const [], required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun, this.cizgiKaydet, this.cizgiIleBol, this.bolgeEkle});
+  const _HaritaGorunum({required this.p, this.g = const [], required this.cks, this.maxOlcek = 6, this.yazi = 11.5, this.dekar = false, this.onDokun, this.cizgiKaydet, this.cizgiIleBol, this.bolgeEkle, this.sinirKaydet, this.sinirGeriAl, this.degisenSinir = const {}});
   final List<TarlaParsel> p;
   final List<TarlaGorsel> g;
   final Set<String> cks;
@@ -899,6 +917,15 @@ class _HaritaGorunum extends StatefulWidget {
 
   /// Parsel içine dikdörtgen, daire ya da noktalarla çizilen bölge: [pay] bölgenin parsele oranı.
   final Future<void> Function(TarlaParsel p, ParselBolge bolge, double pay)? bolgeEkle;
+
+  /// Parsel sınırını yeniden çizme / yeni parsel ekleme: [p] null ise yeni parsel; [koord] (boylam, enlem).
+  final Future<bool> Function(TarlaParsel? p, List<(double, double)> koord, double dekar)? sinirKaydet;
+
+  /// Değiştirilmiş sınırı KMZ'deki hâline döndürür (haritadan eklenen parseli kaldırır).
+  final Future<bool> Function(TarlaParsel p)? sinirGeriAl;
+
+  /// Sınırı haritadan değiştirilmiş (ya da haritadan eklenmiş) parsel adları.
+  final Set<String> degisenSinir;
   @override
   State<_HaritaGorunum> createState() => _HaritaGorunumState();
 }
@@ -914,13 +941,113 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
       final ayniCizim = old.p.length == widget.p.length &&
           [for (var i = 0; i < old.p.length; i++) identical(old.p[i].koord, widget.p[i].koord)].every((e) => e);
       _g = _Geometri(widget.p, widget.g);
-      if (!ayniCizim) _ctl.value = Matrix4.identity();
+      if (_duzenParsel != null && !_g.poligon.containsKey(_duzenParsel)) {
+        final ad = _duzenParsel!.ad;
+        final yeni = widget.p.where((x) => x.ad == ad).firstOrNull;
+        if (yeni == null || _kaydediliyor) {
+          _duzenBirak();
+        } else {
+          _duzenParsel = yeni;
+        }
+      }
+      if (!ayniCizim && !_cizim) _ctl.value = Matrix4.identity();
     }
   }
 
   // Çizim kipi: 'cizgi' (ayırma çizgisi), 'kare', 'daire', 'nokta' (dokunarak köşe).
   String _sekil = 'cizgi';
   final List<Offset> _noktalar = [];
+
+  // Sınır düzenleme: seçilen parsel, köşeleri (düzlem), seçili / sürüklenen köşe, baştan çizim.
+  TarlaParsel? _duzenParsel;
+  List<_N> _duzen = [];
+  int? _secKose, _surukle;
+  bool _yenidenCiz = false;
+  double get _olcek => _ctl.value.getMaxScaleOnAxis();
+
+  void _duzenBirak() {
+    _duzenParsel = null;
+    _duzen = [];
+    _secKose = _surukle = null;
+    _yenidenCiz = false;
+  }
+
+  bool get _noktaDokunusu => _sekil == 'nokta' || _sekil == 'yeni' || (_sekil == 'sinir' && (_duzenParsel == null || _yenidenCiz));
+
+  void _noktaEkle(Offset e, Size size) {
+    final t = _g.tersDonusum(size);
+    setState(() {
+      switch (_sekil) {
+        case 'nokta':
+          _noktalar.add(e);
+        case 'yeni':
+          _duzen.add(t(e));
+        case 'sinir' when _yenidenCiz:
+          _duzen.add(t(e));
+        case 'sinir':
+          final x = _bul(e, size);
+          if (x != null && _g.poligon[x.$1]!.length > 2) {
+            _duzenParsel = x.$1;
+            _duzen = [..._g.poligon[x.$1]!];
+            _secKose = null;
+          }
+      }
+    });
+  }
+
+  /// Sürükleme başlangıcı: bir köşe ya da kenar ortası yakınında mı (kenar ortasında yeni köşe açılır).
+  bool _koseYakala(Offset e, Size size) {
+    if (_duzenParsel == null || _yenidenCiz || _duzen.isEmpty) return false;
+    final d = _g.donusum(size);
+    final ekran = [for (final c in _duzen) d(c)];
+    final r = 24 / _olcek;
+    int? en;
+    var enU = r;
+    for (var i = 0; i < ekran.length; i++) {
+      final u = (ekran[i] - e).distance;
+      if (u < enU) {
+        enU = u;
+        en = i;
+      }
+    }
+    if (en != null) {
+      _surukle = en;
+      return true;
+    }
+    for (final (i, o) in _ortaNoktalar(ekran, _olcek)) {
+      if ((o - e).distance < r * 0.8) {
+        _duzen.insert(i + 1, _g.tersDonusum(size)(o));
+        _surukle = i + 1;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _sinirKaydetBas() async {
+    final k = [for (final c in _duzen) (c.$1 / _g.kx, c.$2)];
+    final p = _sekil == 'yeni' ? null : _duzenParsel;
+    if (k.length < 3 || widget.sinirKaydet == null) return;
+    setState(() => _kaydediliyor = true);
+    final ok = await widget.sinirKaydet!(p, k, _dekarAlan(_duzen));
+    if (!mounted) return;
+    setState(() {
+      _kaydediliyor = false;
+      if (ok) _duzenBirak();
+    });
+  }
+
+  Future<void> _sinirGeriAlBas() async {
+    final p = _duzenParsel;
+    if (p == null || widget.sinirGeriAl == null) return;
+    setState(() => _kaydediliyor = true);
+    final ok = await widget.sinirGeriAl!(p);
+    if (!mounted) return;
+    setState(() {
+      _kaydediliyor = false;
+      if (ok) _duzenBirak();
+    });
+  }
   Size _sonBoyut = Size.zero;
 
   Future<void> _sekilBitir(Size size, {List<Offset>? noktalar}) async {
@@ -1145,18 +1272,55 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
           InteractiveViewer(
             transformationController: _ctl,
             maxScale: widget.maxOlcek,
-            panEnabled: !_cizim,
-            scaleEnabled: !_cizim,
+            panEnabled: !_cizim || const {'nokta', 'yeni', 'sinir'}.contains(_sekil),
+            scaleEnabled: !_cizim || const {'nokta', 'yeni', 'sinir'}.contains(_sekil),
             child: LayoutBuilder(builder: (context, k) {
-              final resim = CustomPaint(
-                  size: Size.infinite,
-                  painter: _PoligonCizer(_g, widget.cks,
-                      cizim: _bas == null || _son == null ? null : (_bas!, _son!), sekil: _sekil, noktalar: [..._noktalar]));
+              final d = _g.donusum(k.biggest);
+              final resim = AnimatedBuilder(
+                animation: _ctl,
+                builder: (_, __) => CustomPaint(
+                    size: Size.infinite,
+                    painter: _PoligonCizer(_g, widget.cks,
+                        cizim: _bas == null || _son == null ? null : (_bas!, _son!),
+                        sekil: _sekil,
+                        noktalar: [..._noktalar],
+                        duzen: _cizim && (_sekil == 'yeni' || _sekil == 'sinir') ? [for (final c in _duzen) d(c)] : null,
+                        duzenKapali: _sekil == 'sinir' && !_yenidenCiz,
+                        secKose: _secKose,
+                        olcek: _olcek)),
+              );
               _sonBoyut = k.biggest;
-              if (_cizim && _sekil == 'nokta') {
+              if (_cizim && _noktaDokunusu) {
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTapUp: (e) => setState(() => _noktalar.add(e.localPosition)),
+                  onTapUp: (e) => _noktaEkle(e.localPosition, k.biggest),
+                  child: resim,
+                );
+              }
+              if (_cizim && _sekil == 'sinir') {
+                // Köşe ya da kenar ortası tutulunca sürükleme; başka yerde harita kayar / yakınlaşır.
+                return RawGestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  gestures: {
+                    _KoseSurukle: GestureRecognizerFactoryWithHandlers<_KoseSurukle>(
+                      _KoseSurukle.new,
+                      (r) => r
+                        ..kabul = ((e) => _koseYakala(e, k.biggest))
+                        ..onUpdate = ((e) {
+                          final i = _surukle;
+                          if (i == null || i >= _duzen.length) return;
+                          setState(() => _duzen[i] = _g.tersDonusum(k.biggest)(e.localPosition));
+                        })
+                        ..onEnd = ((_) => setState(() {
+                              _secKose = _surukle;
+                              _surukle = null;
+                            }))
+                        ..onCancel = (() => setState(() {
+                              _secKose = _surukle;
+                              _surukle = null;
+                            })),
+                    ),
+                  },
                   child: resim,
                 );
               }
@@ -1203,12 +1367,16 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                   ? FilledButton.icon(
                       onPressed: () {
                         _iptal();
-                        setState(() => _cizim = false);
+                        setState(() {
+                          _cizim = false;
+                          _noktalar.clear();
+                          _duzenBirak();
+                        });
                       },
                       icon: const Icon(Icons.close),
                       label: const Text('Çizimi bitir'))
                   : IconButton.filledTonal(
-                      tooltip: 'Ayırma çizgisi çiz',
+                      tooltip: 'Çizim: ayırma çizgisi, bölge, parsel sınırı',
                       icon: const Icon(Icons.draw_outlined),
                       onPressed: () => setState(() => _cizim = true)),
             ),
@@ -1225,30 +1393,86 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                   padding: const EdgeInsets.all(10),
                   child: _bekleyen == null
                       ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                          SegmentedButton<String>(
-                            showSelectedIcon: false,
-                            segments: const [
-                              ButtonSegment(value: 'cizgi', label: Text('Çizgi'), icon: Icon(Icons.horizontal_rule)),
-                              ButtonSegment(value: 'kare', label: Text('Kare'), icon: Icon(Icons.crop_square)),
-                              ButtonSegment(value: 'daire', label: Text('Daire'), icon: Icon(Icons.circle_outlined)),
-                              ButtonSegment(value: 'nokta', label: Text('Nokta'), icon: Icon(Icons.polyline_outlined)),
-                            ],
-                            selected: {_sekil},
-                            onSelectionChanged: (x) => setState(() {
-                              _sekil = x.first;
-                              _noktalar.clear();
-                            }),
-                          ),
+                          Wrap(spacing: 6, runSpacing: 0, children: [
+                            for (final (d, ad, ik) in [
+                              ('cizgi', 'Çizgi', Icons.horizontal_rule),
+                              ('kare', 'Kare', Icons.crop_square),
+                              ('daire', 'Daire', Icons.circle_outlined),
+                              ('nokta', 'Nokta', Icons.polyline_outlined),
+                              if (widget.sinirKaydet != null) ('sinir', 'Sınır düzenle', Icons.edit_location_alt_outlined),
+                              if (widget.sinirKaydet != null) ('yeni', 'Yeni parsel', Icons.add_location_alt_outlined),
+                            ])
+                              ChoiceChip(
+                                visualDensity: VisualDensity.compact,
+                                avatar: Icon(ik, size: 16),
+                                label: Text(ad),
+                                selected: _sekil == d,
+                                onSelected: (_) => setState(() {
+                                  _sekil = d;
+                                  _noktalar.clear();
+                                  _duzenBirak();
+                                }),
+                              ),
+                          ]),
                           const SizedBox(height: 6),
                           Text(
                               switch (_sekil) {
                                 'kare' => 'Parselin içinde bir köşeden karşı köşeye parmağınızı sürükleyin; dikdörtgen bölge olur.',
                                 'daire' => 'Bölgenin ortasına basıp dışa doğru sürükleyin; daire bölge olur.',
                                 'nokta' => 'Bölgenin köşelerine sırayla dokunun (en az 3 nokta), sonra "Bölgeyi kapat".',
+                                'sinir' when _duzenParsel == null =>
+                                  'Sınırını değiştirmek istediğiniz parsele dokunun. Haritayı iki parmakla yakınlaştırıp kaydırabilirsiniz.',
+                                'sinir' when _yenidenCiz =>
+                                  '${_duzenParsel!.ad}: yeni sınırın köşelerine sırayla dokunun (en az 3 nokta). '
+                                      'Çizilen alan ≈ ${sayi(_dekarAlan(_duzen))} da',
+                                'sinir' => '${_duzenParsel!.ad}: köşeleri sürükleyin; kenar ortasındaki küçük noktayı sürükleyerek '
+                                    'köşe ekleyin; köşeye dokunup seçerek silin. Çizilen alan ≈ ${sayi(_dekarAlan(_duzen))} da',
+                                'yeni' => 'Yeni parselin köşelerine sırayla dokunun (en az 3 nokta). '
+                                    'Çizilen alan ≈ ${sayi(_dekarAlan(_duzen))} da',
                                 _ => 'Ayırmak istediğiniz parselin üzerinden bir çizgi çekin. İki renkli parselde çizgi yer '
                                     'değiştirir; tek ürünlü parselde parsel iki parçaya bölünür.',
                               },
                               style: const TextStyle(fontSize: 12.5)),
+                          if ((_sekil == 'sinir' && _duzenParsel != null) || _sekil == 'yeni')
+                            Wrap(spacing: 6, runSpacing: 0, children: [
+                              if (_sekil == 'yeni' || _yenidenCiz)
+                                TextButton.icon(
+                                    onPressed: _duzen.isEmpty ? null : () => setState(_duzen.removeLast),
+                                    icon: const Icon(Icons.undo),
+                                    label: const Text('Son noktayı sil'))
+                              else ...[
+                                TextButton.icon(
+                                    onPressed: _secKose == null || _duzen.length <= 3
+                                        ? null
+                                        : () => setState(() {
+                                              _duzen.removeAt(_secKose!);
+                                              _secKose = null;
+                                            }),
+                                    icon: const Icon(Icons.delete_outline),
+                                    label: const Text('Seçili köşeyi sil')),
+                                TextButton.icon(
+                                    onPressed: () => setState(() {
+                                          _duzen = [];
+                                          _yenidenCiz = true;
+                                          _secKose = null;
+                                        }),
+                                    icon: const Icon(Icons.gesture),
+                                    label: const Text('Baştan çiz')),
+                              ],
+                              if (_sekil == 'sinir' && widget.degisenSinir.contains(_duzenParsel!.ad))
+                                TextButton.icon(
+                                    onPressed: _kaydediliyor ? null : _sinirGeriAlBas,
+                                    icon: const Icon(Icons.restore),
+                                    label: const Text('Değişikliği geri al')),
+                              if (_sekil == 'sinir')
+                                TextButton(onPressed: () => setState(_duzenBirak), child: const Text('Vazgeç')),
+                              FilledButton.icon(
+                                  onPressed: _kaydediliyor || _duzen.length < 3 ? null : _sinirKaydetBas,
+                                  icon: _kaydediliyor
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(Icons.check),
+                                  label: Text(_sekil == 'yeni' ? 'Parseli kaydet' : 'Sınırı kaydet')),
+                            ]),
                           if (_sekil == 'nokta')
                             Wrap(spacing: 8, children: [
                               TextButton.icon(
@@ -1289,6 +1513,17 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
   }
 }
 
+/// Yalnızca köşe / kenar ortası üzerinde başlayan sürükleme (başka yerde harita kayar).
+class _KoseSurukle extends PanGestureRecognizer {
+  bool Function(Offset local) kabul = (_) => false;
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    if (!kabul(event.localPosition)) return;
+    super.addAllowedPointer(event);
+    resolve(GestureDisposition.accepted);
+  }
+}
+
 /// Parmak değer değmez kabul edilen sürükleme (üst kaydırma ile yarışmaz).
 class _HemenPan extends PanGestureRecognizer {
   @override
@@ -1299,7 +1534,14 @@ class _HemenPan extends PanGestureRecognizer {
 }
 
 class _PoligonCizer extends CustomPainter {
-  _PoligonCizer(this.g, this.cks, {this.cizim, this.sekil = 'cizgi', this.noktalar = const []});
+  _PoligonCizer(this.g, this.cks,
+      {this.cizim, this.sekil = 'cizgi', this.noktalar = const [], this.duzen, this.duzenKapali = true, this.secKose, this.olcek = 1});
+
+  /// Düzenlenen sınırın köşeleri (ekran, yakınlaştırma öncesi); kapalı ise kenar ortaları da çizilir.
+  final List<Offset>? duzen;
+  final bool duzenKapali;
+  final int? secKose;
+  final double olcek;
   final _Geometri g;
   final Set<String> cks;
   final (Offset, Offset)? cizim;
@@ -1386,6 +1628,39 @@ class _PoligonCizer extends CustomPainter {
           canvas.drawCircle(a, (b - a).distance, kalem);
         default:
           canvas.drawLine(a, b, kalem);
+      }
+    }
+    if (duzen case final e? when e.isNotEmpty) {
+      final u = 1 / olcek;
+      final yol = Path()..addPolygon(e, e.length > 2);
+      if (e.length > 2) canvas.drawPath(yol, Paint()..color = Colors.orange.withValues(alpha: 0.25));
+      canvas.drawPath(
+          yol,
+          Paint()
+            ..color = Colors.deepOrange
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.5 * u);
+      if (duzenKapali && e.length > 2) {
+        for (final (_, o) in _ortaNoktalar(e, olcek)) {
+          canvas.drawCircle(o, 4 * u, Paint()..color = Colors.white.withValues(alpha: 0.9));
+          canvas.drawCircle(
+              o,
+              4 * u,
+              Paint()
+                ..color = Colors.deepOrange
+                ..style = PaintingStyle.stroke
+                ..strokeWidth = 1.2 * u);
+        }
+      }
+      for (final (i, n) in e.indexed) {
+        canvas.drawCircle(n, (i == secKose ? 8 : 6) * u, Paint()..color = i == secKose ? Colors.red : Colors.white);
+        canvas.drawCircle(
+            n,
+            (i == secKose ? 8 : 6) * u,
+            Paint()
+              ..color = Colors.deepOrange
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2 * u);
       }
     }
     if (sekil == 'nokta' && noktalar.isNotEmpty) {
@@ -2840,6 +3115,106 @@ class _TohumGirState extends State<_TohumGir> {
               child: const Text('Kaydet')),
         ],
       );
+}
+
+/// Haritada sınırı değiştirilmiş ya da haritadan eklenmiş parsel adları.
+Set<String> _degisenSinirlar(RaporVerisi v, TarlaCiftlik c) =>
+    {for (final k in gecerliSinirlar(VeriDeposu.ben.parselSinirleri(v)).keys) if (k.$1 == c.ad) k.$2};
+
+/// Yeniden çizilen sınırı (ya da yeni parseli) kaydeder. Sınır tüm sezonlarda geçerlidir.
+Future<bool> _sinirKaydet(BuildContext context, TarlaCiftlik c, TarlaParsel? p, List<(double, double)> k, double da) async {
+  var ad = p?.ad;
+  if (ad == null) {
+    final cizilmemis = [for (final x in c.parseller) if (x.koord.length <= 2) x.ad];
+    final cizili = {for (final x in c.parseller) if (x.koord.length > 2) x.ad};
+    ad = await showDialog<String>(
+        context: context, builder: (_) => _YeniParselAdi(cizilmemis: cizilmemis, cizili: cizili, dekar: da));
+    if (ad == null || !context.mounted) return false;
+  } else {
+    final onay = await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+              title: Text('$ad sınırı'),
+              content: Text('Yeni sınır tüm sezonların haritasında kullanılacak. Çizilen alan yaklaşık ${sayi(da)} da '
+                  '(beyan edilen dekar değişmez; gerekirse parselden ayrıca düzeltin).'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Vazgeç')),
+                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Kaydet')),
+              ],
+            ));
+    if (onay != true || !context.mounted) return false;
+  }
+  try {
+    final m = await VeriDeposu.ben.parselSinirKaydet(ciftlik: c.ad, parsel: ad, koord: k);
+    if (context.mounted) bildir(context, '$m Çizilen alan ≈ ${sayi(da)} da.');
+    return true;
+  } catch (e) {
+    if (context.mounted) bildir(context, '$e');
+    return false;
+  }
+}
+
+Future<bool> _sinirGeriAl(BuildContext context, TarlaCiftlik c, TarlaParsel p) async {
+  try {
+    final m = await VeriDeposu.ben.parselSinirKaydet(ciftlik: c.ad, parsel: p.ad, geriAl: true);
+    if (context.mounted) bildir(context, m);
+    return true;
+  } catch (e) {
+    if (context.mounted) bildir(context, '$e');
+    return false;
+  }
+}
+
+class _YeniParselAdi extends StatefulWidget {
+  const _YeniParselAdi({required this.cizilmemis, required this.cizili, required this.dekar});
+  final List<String> cizilmemis;
+  final Set<String> cizili;
+  final double dekar;
+  @override
+  State<_YeniParselAdi> createState() => _YeniParselAdiState();
+}
+
+class _YeniParselAdiState extends State<_YeniParselAdi> {
+  final _ad = TextEditingController();
+  @override
+  void dispose() {
+    _ad.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ad = _ad.text.trim();
+    final hata = ad.isEmpty ? null : (widget.cizili.contains(ad) ? 'Bu adla çizili bir parsel var.' : null);
+    return AlertDialog(
+      title: const Text('Yeni parsel'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Çizilen alan yaklaşık ${sayi(widget.dekar)} da. Sınır tüm sezonların haritasında kullanılır.',
+              style: const TextStyle(fontSize: 13)),
+          if (widget.cizilmemis.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Text('Haritada sınırı olmayan parseller:', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+            Wrap(spacing: 6, children: [
+              for (final x in widget.cizilmemis)
+                ActionChip(label: Text(x), onPressed: () => setState(() => _ad.text = x)),
+            ]),
+          ],
+          TextField(
+            controller: _ad,
+            maxLength: 80,
+            decoration: InputDecoration(labelText: 'Parsel adı', hintText: 'Örn. 12. parsel', errorText: hata),
+            onChanged: (_) => setState(() {}),
+          ),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
+        FilledButton(
+            onPressed: ad.isEmpty || hata != null ? null : () => Navigator.pop(context, ad), child: const Text('Kaydet')),
+      ],
+    );
+  }
 }
 
 /// Parsel içine çizilen bölgeyi kaydeder: bölgenin ürünü/dekarı ve parselin kalanının ürünü/dekarı sorulur.

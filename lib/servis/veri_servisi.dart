@@ -72,6 +72,12 @@ class VeriDeposu extends ChangeNotifier {
   bool _tekrarYenile = false;
 
   /// Sezon parsel girişleri: sunucudaki kayıtlar + henüz yansımamış yerel girişler (son giriş geçerlidir).
+  final List<(DateTime, ParselSinir)> _yerelSinir = [];
+
+  /// Parsel sınırları: sunucudakiler ve bu oturumda kaydedilip henüz gelmeyenler.
+  List<ParselSinir> parselSinirleri(RaporVerisi v) =>
+      _yerelSinir.isEmpty ? v.parselSinir : [...v.parselSinir, for (final e in _yerelSinir) e.$2];
+
   List<SezonParsel> sezonParselleri(RaporVerisi v) =>
       _yerelParsel.isEmpty ? v.sezonParsel : [...v.sezonParsel, for (final e in _yerelParsel) e.$2];
   DateTime? sonAlinma;
@@ -210,6 +216,7 @@ class VeriDeposu extends ChangeNotifier {
     hata = null;
     // Bu çekim başlamadan önce kaydedilen yerel girişler artık sunucu verisinde.
     _yerelParsel.removeWhere((e) => e.$1.isBefore(baslangic));
+    _yerelSinir.removeWhere((e) => e.$1.isBefore(baslangic));
     final kanca = veriGeldi;
     if (kanca != null) unawaited(kanca(v, ham));
   }
@@ -434,6 +441,21 @@ class VeriDeposu extends ChangeNotifier {
     ));
     notifyListeners();
     if (yenilensin) unawaited(yenile());
+    return (j['mesaj'] ?? 'Kaydedildi.').toString();
+  }
+
+  /// Tarla Haritası: parsel sınırını kaydeder (yeni parsel de olabilir) ya da KMZ sınırına döndürür.
+  /// Yalnızca çiftlik, parsel adı ve koordinat gönderilir; kişisel veri yoktur.
+  Future<String> parselSinirKaydet(
+      {required String ciftlik, required String parsel, List<(double, double)> koord = const [], bool geriAl = false}) async {
+    final j = await _islem(geriAl ? 'parselSinirGeriAl' : 'parselSinir',
+        {'ciftlik': ciftlik, 'parsel': parsel, 'koord': ParselSinir.koordYaz(koord)});
+    _yerelSinir.add((
+      DateTime.now(),
+      ParselSinir(ciftlik: ciftlik, parsel: parsel, koord: koord, durum: geriAl ? 'Geri alındı' : 'Aktif'),
+    ));
+    notifyListeners();
+    unawaited(yenile());
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
 
