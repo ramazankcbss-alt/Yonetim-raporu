@@ -372,6 +372,7 @@ class _Karsilastirma extends StatelessWidget {
                 Text(hatalar.map((k) => '${k.deger} – ${k.baslik.toLowerCase()}').join('\n'),
                     style: const TextStyle(fontSize: 12.5, color: Renk.soluk)),
                 const SizedBox(height: 8),
+                if (VeriDeposu.ben.paylasim == null)
                 FilledButton.icon(
                   onPressed: () => gonder(hatalar),
                   icon: const Icon(Icons.send),
@@ -414,7 +415,7 @@ class _Karsilastirma extends StatelessWidget {
                         icon: const Icon(Icons.list_alt),
                         label: Text('Nerede? ${k.detay.length} kaydın yeri'),
                       ),
-                    if (_talep.contains(b))
+                    if (_talep.contains(b) && VeriDeposu.ben.paylasim == null)
                       TextButton.icon(
                         onPressed: () => gonder([k]),
                         icon: const Icon(Icons.send),

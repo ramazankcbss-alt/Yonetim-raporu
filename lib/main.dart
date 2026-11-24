@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -12,7 +13,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr_TR');
   await VeriDeposu.ben.baslat();
-  VeriDeposu.ben.veriGeldi = RaporArsivi.guncelle;
+  // Web sürümü yalnızca paylaşım linkiyle açılır: ?s=<veri adresi>&k=<paylaşım anahtarı>
+  if (kIsWeb && Uri.base.queryParameters.containsKey('k')) {
+    await VeriDeposu.ben.linkAyarla(Uri.base.toString());
+  }
+  if (!kIsWeb) VeriDeposu.ben.veriGeldi = RaporArsivi.guncelle;
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,

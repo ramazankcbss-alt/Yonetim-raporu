@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../bicim.dart';
@@ -22,7 +23,10 @@ class Kapi extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: VeriDeposu.ben,
-      builder: (context, _) => VeriDeposu.ben.link == null
+      builder: (context, _) => kIsWeb
+          // Web sürümü: yalnızca paylaşım linkiyle (ana bağlantı tarayıcıda kullanılmaz).
+          ? (VeriDeposu.ben.link != null && VeriDeposu.ben.paylasimLinki ? const PaylasimKabugu() : const WebKarsilama())
+          : VeriDeposu.ben.link == null
           ? const KurulumEkrani(ilk: true)
           // Paylaşım linkiyle kurulduysa yalnızca Tarla Haritası açılır.
           : VeriDeposu.ben.paylasimLinki

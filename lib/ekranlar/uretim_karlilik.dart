@@ -49,11 +49,13 @@ class UretimKarlilikEkran extends StatelessWidget {
                 tabs: [Tab(text: 'Ürünler'), Tab(text: 'Çiftlikler'), Tab(text: 'Teslimatlar')],
               ),
             ),
-            floatingActionButton: FloatingActionButton.extended(
-              onPressed: () => teslimatFormu(context, t),
-              icon: const Icon(Icons.add),
-              label: const Text('Teslimat / satış'),
-            ),
+            floatingActionButton: VeriDeposu.ben.paylasim != null
+                ? null
+                : FloatingActionButton.extended(
+                    onPressed: () => teslimatFormu(context, t),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Teslimat / satış'),
+                  ),
             body: v.tarimsalUretim.bos && v.urunTeslimat.gunler.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.all(16),
@@ -331,11 +333,13 @@ class _Teslimatlar extends StatelessWidget {
                     if (e.fiyat != null) '${sayi(e.fiyat, ondalik: 2)} ₺/kg',
                     if (e.aciklama.isNotEmpty) e.aciklama,
                   ].join(' · ')),
-                  trailing: IconButton(
-                    tooltip: 'Sil',
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () => _sil(context, e),
-                  ),
+                  trailing: VeriDeposu.ben.paylasim != null
+                      ? null
+                      : IconButton(
+                          tooltip: 'Sil',
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _sil(context, e),
+                        ),
                 ),
             ]),
           ),

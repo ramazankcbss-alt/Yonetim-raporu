@@ -33,6 +33,14 @@ class VeriHatasi implements Exception {
 }
 
 /// Bağlantı linki biçim kontrolü: Apps Script web uygulaması + anahtar.
+/// Web paylaşım linki (…github.io/Yonetim-raporu/?s=…&k=…) → veri bağlantısı (…/exec?anahtar=…).
+String paylasimLinkiCevir(String link) {
+  final u = Uri.tryParse(link.trim());
+  final s = u?.queryParameters['s'], k = u?.queryParameters['k'];
+  if (u == null || s == null || k == null || u.host == 'script.google.com') return link.trim();
+  return '$s?anahtar=$k';
+}
+
 String? linkKontrol(String link) {
   final s = link.trim();
   if (s.isEmpty) return 'Bağlantı linkini yapıştırın.';
@@ -127,13 +135,26 @@ class VeriDeposu extends ChangeNotifier {
 
   /// Linki dener; çalışırsa kaydeder ve veriyi yükler.
   Future<void> linkKaydet(String yeniLink) async {
-    final temiz = yeniLink.trim();
+    final temiz = paylasimLinkiCevir(yeniLink);
     final h = linkKontrol(temiz);
     if (h != null) throw VeriHatasi(h);
     await _getir(temiz);
     final p = await SharedPreferences.getInstance();
     await p.setString(_kLink, temiz);
     link = temiz;
+    notifyListeners();
+  }
+
+  /// Web: paylaşım linkiyle açılışta bağlantıyı doğrulamadan ayarlar (veri ilk yenilemede gelir).
+  Future<void> linkAyarla(String yeniLink) async {
+    final temiz = paylasimLinkiCevir(yeniLink);
+    if (linkKontrol(temiz) != null || temiz == link) return;
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kLink, temiz);
+    await p.remove(_kOnbellek);
+    link = temiz;
+    veri = null;
+    paylasimKapali = false;
     notifyListeners();
   }
 
@@ -211,9 +232,12 @@ class VeriDeposu extends ChangeNotifier {
     }
     final v = RaporVerisi.json(j);
     final p = await SharedPreferences.getInstance();
-    await p.setString(_kOnbellek, ham);
     final simdi = DateTime.now();
-    await p.setInt(_kOnbellekZaman, simdi.millisecondsSinceEpoch);
+    // Web sürümünde (paylaşım) veri tarayıcıya kaydedilmez; yalnızca açık sayfada tutulur.
+    if (!kIsWeb) {
+      await p.setString(_kOnbellek, ham);
+      await p.setInt(_kOnbellekZaman, simdi.millisecondsSinceEpoch);
+    }
     veri = v;
     sonAlinma = simdi;
     hata = null;
@@ -244,8 +268,9 @@ class VeriDeposu extends ChangeNotifier {
   bool paylasimKapali = false;
 
   /// Tarla Haritası paylaşımı (yalnızca sahibin uygulamasından): ekle, yetki, kapat, aç, sil.
-  Future<String> paylasimYonet(String tur, {String id = '', String etiket = '', String yetki = 'gor'}) async {
-    final j = await _islem(tur, {'id': id, 'etiket': etiket, 'yetki': yetki});
+  Future<String> paylasimYonet(String tur,
+      {String id = '', String etiket = '', String yetki = 'gor', List<String> bolumler = const []}) async {
+    final j = await _islem(tur, {'id': id, 'etiket': etiket, 'yetki': yetki, 'bolumler': bolumler.join(',')});
     await yenile();
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
