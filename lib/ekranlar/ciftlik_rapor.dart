@@ -316,24 +316,47 @@ class _BirimGrafik extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = [for (final a in aylar) if (!a.tutarsiz) a];
-    return Column(children: [
-      SizedBox(height: 180, child: CustomPaint(size: Size.infinite, painter: _CizgiCizer(l))),
-      const SizedBox(height: 6),
-      Wrap(spacing: 16, children: [
-        const _Lej(renk: Renk.kirmizi, yazi: 'Birim maliyet'),
-        _Lej(renk: Renk.ana, yazi: fiyatAdi),
-      ]),
-      const SizedBox(height: 8),
-      VeriTablosu(
-        ilkSutunGenislik: 92,
-        basliklar: const ['Ay', 'Miktar', 'Maliyet', 'Fiyat', 'Fark'],
-        satirlar: [
-          for (final a in l)
-            [a.donem, sayi(a.miktar), tl2(a.birimMaliyet), tl2(a.fiyat), tl2f(a.fiyat == null ? null : a.fiyat! - a.birimMaliyet)],
-        ],
-      ),
+    final yillar = {for (final a in l) a.yil}.toList()..sort((x, y) => y.compareTo(x));
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      for (final yil in yillar) ...[
+        _YilBasligi(yil),
+        () {
+          final y = [for (final a in l) if (a.yil == yil) a];
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            SizedBox(height: 170, child: CustomPaint(size: Size.infinite, painter: _CizgiCizer(y))),
+            const SizedBox(height: 6),
+            Wrap(alignment: WrapAlignment.center, spacing: 16, children: [
+              const _Lej(renk: Renk.kirmizi, yazi: 'Birim maliyet'),
+              _Lej(renk: Renk.ana, yazi: fiyatAdi),
+            ]),
+            const SizedBox(height: 8),
+            VeriTablosu(
+              ilkSutunGenislik: 80,
+              basliklar: const ['Ay', 'Miktar', 'Maliyet', 'Fiyat', 'Fark'],
+              satirlar: [
+                for (final a in y)
+                  [raporAylari[a.ayNo - 1], sayi(a.miktar), tl2(a.birimMaliyet), tl2(a.fiyat), tl2f(a.fiyat == null ? null : a.fiyat! - a.birimMaliyet)],
+              ],
+            ),
+          ]);
+        }(),
+        const SizedBox(height: 14),
+      ],
     ]);
   }
+}
+
+/// Yıl ayırıcı başlığı.
+class _YilBasligi extends StatelessWidget {
+  const _YilBasligi(this.yil);
+  final int yil;
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 4, bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(color: Renk.anaAcik, borderRadius: BorderRadius.circular(8)),
+        child: Text('$yil', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Renk.anaKoyu)),
+      );
 }
 
 class _CizgiCizer extends CustomPainter {
@@ -595,15 +618,21 @@ class _Tarim extends StatelessWidget {
         const SizedBox(height: 12),
         Panel(
           baslik: 'Ürün bazında birim maliyet ve satış fiyatı (₺/kg)',
-          child: VeriTablosu(
-            ilkSutunGenislik: 150,
-            metinSutunlari: const {0, 1},
-            basliklar: const ['Ürün', 'Çiftlik', 'Yıl', 'Satış (kg)', 'Satış', 'Birim maliyet', 'Satış fiyatı', 'Kg başı sonuç'],
-            satirlar: [
-              for (final t in urunler)
-                [t.urun, t.ciftlik, '${t.yil}', sayi(t.satisKg), mn(t.satisTl), tl2(t.birimMaliyet), tl2(t.fiyat), tl2f(t.birimKar)],
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (final yil in {for (final t in urunler) t.yil}.toList()..sort((a, b) => b.compareTo(a))) ...[
+              _YilBasligi(yil),
+              VeriTablosu(
+                ilkSutunGenislik: 150,
+                metinSutunlari: const {0, 1},
+                basliklar: const ['Ürün', 'Çiftlik', 'Satış (kg)', 'Satış', 'Birim maliyet', 'Satış fiyatı', 'Kg başı sonuç'],
+                satirlar: [
+                  for (final t in urunler.where((t) => t.yil == yil))
+                    [t.urun, t.ciftlik, sayi(t.satisKg), mn(t.satisTl), tl2(t.birimMaliyet), tl2(t.fiyat), tl2f(t.birimKar)],
+                ],
+              ),
+              const SizedBox(height: 12),
             ],
-          ),
+          ]),
         ),
         _Nedenler(nedenler),
       ],
@@ -882,22 +911,29 @@ class _MaliyetTakip extends StatelessWidget {
         Panel(
           baslik: '1 litre süt maliyeti (₺)',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            VeriTablosu(
-              ilkSutunGenislik: 80,
-              basliklar: const ['Ay', 'Şekersüt 2025', 'Şekersüt 2026', 'Satış', 'Pan-Gev 2025', 'Pan-Gev 2026', 'Satış'],
-              satirlar: [
-                for (var ay = 1; ay <= 12; ay++)
-                  if (m.sut.any((x) => x.ay == ay && x.yil >= 2025))
-                    [
-                      raporAylari[ay - 1],
-                      for (final c in const ['Şekersüt', 'Pan-Gev']) ...[
-                        s2(m.sutAylar(c, 2025).where((x) => x.ay == ay).firstOrNull?.maliyet),
-                        s2(m.sutAylar(c, 2026).where((x) => x.ay == ay).firstOrNull?.maliyet),
-                        s2(m.sutAylar(c, 2026).where((x) => x.ay == ay).firstOrNull?.satis),
-                      ],
-                    ],
+            for (final yil in const [2026, 2025, 2024])
+              if (m.sut.any((x) => x.yil == yil)) ...[
+                _YilBasligi(yil),
+                VeriTablosu(
+                  ilkSutunGenislik: 80,
+                  basliklar: [
+                    'Ay',
+                    for (final c in const ['Şekersüt', 'Pan-Gev']) ...[c, if (yil == 2026) 'Satış'],
+                  ],
+                  satirlar: [
+                    for (var ay = 1; ay <= 12; ay++)
+                      if (m.sut.any((x) => x.ay == ay && x.yil == yil))
+                        [
+                          raporAylari[ay - 1],
+                          for (final c in const ['Şekersüt', 'Pan-Gev']) ...[
+                            s2(m.sutAylar(c, yil).where((x) => x.ay == ay).firstOrNull?.maliyet),
+                            if (yil == 2026) s2(m.sutAylar(c, yil).where((x) => x.ay == ay).firstOrNull?.satis),
+                          ],
+                        ],
+                  ],
+                ),
+                const SizedBox(height: 12),
               ],
-            ),
             for (final c in const ['Şekersüt', 'Pan-Gev'])
               for (final (b, a) in sutTakipNedenleri(m, c))
                 Padding(
