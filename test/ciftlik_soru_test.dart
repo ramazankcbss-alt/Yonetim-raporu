@@ -46,4 +46,12 @@ void main() {
     final y = cevapla(r, 'merhaba');
     expect(y.anlasildi, isFalse);
   });
+
+  test('piyasa senaryosu sorusu iki senaryoyu karşılaştırır', () {
+    final y = cevapla(r, 'Aslım piyasa senaryosunda neden zarar ediyor?');
+    expect(y.anlasildi, isTrue);
+    expect(y.paragraflar.join(' '), contains('Aslım'));
+    expect(y.paragraflar.join(' '), contains('piyasa'));
+    expect(y.bulgular.any((b) => b.baslik.contains('Aslım – piyasa')), isTrue);
+  });
 }

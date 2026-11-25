@@ -10,6 +10,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import '../bicim.dart';
 import 'maliyet_takip.dart';
+import 'senaryo.dart';
 
 const raporAylari = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
@@ -170,6 +171,7 @@ class CiftlikRaporu {
     required this.tarim,
     required this.tesvik,
     this.mt,
+    this.senaryo,
   });
 
   final String baslik, kaynak, donem;
@@ -183,6 +185,9 @@ class CiftlikRaporu {
 
   /// "ÇİFTLİKLER : MALİYET TAKİP 2026" verisi (yoksa null).
   final MaliyetTakip? mt;
+
+  /// Maliyet bedeliyle ve piyasa fiyatıyla iki senaryo ("2" uzantılı sayfalar).
+  final Senaryo? senaryo;
 
   static CiftlikRaporu coz(String metin, {String? maliyetTakip}) {
     final j = jsonDecode(metin) as Map<String, dynamic>;
@@ -200,6 +205,7 @@ class CiftlikRaporu {
       tarim: [for (final x in l('tarim')) TarimUrun.json(x)],
       tesvik: {for (final x in l('tesvik')) (x['yil'] as int, x['kalem'] as String): (x['tutar'] as num).toDouble()},
       mt: maliyetTakip == null ? null : MaliyetTakip.coz(maliyetTakip),
+      senaryo: Senaryo.json(j['senaryo'] as Map<String, dynamic>?),
     );
   }
 

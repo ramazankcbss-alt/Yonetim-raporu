@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yonetim_raporu/ekranlar/ciftlik_rapor.dart';
 import 'package:yonetim_raporu/veri/ciftlik_rapor.dart';
+import 'package:yonetim_raporu/veri/senaryo.dart';
 
 void main() {
   final r = CiftlikRaporu.coz(File('assets/veri/ciftlik_rapor_2026.json').readAsStringSync());
@@ -38,5 +39,27 @@ void main() {
     final n = birimNedenleri(r, kSekersut, 'Şekersüt', 'L');
     expect(n.first.$2, contains('31,36'));
     expect(n.any((x) => x.$2.contains('zarar')), isTrue);
+  });
+
+  test('piyasa senaryosu: "2" sayfaları ayrı okunur, toplam çiftliklerin toplamıdır', () {
+    final s = r.senaryo!;
+    expect(s.ciftlikler.first.ciftlik, kSenaryoToplam);
+    final a = s.ciftlik('Aslım')!;
+    expect(a.net1, closeTo(-709021, 1));
+    expect(a.net2, closeTo(-7537646, 1));
+    final t = s.ciftlikler.first;
+    final top = s.ciftlikler.skip(1).fold<double>(0, (x, c) => x + c.net2);
+    expect(t.net2, closeTo(top, 4));
+    // Birinci senaryo toplamı = Çiftliklerimiz (ESK hariç) gelir tablosu
+    expect(t.net1, closeTo(r.d26(kCiftliklerimiz, 'Dönem net kârı/zararı'), 4));
+    expect(s.kontrol.any((k) => k.baslik.contains('Konsolide (2)')), isTrue);
+  });
+
+  test('senaryo nedenleri veriden üretilir', () {
+    final s = r.senaryo!;
+    final n = senaryoNedenleri(s, s.ciftlik('Aslım')!);
+    expect(n.first.$2, contains('7,5 mn ₺ zarar'));
+    expect(n.any((x) => x.$1 == 'Yorum'), isTrue);
+    expect(senaryoNedenleri(s, s.ciftlikler.first).any((x) => x.$1 == 'Grup toplamındaki fark'), isTrue);
   });
 }

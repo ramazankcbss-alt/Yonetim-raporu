@@ -8,6 +8,7 @@ import '../tema.dart';
 import '../veri/ciftlik_rapor.dart';
 import '../veri/ciftlik_soru.dart';
 import '../veri/maliyet_analiz.dart';
+import '../veri/senaryo.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 
@@ -26,7 +27,7 @@ class CiftlikRaporEkran extends StatelessWidget {
       builder: (context, s) {
         final r = s.data;
         return DefaultTabController(
-          length: 7,
+          length: 8,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Çiftlikler Rapor 2026'),
@@ -43,6 +44,7 @@ class CiftlikRaporEkran extends StatelessWidget {
                   Tab(text: 'Et / Besi'),
                   Tab(text: 'Tarım'),
                   Tab(text: 'Maliyet Takip'),
+                  Tab(text: 'Piyasa Senaryosu'),
                   Tab(text: 'Kapsam'),
                 ],
               ),
@@ -61,6 +63,7 @@ class CiftlikRaporEkran extends StatelessWidget {
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Et / Besi', child: _Et(r: r)),
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Tarım', child: _Tarim(r: r)),
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Maliyet Takip', child: _MaliyetTakip(r: r)),
+                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Piyasa Senaryosu', child: _PiyasaSenaryosu(r: r)),
                         _Kapsam(r: r),
                       ]),
           ),
@@ -659,7 +662,7 @@ class _Kapsam extends StatelessWidget {
             ('Dönem', '2026 verileri Ocak–Eylül dönemini kapsar; karşılaştırmalar 2025’in aynı dokuz ayıyla yapılmıştır.'),
             ('Süt', 'Şekersüt ve Pan-Gev gelir tablosu dosyasında Ağustos 2025’ten itibaren yer aldığından süt birim maliyeti 2025 Ağustos–Aralık ortalamasıyla karşılaştırılmıştır. Daha eski aylar için Maliyet Takip sekmesine bakılabilir.'),
             ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyasındaki özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları; İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme ayrıntısı olduğundan özet tablolar üzerinden kullanılmıştır. Formül hatalı hücreler hesaba katılmamıştır.'),
-            ('Alternatif sayfalar', 'Dosyadaki “2” uzantılı çiftlik sayfaları konsolide toplamla örtüşmediğinden kullanılmamıştır.'),
+            ('İki senaryo', 'Çiftlik sayfaları (ör. “1605 - Aslım”) grup içi ürünlerin maliyet bedeliyle aktarıldığı fiili durumu; “2” uzantılı sayfalar (ör. “1605 - Aslım 2”) aynı ürünler dışarı satılsaydı piyasa satış fiyatıyla, dışarıdan alınsaydı piyasa alış fiyatıyla hesaplanan durumu gösterir. Kâr / Zarar, Süt, Et ve Tarım sekmeleri birinci senaryoya; Piyasa Senaryosu sekmesi ikisinin karşılaştırmasına dayanır. “Çiftlikler Konsolide (2)” sayfası Taşağıl’ı (ESK) içermez.'),
             ('Çiftliklerimiz (ESK hariç)', 'Konsolide toplamdan 1604 Taşağıl (ESK besi hizmeti) çıkarılarak hesaplanmıştır.'),
             ('KVKK', 'Rapor yalnızca çiftlik bazında toplam tutar ve birim maliyet içerir; kişi adı, personel, ücret ayrıntısı, alıcı adı ve küpe numarası yoktur.'),
             ('Güncelleme', 'Dosyanın yeni sürümü geldiğinde veri araclar/ciftlik_rapor/uret.py ile yeniden üretilir.'),
@@ -678,6 +681,7 @@ const _ornekSorular = [
   'ESK besi hizmeti neden zarar ediyor?',
   'Konsolide net kâr neden arttı?',
   'Teşvikler ne kadar?',
+  'Aslım piyasa senaryosunda neden zarar ediyor?',
   'Tutarsızlıklar neler?',
 ];
 
@@ -1034,6 +1038,95 @@ class _MaliyetTakip extends StatelessWidget {
               ),
           ]),
         ),
+      ],
+    );
+  }
+}
+
+// ----------------------------------------------------------------- Piyasa Senaryosu
+
+/// Maliyet bedeliyle aktarım (çiftlik sayfası) ile piyasa fiyatıyla değerleme
+/// ("2" uzantılı sayfa) karşılaştırması.
+class _PiyasaSenaryosu extends StatefulWidget {
+  const _PiyasaSenaryosu({required this.r});
+  final CiftlikRaporu r;
+  @override
+  State<_PiyasaSenaryosu> createState() => _PiyasaSenaryosuState();
+}
+
+class _PiyasaSenaryosuState extends State<_PiyasaSenaryosu> {
+  String? _secili;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.r.senaryo;
+    if (s == null || s.ciftlikler.isEmpty) {
+      return const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(uyari: true, yazi: 'Dosyada piyasa fiyatlı senaryo sayfası bulunamadı.'));
+    }
+    final c = s.ciftlik(_secili ?? '') ?? s.ciftlikler.first;
+    final bulgular = senaryoBulgulari(widget.r);
+    final olumsuz = [for (final b in bulgular) if (b.tur == BulguTuru.olumsuz) b];
+    final tutarsiz = [for (final b in bulgular) if (b.tur == BulguTuru.tutarsizlik) b];
+    final bilgi = [for (final k in s.kontrol) if (k.tur == 'bilgi' && (c.ciftlik == kSenaryoToplam || k.ciftlik == c.ciftlik)) k];
+    String m1(double v) => sayi(v / 1e6, ondalik: 1);
+    String f1(double v) => '${v > 0 ? '+' : v < 0 ? '−' : ''}${sayi(v.abs() / 1e6, ondalik: 1)}';
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        BilgiKutusu(yazi: '${s.aciklama} Dönem: ${s.donem}. Tutarlar mn ₺.'),
+        Panel(
+          baslik: 'Dönem net sonucu – iki senaryo (mn ₺)',
+          child: VeriTablosu(
+            ilkSutunGenislik: 150,
+            basliklar: const ['Çiftlik', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
+            satirlar: [
+              for (final x in [...s.ciftlikler.skip(1), s.ciftlikler.first]) [x.ciftlik, m1(x.net1), m1(x.net2), f1(x.netFark)],
+            ],
+            vurguluSonSatir: s.ciftlikler.first.ciftlik == kSenaryoToplam,
+          ),
+        ),
+        if (olumsuz.isNotEmpty || tutarsiz.isNotEmpty)
+          Panel(
+            baslik: 'Olumsuz sonuçlar ve tutarsızlıklar',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (olumsuz.isNotEmpty) _BulguListesi(baslik: 'Olumsuz sonuçlar', bulgular: olumsuz),
+              if (tutarsiz.isNotEmpty) _BulguListesi(baslik: 'Veri tutarsızlıkları', bulgular: tutarsiz),
+            ]),
+          ),
+        const SizedBox(height: 4),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          for (final x in s.ciftlikler)
+            ChoiceChip(
+              label: Text(x.ciftlik),
+              selected: x.ciftlik == c.ciftlik,
+              onSelected: (_) => setState(() => _secili = x.ciftlik),
+            ),
+        ]),
+        Panel(
+          baslik: '${c.ciftlik} – kalem karşılaştırması (mn ₺)',
+          child: VeriTablosu(
+            ilkSutunGenislik: 150,
+            basliklar: const ['Kalem', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
+            satirlar: [
+              for (final k in senaryoKalemleri) [k, m1(c.s1(k)), m1(c.s2(k)), f1(c.fark(k))],
+            ],
+            vurguluSonSatir: true,
+          ),
+        ),
+        Panel(
+          baslik: '${c.ciftlik} – aylık net sonuç (mn ₺)',
+          child: VeriTablosu(
+            ilkSutunGenislik: 80,
+            basliklar: const ['Ay', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
+            satirlar: [
+              for (final a in c.aylik) [a.ay, m1(a.s1), m1(a.s2), f1(a.fark)],
+              ['Toplam', m1(c.net1), m1(c.net2), f1(c.netFark)],
+            ],
+            vurguluSonSatir: true,
+          ),
+        ),
+        _Nedenler(senaryoNedenleri(s, c), baslik: 'Farkın nedenleri'),
+        if (bilgi.isNotEmpty) _Nedenler([for (final k in bilgi) (k.baslik, k.aciklama)], baslik: 'Notlar'),
       ],
     );
   }

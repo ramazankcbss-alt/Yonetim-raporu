@@ -6,6 +6,7 @@ import '../bicim.dart';
 import 'ciftlik_rapor.dart';
 import 'maliyet_analiz.dart';
 import 'maliyet_takip.dart';
+import 'senaryo.dart';
 
 enum BulguTuru { olumsuz, tutarsizlik }
 
@@ -128,6 +129,55 @@ List<Bulgu> tumBulgular(CiftlikRaporu r) {
     }
   }
   if (r.mt != null) l.addAll(maliyetTakipBulgulari(r));
+  l.addAll(senaryoBulgulari(r));
+  return l;
+}
+
+/// Piyasa senaryosu ("2" uzantılı sayfalar) olumsuz sonuçları ve tutarsızlıkları.
+List<Bulgu> senaryoBulgulari(CiftlikRaporu r) {
+  final s = r.senaryo;
+  if (s == null) return const [];
+  final l = <Bulgu>[];
+  for (final c in s.ciftlikler) {
+    if (c.ciftlik == kSenaryoToplam) continue;
+    if (c.net2 < 0) {
+      l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa fiyatlarıyla zarar',
+          'Grup içi ürünler piyasa fiyatıyla değerlendiğinde ${s.donem} sonucu ${kz(c.net2)} (maliyet bedeliyle ${kz(c.net1)}; fark ${mnFark(c.netFark)}).',
+          {c.ciftlik, 'senaryo', 'finans', if (c.ciftlik == 'Aslım') 'et'}));
+    } else if (c.netFark < -1e6) {
+      l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa fiyatlarıyla kâr düşüyor',
+          'Piyasa senaryosunda sonuç ${kz(c.net2)}, maliyet senaryosunda ${kz(c.net1)}.', {c.ciftlik, 'senaryo', 'finans'}));
+    }
+    if (c.s2('Brüt satış kârı/zararı') < 0) {
+      l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa senaryosunda brüt zarar',
+          'Piyasa fiyatlarıyla brüt satış sonucu ${mn(c.s2('Brüt satış kârı/zararı'))}.', {c.ciftlik, 'senaryo', 'finans'}));
+    }
+  }
+  for (final k in s.kontrol) {
+    if (k.tur != 'tutarsizlik') continue;
+    l.add(Bulgu(BulguTuru.tutarsizlik, k.baslik, k.aciklama, {k.ciftlik, 'senaryo', 'finans'}));
+  }
+  return l;
+}
+
+List<String> _senaryo(CiftlikRaporu r, _Soru q) {
+  final s = r.senaryo;
+  if (s == null) return ['Dosyada piyasa fiyatlı senaryo sayfası bulunamadı.'];
+  final hedef = [
+    for (final c in s.ciftlikler)
+      if (q.ciftlikler.contains(c.ciftlik) ||
+          ((q.ciftlikler.contains(kCiftliklerimiz) || q.ciftlikler.contains(kKonsolide)) && c.ciftlik == kSenaryoToplam))
+        c,
+  ];
+  final l = <String>[];
+  if (hedef.isEmpty) {
+    l.add('${s.aciklama} ${s.donem} dönem sonuçları: '
+        '${s.ciftlikler.map((c) => '${c.ciftlik} ${kz(c.net1)} → ${kz(c.net2)} (${mnFark(c.netFark)})').join('; ')}.');
+    hedef.add(s.ciftlikler.first);
+  }
+  for (final c in hedef) {
+    l.add('${c.ciftlik}: ${senaryoNedenleri(s, c).map((x) => '${x.$1}: ${x.$2}').join(' ')}');
+  }
   return l;
 }
 
@@ -357,7 +407,9 @@ class _Soru {
     canli = _var(s, ['canlı', 'kayar']);
     dekar = _var(s, ['dekar', 'ekiliş', 'ekilis', 'ortak gider']);
     yemFiyat = s.contains('yem') && _var(s, ['fiyat', 'pahal', 'ucuz', 'kg']);
-        tutarsiz = _var(s, ['tutarsız', 'tutarsiz', 'hata', 'yanlış', 'sorun', 'olumsuz', 'risk', 'uyarı']);
+    senaryo = _var(s, ['senaryo', 'piyasa', 'aslım 2', 'aslim 2', 'pan-gev 2', 'pangev 2', 'şekersüt 2', 'alan 2', 'iç transfer',
+      'grup içi', 'dışarı sat', 'dışarıdan al', 'ikinci sayfa', '2. sayfa', 'maliyet bedel']);
+    tutarsiz = _var(s, ['tutarsız', 'tutarsiz', 'hata', 'yanlış', 'sorun', 'olumsuz', 'risk', 'uyarı']);
     for (final e in const {
       'favök': 'FAVÖK (EBITDA)', 'ebitda': 'FAVÖK (EBITDA)', 'brüt': 'Brüt satış kârı/zararı', 'finansman': 'Finansman giderleri',
       'faiz': 'Finansman giderleri', 'genel yönetim': 'Faaliyet giderleri', 'faaliyet gider': 'Faaliyet giderleri',
@@ -377,12 +429,12 @@ class _Soru {
   final urunler = <String>{};
   bool sut = false, et = false, tarim = false, neden = false, enCok = false, enAz = false;
   bool maliyet = false, fiyat = false, tesvik = false, tutarsiz = false;
-  bool hayvanBasi = false, karkas = false, canli = false, dekar = false, yemFiyat = false;
+  bool hayvanBasi = false, karkas = false, canli = false, dekar = false, yemFiyat = false, senaryo = false;
   int? ay, yil;
   String? bilesen, kalem;
 
   bool get takip => hayvanBasi || karkas || canli || dekar || yemFiyat;
-  bool get bos => ciftlikler.isEmpty && !sut && !et && !tarim && kalem == null && !tesvik && !tutarsiz && !maliyet && !fiyat && !takip;
+  bool get bos => ciftlikler.isEmpty && !sut && !et && !tarim && kalem == null && !tesvik && !tutarsiz && !maliyet && !fiyat && !takip && !senaryo;
 
   Set<String> get etiketler => {
         ...ciftlikler,
@@ -397,6 +449,7 @@ class _Soru {
         if (canli) 'canlı',
         if (yemFiyat) 'yem',
         if (dekar) 'tarım',
+        if (senaryo) 'senaryo',
       };
 }
 
@@ -420,6 +473,15 @@ Yanit cevapla(CiftlikRaporu r, String soru) {
         _genelOzet(r),
       ],
       bulgular: tum.where((b) => b.tur == BulguTuru.olumsuz).take(3).toList(),
+    );
+  }
+
+  if (q.senaryo && q.urunler.isEmpty) {
+    final et = q.etiketler;
+    return Yanit(
+      soru: soru,
+      paragraflar: _senaryo(r, q),
+      bulgular: [for (final b in tum) if (b.konular.contains('senaryo') && (q.ciftlikler.isEmpty || b.konular.any(et.contains))) b],
     );
   }
 
