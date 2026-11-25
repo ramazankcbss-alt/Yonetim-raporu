@@ -118,9 +118,10 @@ def uret(s):
             v = g[sayfa][key]
             gelir.append(dict(ciftlik=ad, bolum=bolum, kalem=lab, y2026_9ay=top(v['26'], 9), y2025_9ay=top(v['25'], 9),
                               y2025_yil=top(v['25']), y2024_yil=top(v['24'])))
-        for i in range(9):
-            aylik.append(dict(ciftlik=ad, ay=M[i], ay_no=i + 1, net_kar=round(g[sayfa][KALEMLER[-1][1]]['26'][i] or 0),
-                              brut_kar=round(g[sayfa][KALEMLER[3][1]]['26'][i] or 0)))
+        for y, yil, n in (('26', 2026, 9), ('25', 2025, 12)):
+            for i in range(n):
+                aylik.append(dict(ciftlik=ad, yil=yil, ay=M[i], ay_no=i + 1, net_kar=round(g[sayfa][KALEMLER[-1][1]][y][i] or 0),
+                                  brut_kar=round(g[sayfa][KALEMLER[3][1]][y][i] or 0)))
     for lab, key in KALEMLER:  # Çiftliklerimiz = Konsolide – Taşağıl (ESK)
         a, b = g['Çiftlikler Konsolide'][key], g['1604 - Taşağıl'][key]
         d = {y: [(x or 0) - (z or 0) for x, z in zip(a[y], b[y])] for y in a}

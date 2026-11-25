@@ -53,9 +53,9 @@ class GelirKalemi {
 }
 
 class AylikSonuc {
-  const AylikSonuc(this.ciftlik, this.ayNo, this.brutKar, this.netKar);
+  const AylikSonuc(this.ciftlik, this.ayNo, this.brutKar, this.netKar, {this.yil = 2026});
   final String ciftlik;
-  final int ayNo;
+  final int ayNo, yil;
   final double brutKar, netKar;
   String get ay => raporAylari[ayNo - 1];
 }
@@ -199,7 +199,8 @@ class CiftlikRaporu {
       gelir: [for (final x in l('gelir')) GelirKalemi.json(x)],
       aylik: [
         for (final x in l('aylik'))
-          AylikSonuc(x['ciftlik'] as String, x['ay_no'] as int, (x['brut_kar'] as num).toDouble(), (x['net_kar'] as num).toDouble()),
+          AylikSonuc(x['ciftlik'] as String, x['ay_no'] as int, (x['brut_kar'] as num).toDouble(), (x['net_kar'] as num).toDouble(),
+              yil: x['yil'] as int? ?? 2026),
       ],
       birim: [for (final x in l('birim')) BirimAy.json(x)],
       tarim: [for (final x in l('tarim')) TarimUrun.json(x)],
@@ -238,6 +239,8 @@ class CiftlikRaporu {
 
   double d26(String c, String k) => kalem(c, k)?.y2026 ?? 0;
   double d25(String c, String k) => kalem(c, k)?.y2025Donem ?? 0;
+  double d25Yil(String c, String k) => kalem(c, k)?.y2025Yil ?? 0;
+  double d24Yil(String c, String k) => kalem(c, k)?.y2024Yil ?? 0;
 
   /// Faaliyet dışı net: (649 + 679 gelirleri) − (65 + 68 giderleri).
   double faaliyetDisi(String c, {bool y2025 = false}) {
@@ -245,7 +248,7 @@ class CiftlikRaporu {
     return f('Diğer olağan gelirler (649)') + f('Olağandışı gelirler (679)') - f('Diğer olağan giderler') - f('Olağandışı giderler');
   }
 
-  List<AylikSonuc> aylikSonuc(String ciftlik) => [for (final a in aylik) if (a.ciftlik == ciftlik) a]
+  List<AylikSonuc> aylikSonuc(String ciftlik, {int yil = 2026}) => [for (final a in aylik) if (a.ciftlik == ciftlik && a.yil == yil) a]
     ..sort((a, b) => a.ayNo.compareTo(b.ayNo));
 
   List<BirimAy> birimAylar(String urun) => [for (final b in birim) if (b.urun == urun) b]

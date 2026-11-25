@@ -12,8 +12,7 @@ import '../veri/senaryo.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 
-/// Çiftlikler Rapor 2026: kâr/zarar ve süt, et, tarım birim maliyetleri,
-/// artış ve azalışların nedenleriyle birlikte.
+/// Çiftlikler Rapor: her yıl ayrı bir bölümdür (Tarla Haritası sezonları gibi).
 class CiftlikRaporEkran extends StatelessWidget {
   const CiftlikRaporEkran({super.key});
 
@@ -22,53 +21,255 @@ class CiftlikRaporEkran extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<CiftlikRaporu>(
-      future: _veri,
-      builder: (context, s) {
-        final r = s.data;
-        return DefaultTabController(
-          length: 8,
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Çiftlikler Rapor 2026'),
-              bottom: const TabBar(
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                labelColor: Colors.white,
-                unselectedLabelColor: Color(0xCCFFFFFF),
-                indicatorColor: Colors.white,
-                tabs: [
-                  Tab(text: 'Kâr / Zarar'),
-                  Tab(text: 'Soru Sor'),
-                  Tab(text: 'Süt'),
-                  Tab(text: 'Et / Besi'),
-                  Tab(text: 'Tarım'),
-                  Tab(text: 'Maliyet Takip'),
-                  Tab(text: 'Piyasa Senaryosu'),
-                  Tab(text: 'Kapsam'),
-                ],
+    return Scaffold(
+      appBar: AppBar(title: const Text('Çiftlikler Rapor')),
+      body: FutureBuilder<CiftlikRaporu>(
+        future: _veri,
+        builder: (context, s) {
+          if (s.hasError) {
+            return const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(uyari: true, yazi: 'Rapor verisi okunamadı.'));
+          }
+          final r = s.data;
+          if (r == null) return const Center(child: CircularProgressIndicator());
+          const net = 'Dönem net kârı/zararı';
+          void ac(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
+          return GonderAlani(
+            konu: 'Çiftlikler Rapor – Yıllar',
+            child: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+              BilgiKutusu(
+                  yazi: 'Her yıl ayrı bir bölümdür; içinde kâr / zarar, süt, maliyet takip ve piyasa senaryosu sekmeleri yer alır. '
+                      'Kaynak: “${r.kaynak}” (muhasebe gelir tabloları) ve “ÇİFTLİKLER : MALİYET TAKİP 2026”.'),
+              const SizedBox(height: 12),
+              _YilKarti(
+                baslik: '2025 yılı',
+                alt: 'Ocak–Aralık 2025 · Konsolide net sonuç ${kz(r.d25Yil(kKonsolide, net))} · '
+                    'Şekersüt ve Pan-Gev verisi Ağustos 2025’ten başlar',
+                ikon: Icons.event_available,
+                dokun: () => ac(_Yil2025(r: r)),
               ),
+              _YilKarti(
+                baslik: '2026 yılı',
+                alt: '${r.donem} · Konsolide net sonuç ${kz(r.d26(kKonsolide, net))} · Ekim–Aralık henüz işlenmemiş',
+                ikon: Icons.insights,
+                dokun: () => ac(_Yil2026(r: r)),
+              ),
+              _YilKarti(
+                baslik: '2027 yılı',
+                alt: 'Veri yok · 2027 kayıtları kaynak dosyalara girildiğinde bu bölüm doldurulacaktır',
+                ikon: Icons.event_note,
+                dokun: () => ac(const _Yil2027()),
+              ),
+            ]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _YilKarti extends StatelessWidget {
+  const _YilKarti({required this.baslik, required this.alt, required this.ikon, required this.dokun});
+  final String baslik, alt;
+  final IconData ikon;
+  final VoidCallback dokun;
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.only(bottom: 8),
+        child: ListTile(
+          leading: CircleAvatar(backgroundColor: Renk.anaAcik, child: Icon(ikon, color: Renk.ana)),
+          title: Text(baslik, style: const TextStyle(fontWeight: FontWeight.w700)),
+          subtitle: Text(alt),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: dokun,
+        ),
+      );
+}
+
+/// Sekmeli yıl ekranı.
+class _SekmeliYil extends StatelessWidget {
+  const _SekmeliYil({required this.baslik, required this.sekmeler});
+  final String baslik;
+  final List<(String, Widget)> sekmeler;
+  @override
+  Widget build(BuildContext context) => DefaultTabController(
+        length: sekmeler.length,
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(baslik),
+            bottom: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelColor: Colors.white,
+              unselectedLabelColor: const Color(0xCCFFFFFF),
+              indicatorColor: Colors.white,
+              tabs: [for (final (t, _) in sekmeler) Tab(text: t)],
             ),
-            body: s.hasError
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: BilgiKutusu(uyari: true, yazi: 'Rapor verisi okunamadı.'),
-                  )
-                : r == null
-                    ? const Center(child: CircularProgressIndicator())
-                    : TabBarView(children: [
-                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Kâr / Zarar', child: _KarZarar(r: r)),
-                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Soru Sor', child: _SoruSor(r: r)),
-                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Süt', child: _Sut(r: r)),
-                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Et / Besi', child: _Et(r: r)),
-                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Tarım', child: _Tarim(r: r)),
-                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Maliyet Takip', child: _MaliyetTakip(r: r)),
-                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Piyasa Senaryosu', child: _PiyasaSenaryosu(r: r)),
-                        _Kapsam(r: r),
-                      ]),
           ),
-        );
-      },
+          body: TabBarView(children: [
+            for (final (t, w) in sekmeler) t == 'Kapsam' ? w : GonderAlani(konu: '$baslik – $t', child: w),
+          ]),
+        ),
+      );
+}
+
+class _Yil2026 extends StatelessWidget {
+  const _Yil2026({required this.r});
+  final CiftlikRaporu r;
+  @override
+  Widget build(BuildContext context) => _SekmeliYil(baslik: 'Çiftlikler Rapor 2026', sekmeler: [
+        ('Kâr / Zarar', _KarZarar(r: r)),
+        ('Soru Sor', _SoruSor(r: r)),
+        ('Süt', _Sut(r: r)),
+        ('Et / Besi', _Et(r: r)),
+        ('Tarım', _Tarim(r: r)),
+        ('Maliyet Takip', _MaliyetTakip(r: r)),
+        ('Piyasa Senaryosu', _PiyasaSenaryosu(r: r, sabitYil: 2026)),
+        ('Kapsam', _Kapsam(r: r)),
+      ]);
+}
+
+class _Yil2025 extends StatelessWidget {
+  const _Yil2025({required this.r});
+  final CiftlikRaporu r;
+  @override
+  Widget build(BuildContext context) => _SekmeliYil(baslik: 'Çiftlikler Rapor 2025', sekmeler: [
+        ('Kâr / Zarar', _KarZarar2025(r: r)),
+        ('Süt', _Sut2025(r: r)),
+        ('Maliyet Takip', _MaliyetTakip(r: r, yil: 2025)),
+        ('Piyasa Senaryosu', _PiyasaSenaryosu(r: r, sabitYil: 2025)),
+      ]);
+}
+
+class _Yil2027 extends StatelessWidget {
+  const _Yil2027();
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Çiftlikler Rapor 2027')),
+        body: ListView(padding: const EdgeInsets.all(16), children: const [
+          BilgiKutusu(
+              uyari: true,
+              yazi: '2027 yılına ait çiftlik raporu verisi henüz bulunmuyor. “2026 Yılı Çiftlik Raporları” ve “ÇİFTLİKLER : MALİYET TAKİP 2026” '
+                  'dosyaları 2027 sütunu içermiyor. 2027 dosyaları paylaşıldığında bu bölüm kâr / zarar, süt, maliyet takip ve piyasa '
+                  'senaryosu sekmeleriyle doldurulacaktır. Tahmini ya da varsayımsal rakam gösterilmez.'),
+        ]),
+      );
+}
+
+/// 2025 kâr / zarar: yıl toplamları ve aylık sonuç.
+class _KarZarar2025 extends StatefulWidget {
+  const _KarZarar2025({required this.r});
+  final CiftlikRaporu r;
+  @override
+  State<_KarZarar2025> createState() => _KarZarar2025State();
+}
+
+class _KarZarar2025State extends State<_KarZarar2025> {
+  String _secili = kKonsolide;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.r;
+    final c = _secili;
+    const net = 'Dönem net kârı/zararı', brut = 'Brüt satış kârı/zararı';
+    final aylik = r.aylikSonuc(c, yil: 2025);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Text('Kaynak: ${r.kaynak} · Fiili Ocak–Aralık 2025', style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+        ),
+        BilgiKutusu(
+            yazi: '2025 yılında çiftlikler konsolide olarak ${kz(r.d25Yil(kKonsolide, net))} elde etti '
+                '(2024: ${kz(r.d24Yil(kKonsolide, net))}). Brüt satış kârı ${mn(r.d25Yil(kKonsolide, brut))}.'),
+        Secici<String>(
+          secenekler: r.ciftlikler.reversed.toList(),
+          secili: c,
+          etiket: (s) => s,
+          degisti: (s) => setState(() => _secili = s),
+        ),
+        GostergeIzgarasi(kartlar: [
+          for (final (k, f) in [('Net satışlar', mn), (brut, mn), ('FAVÖK (EBITDA)', mn), (net, kz)])
+            _DegerKarti(
+              baslik: '${k == net ? 'Dönem net sonucu' : k} · 2025',
+              deger: f(r.d25Yil(c, k)),
+              renk: k == 'Net satışlar' ? Renk.yazi : _isaretRengi(r.d25Yil(c, k)),
+              alt: '2024: ${f(r.d24Yil(c, k))}',
+            ),
+        ]),
+        const SizedBox(height: 12),
+        Panel(
+          baslik: 'Aylık brüt satış kârı ve dönem net sonucu (2025)',
+          child: aylik.isEmpty
+              ? const Text('Bu görünüm için aylık kırılım dosyada bulunmuyor.', style: TextStyle(color: Renk.soluk))
+              : _AylikGrafik(aylar: aylik),
+        ),
+        Panel(
+          baslik: 'Çiftlik bazında kâr / zarar (Ocak–Aralık 2025)',
+          child: VeriTablosu(
+            ilkSutunGenislik: 150,
+            basliklar: const ['Çiftlik', 'Net satış', 'Satış maliyeti', 'Brüt kâr', 'Net 2025', 'Net 2024'],
+            satirlar: [
+              for (final x in r.ciftlikler)
+                [
+                  x,
+                  mn(r.d25Yil(x, 'Net satışlar')),
+                  mn(r.d25Yil(x, 'Satışların maliyeti')),
+                  mn(r.d25Yil(x, brut)),
+                  mn(r.d25Yil(x, net)),
+                  mn(r.d24Yil(x, net)),
+                ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 2025 süt: muhasebe (satılan mamul maliyeti) ve maliyet takip litre maliyeti yan yana.
+class _Sut2025 extends StatelessWidget {
+  const _Sut2025({required this.r});
+  final CiftlikRaporu r;
+  @override
+  Widget build(BuildContext context) {
+    String s2(double? v) => v == null ? '—' : sayi(v, ondalik: 2);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const BilgiKutusu(
+            yazi: 'Muhasebe: satılan mamul maliyeti ÷ üretilen litre. Takip: “ÇİFTLİKLER : MALİYET TAKİP 2026” SÜT MALİYETİ sayfasındaki 2025 değeri. '
+                'Muhasebe verisi Ağustos 2025’ten başlar.'),
+        for (final (c, u) in const [('Şekersüt', kSekersut), ('Pan-Gev', kPangev)])
+          Panel(
+            baslik: '$c – 1 litre süt (2025, ₺)',
+            child: VeriTablosu(
+              ilkSutunGenislik: 80,
+              basliklar: const ['Ay', 'Üretim (lt)', 'Muhasebe maliyet', 'Takip maliyet', 'Satış fiyatı', 'Litre başı sonuç'],
+              satirlar: [
+                for (var ay = 1; ay <= 12; ay++)
+                  if (r.birimAylar(u).where((b) => b.yil == 2025 && b.ayNo == ay && b.miktar > 0).firstOrNull case final b?)
+                    [
+                      raporAylari[ay - 1],
+                      sayi(b.miktar),
+                      s2(b.birimMaliyet),
+                      s2(r.mt?.sutAylar(c, 2025).where((x) => x.ay == ay).firstOrNull?.maliyet),
+                      s2(b.fiyat),
+                      b.fiyat == null ? '—' : tl2f(b.fiyat! - b.birimMaliyet),
+                    ]
+                  else if (r.mt?.sutAylar(c, 2025).where((x) => x.ay == ay).firstOrNull case final t?)
+                    [raporAylari[ay - 1], '—', '—', s2(t.maliyet), '—', '—'],
+                if (r.donemOrt(u, 2025).aylar.isNotEmpty)
+                  () {
+                    final d = r.donemOrt(u, 2025);
+                    return ['Ort.', sayi(d.aylar.fold(0.0, (t, a) => t + a.miktar)), s2(d.birimMaliyet), '', s2(d.fiyat),
+                      d.fiyat == null ? '—' : tl2f(d.fiyat! - d.birimMaliyet)];
+                  }(),
+              ],
+              vurguluSonSatir: r.donemOrt(u, 2025).aylar.isNotEmpty,
+            ),
+          ),
+      ],
     );
   }
 }
@@ -849,8 +1050,9 @@ class _BulguListesi extends StatelessWidget {
 
 /// "ÇİFTLİKLER : MALİYET TAKİP 2026" dosyasının analizi.
 class _MaliyetTakip extends StatelessWidget {
-  const _MaliyetTakip({required this.r});
+  const _MaliyetTakip({required this.r, this.yil = 2026});
   final CiftlikRaporu r;
+  final int yil;
 
   @override
   Widget build(BuildContext context) {
@@ -858,7 +1060,7 @@ class _MaliyetTakip extends StatelessWidget {
     if (m == null) {
       return const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(uyari: true, yazi: 'Maliyet takip verisi bulunamadı.'));
     }
-    final bulgular = maliyetTakipBulgulari(r);
+    final bulgular = [for (final b in maliyetTakipBulgulari(r)) if (yil == 2026 || b.baslik.contains('$yil')) b];
     final olumsuz = [for (final b in bulgular) if (b.tur == BulguTuru.olumsuz) b];
     final tutarsiz = [for (final b in bulgular) if (b.tur == BulguTuru.tutarsizlik) b];
     String s2(double? v) => v == null ? '—' : sayi(v, ondalik: 2);
@@ -878,15 +1080,15 @@ class _MaliyetTakip extends StatelessWidget {
           ),
         // Hayvancılık
         for (final c in m.hayvanCiftlikleri)
-          if (m.hayvanAylar(c, 2026).isNotEmpty)
+          if (m.hayvanAylar(c, yil).isNotEmpty)
             Panel(
-              baslik: '$c – hayvan başı aylık maliyet (2026)',
+              baslik: '$c – hayvan başı aylık maliyet ($yil)',
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 VeriTablosu(
                   ilkSutunGenislik: 80,
                   basliklar: const ['Ay', 'Hayvan', 'Toplam', 'Baş/ay', 'Baş/gün', 'Yem', 'İşçilik', 'Amortisman', 'Diğer'],
                   satirlar: [
-                    for (final a in m.hayvanAylar(c, 2026))
+                    for (final a in m.hayvanAylar(c, yil))
                       [
                         raporAylari[a.ay - 1],
                         sayi(a.hayvan),
@@ -898,12 +1100,13 @@ class _MaliyetTakip extends StatelessWidget {
                         sayi(a.basina(a.amortisman)),
                         sayi(a.basina(a.diger)),
                       ],
-                    ['Ort.', '', '', sayi(m.donemBasina(c, 2026, 'Toplam')), '', sayi(m.donemBasina(c, 2026, 'Yem')), sayi(m.donemBasina(c, 2026, 'İşçilik')),
-                      sayi(m.donemBasina(c, 2026, 'Amortisman')), sayi(m.donemBasina(c, 2026, 'Diğer'))],
+                    ['Ort.', '', '', sayi(m.donemBasina(c, yil, 'Toplam')), '', sayi(m.donemBasina(c, yil, 'Yem')), sayi(m.donemBasina(c, yil, 'İşçilik')),
+                      sayi(m.donemBasina(c, yil, 'Amortisman')), sayi(m.donemBasina(c, yil, 'Diğer'))],
                   ],
                   vurguluSonSatir: true,
                 ),
-                for (final (b, a) in hayvanNedenleri(m, c))
+                if (yil == 2026)
+                  for (final (b, a) in hayvanNedenleri(m, c))
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text.rich(TextSpan(children: [
@@ -917,7 +1120,7 @@ class _MaliyetTakip extends StatelessWidget {
         Panel(
           baslik: '1 litre süt maliyeti (₺)',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            for (final yil in const [2026, 2025, 2024])
+            for (final yil in this.yil == 2026 ? const [2026, 2025, 2024] : const [2025, 2024])
               if (m.sut.any((x) => x.yil == yil)) ...[
                 _YilBasligi(yil),
                 VeriTablosu(
@@ -957,8 +1160,9 @@ class _MaliyetTakip extends StatelessWidget {
                   ),
                 const SizedBox(height: 12),
               ],
-            for (final c in const ['Şekersüt', 'Pan-Gev'])
-              for (final (b, a) in sutTakipNedenleri(m, c))
+            if (yil == 2026)
+              for (final c in const ['Şekersüt', 'Pan-Gev'])
+                for (final (b, a) in sutTakipNedenleri(m, c))
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text.rich(TextSpan(children: [
@@ -968,7 +1172,11 @@ class _MaliyetTakip extends StatelessWidget {
                 ),
           ]),
         ),
+        if (yil != 2026)
+          const BilgiKutusu(
+              yazi: 'Karkas, canlı hayvan, tarım ekiliş ve yem sayfaları yalnızca 2026 verisi içerdiğinden bu bölümler 2026 yılında yer alır.'),
         // Karkas
+        if (yil == 2026)
         Panel(
           baslik: '1 kg karkas maliyeti (₺)',
           child: VeriTablosu(
@@ -991,7 +1199,7 @@ class _MaliyetTakip extends StatelessWidget {
           ),
         ),
         // Canlı maliyet
-        if (m.canli.isNotEmpty)
+        if (yil == 2026 && m.canli.isNotEmpty)
           Panel(
             baslik: 'Canlı hayvan maliyeti – kayar ortalama (₺/baş)',
             child: () {
@@ -1019,6 +1227,7 @@ class _MaliyetTakip extends StatelessWidget {
             }(),
           ),
         // Tarım
+        if (yil == 2026)
         Panel(
           baslik: 'Tarım – ekiliş bazında maliyet (Ağustos 2025 – Eylül 2026)',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1044,6 +1253,7 @@ class _MaliyetTakip extends StatelessWidget {
           ]),
         ),
         // Yem
+        if (yil == 2026)
         Panel(
           baslik: 'Yem – ana kalemlerde birim fiyat değişimi (Ocak → Eylül 2026)',
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -1067,8 +1277,11 @@ class _MaliyetTakip extends StatelessWidget {
 /// Maliyet bedeliyle aktarım (çiftlik sayfası) ile piyasa fiyatıyla değerleme
 /// ("2" uzantılı sayfa) karşılaştırması.
 class _PiyasaSenaryosu extends StatefulWidget {
-  const _PiyasaSenaryosu({required this.r});
+  const _PiyasaSenaryosu({required this.r, this.sabitYil});
   final CiftlikRaporu r;
+
+  /// Yıl bölümünden açıldığında aylık görünüm bu yıla sabitlenir.
+  final int? sabitYil;
   @override
   State<_PiyasaSenaryosu> createState() => _PiyasaSenaryosuState();
 }
@@ -1086,7 +1299,8 @@ class _PiyasaSenaryosuState extends State<_PiyasaSenaryosu> {
     }
     final c = s.ciftlik(_secili ?? '') ?? s.ciftlikler.first;
     final yillar = s.yillar.isEmpty ? const [2026] : s.yillar;
-    final yil = yillar.contains(_yil) ? _yil! : yillar.first;
+    final sabit = widget.sabitYil;
+    final yil = sabit != null && yillar.contains(sabit) ? sabit : (yillar.contains(_yil) ? _yil! : yillar.first);
     final aylik = _gorunum == 'Aylık';
     final bulgular = senaryoBulgulari(widget.r, yil: aylik ? yil : null);
     final olumsuz = [for (final b in bulgular) if (b.tur == BulguTuru.olumsuz) b];
@@ -1118,9 +1332,10 @@ class _PiyasaSenaryosuState extends State<_PiyasaSenaryosu> {
       final d = dn(c, yil);
       govde.addAll([
         const SizedBox(height: 8),
-        Wrap(spacing: 8, children: [
-          for (final y in yillar) ChoiceChip(label: Text('$y'), selected: y == yil, onSelected: (_) => setState(() => _yil = y)),
-        ]),
+        if (sabit == null)
+          Wrap(spacing: 8, children: [
+            for (final y in yillar) ChoiceChip(label: Text('$y'), selected: y == yil, onSelected: (_) => setState(() => _yil = y)),
+          ]),
         Panel(
           baslik: 'Dönem net sonucu – ${etiket(yil)} (mn ₺)',
           child: VeriTablosu(
@@ -1232,7 +1447,7 @@ class _PiyasaSenaryosuState extends State<_PiyasaSenaryosu> {
         BilgiKutusu(yazi: '${s.aciklama} Tutarlar mn ₺. Gelir tabloları aylık tutulduğundan günlük ve haftalık kırılım bulunmaz.'),
         const SizedBox(height: 8),
         SegmentedButton<String>(
-          segments: const [ButtonSegment(value: 'Aylık', label: Text('Aylık')), ButtonSegment(value: 'Yıllık', label: Text('Yıllık'))],
+          segments: const [ButtonSegment(value: 'Aylık', label: Text('Aylık')), ButtonSegment(value: 'Yıllık', label: Text('Yıllar karşılaştırması'))],
           selected: {_gorunum},
           onSelectionChanged: (x) => setState(() => _gorunum = x.first),
         ),

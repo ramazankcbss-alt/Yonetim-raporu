@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yonetim_raporu/ekranlar/ciftlik_rapor.dart';
 import 'package:yonetim_raporu/veri/ciftlik_rapor.dart';
 import 'package:yonetim_raporu/veri/senaryo.dart';
 
@@ -77,5 +76,14 @@ void main() {
       }
       expect(c.donemler[2025]!.aySayisi, 12);
     }
+  });
+
+  test('2025 aylık sonuçların toplamı yıl toplamına eşittir', () {
+    for (final c in [kKonsolide, 'Şekersüt', 'Tarımsal Alan', kEsk]) {
+      final l = r.aylikSonuc(c, yil: 2025);
+      expect(l.length, 12);
+      expect(l.fold(0.0, (t, a) => t + a.netKar), closeTo(r.d25Yil(c, 'Dönem net kârı/zararı'), 12));
+    }
+    expect(r.aylikSonuc(kKonsolide).every((a) => a.yil == 2026), isTrue);
   });
 }
