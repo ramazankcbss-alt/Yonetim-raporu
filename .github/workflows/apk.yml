@@ -35,7 +35,10 @@ jobs:
           "$RUNNER_TEMP/flutter/bin/flutter" --version
 
       - name: Sürüm numarası
-        run: echo "SURUM=${{ github.run_number }}" >> "$GITHUB_ENV"
+        run: |
+          echo "SURUM=${{ github.run_number }}" >> "$GITHUB_ENV"
+          # Görünen sürüm 25.11.2026'da sıfırlandı: iç no 186 = 1.0, 187 = 1.1 … (iç no Android için artmaya devam eder)
+          echo "GORUNEN=1.$(( ${{ github.run_number }} - 186 ))" >> "$GITHUB_ENV"
 
       - name: Paketler
         run: flutter pub get
@@ -71,7 +74,7 @@ jobs:
 
       - name: APK derle
         run: |
-          flutter build apk --release --build-number=$SURUM --dart-define=BUILD_NUMBER=$SURUM
+          flutter build apk --release --build-number=$SURUM --build-name=$GORUNEN --dart-define=BUILD_NUMBER=$SURUM
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/yonetim-raporu.apk
 
       - name: İmza kontrolü (güncellemeler eskisinin üzerine kurulabilsin)
@@ -81,7 +84,7 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: surum-${{ env.SURUM }}
-          name: Yönetim Raporu - Sürüm ${{ env.SURUM }}
+          name: Yönetim Raporu - Sürüm ${{ env.GORUNEN }}
           make_latest: true
           body: |
             ${{ github.event.head_commit.message }}

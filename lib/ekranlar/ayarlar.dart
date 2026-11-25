@@ -166,7 +166,7 @@ class _AyarlarEkranState extends State<AyarlarEkran> {
                   Text(
                     Guncelleme.buSurum == 0
                         ? 'Sürüm: geliştirme'
-                        : 'Sürüm: ${Guncelleme.buSurum}',
+                        : 'Sürüm: ${Guncelleme.buGorunen}',
                     style: const TextStyle(fontSize: 14, color: Renk.yazi),
                   ),
                   const SizedBox(height: 12),

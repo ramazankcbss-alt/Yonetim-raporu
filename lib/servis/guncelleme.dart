@@ -14,6 +14,12 @@ class Guncelleme {
   /// Yerel derlemelerde 0'dır ve güncelleme kontrolü yapılmaz.
   static const int buSurum = int.fromEnvironment('BUILD_NUMBER');
 
+  /// Görünen sürüm numarası 25.11.2026'da sıfırlandı: iç derleme no 186 → "1.0", 187 → "1.1"…
+  /// İç numara (Android sürüm kodu) artmaya devam eder; aksi hâlde güncelleme eskisinin üzerine kurulamaz.
+  static const int _taban = 186;
+  static String gorunen(int derleme) => derleme >= _taban ? '1.${derleme - _taban}' : '$derleme';
+  static String get buGorunen => gorunen(buSurum);
+
   static const _depo = 'ramazankcbss-alt/Yonetim-raporu';
   static const _apkAdi = 'yonetim-raporu.apk';
 
@@ -50,7 +56,7 @@ class Guncelleme {
       final etiket = (j['tag_name'] ?? '').toString(); // ör. surum-12
       final yeni = int.tryParse(etiket.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
       if (yeni <= buSurum) {
-        soyle('Uygulama güncel (sürüm $buSurum).');
+        soyle('Uygulama güncel (sürüm $buGorunen).');
         return;
       }
 
@@ -72,7 +78,7 @@ class Guncelleme {
           icon: const Icon(Icons.system_update),
           title: const Text('Yeni sürüm var'),
           content: Text(
-            'Sürüm $yeni yayınlandı (sizdeki: $buSurum).'
+            'Sürüm ${gorunen(yeni)} yayınlandı (sizdeki: $buGorunen).'
             '${notlar.isEmpty ? '' : '\n\n$notlar'}'
             '\n\nŞimdi güncellemek ister misiniz?',
           ),
