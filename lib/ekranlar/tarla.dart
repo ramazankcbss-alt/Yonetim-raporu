@@ -622,6 +622,10 @@ List<(int, Offset)> _ortaNoktalar(List<Offset> e, double olcek) => [
         if ((e[i] - e[(i + 1) % e.length]).distance * olcek > 44) (i, (e[i] + e[(i + 1) % e.length]) / 2)
     ];
 
+/// Kopyalanan parsel şekli (boylam, enlem): başka sezona, çiftliğe ya da yere yapıştırmak için (uygulama açıkken).
+(String, List<(double, double)>)? kopyaSekil;
+void sekilKopyala(String ad, List<(double, double)> koord) => kopyaSekil = (ad, [...koord]);
+
 /// Çizilen şekli boşluğa oturtur: komşu parsellerle çakışan kısımlar çıkarılır, kalan en büyük parça yeni
 /// parselin sınırı olur (kenarlar komşu parsellerin sınırına denk gelir). Çakışma yoksa şekil aynen kalır.
 List<(double, double)> bosluguDoldur(List<(double, double)> sekil, Iterable<List<(double, double)>> parseller) {
@@ -1688,6 +1692,32 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                                     'değiştirir; tek ürünlü parselde parsel iki parçaya bölünür.',
                               },
                               style: const TextStyle(fontSize: 12.5)),
+                          if (kopyaSekil != null && (_sekil == 'yeni' || (_sekil == 'sinir' && _duzenParsel != null)))
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: OutlinedButton.icon(
+                                  onPressed: () => setState(() {
+                                        _duzen = [for (final c in kopyaSekil!.$2) (c.$1 * _g.kx, c.$2)];
+                                        _secKose = null;
+                                        _yenidenCiz = false;
+                                        if (_sekil == 'yeni') _yeniDuzen = true;
+                                      }),
+                                  icon: const Icon(Icons.content_paste),
+                                  label: Text('Yapıştır: ${kopyaSekil!.$1} şekli')),
+                            ),
+                          if (_sekil == 'sinir' && _duzenParsel != null && _duzen.length > 2)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                  onPressed: () {
+                                    sekilKopyala(_duzenParsel!.ad, [for (final c in _duzen) (c.$1 / _g.kx, c.$2)]);
+                                    setState(() {});
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('${_duzenParsel!.ad} şekli kopyalandı.')));
+                                  },
+                                  icon: const Icon(Icons.copy_all_outlined),
+                                  label: const Text('Bu şekli kopyala')),
+                            ),
                           if ((_sekil == 'sinir' && _duzenParsel != null) || _sekil == 'yeni')
                             Wrap(spacing: 6, runSpacing: 0, children: [
                               if ((_sekil == 'yeni' && !_yeniDuzen) || _yenidenCiz)
@@ -2995,6 +3025,19 @@ Future<void> _parselIslem(BuildContext context, TarlaSezonu s, TarlaCiftlik c, T
                   ),
                 ),
               ]),
+              if (p.koord.length > 2) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    sekilKopyala(p.ad, p.koord);
+                    Navigator.pop(context);
+                    bildir(context,
+                        '${p.ad} şekli kopyalandı. Kalem → Yeni parsel ya da Sınır düzenle\'de "Yapıştır" ile istediğiniz sezona/yere koyun.');
+                  },
+                  icon: const Icon(Icons.copy_all_outlined),
+                  label: const Text('Şekli kopyala'),
+                ),
+              ],
               if (ic != null && ic.bolunmus) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
