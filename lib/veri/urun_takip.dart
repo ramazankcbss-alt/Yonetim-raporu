@@ -141,6 +141,9 @@ class UrunDurumu {
   double get kesinti => teslim > net ? teslim - net : 0;
   double get kesintiOrani => teslim > 0 ? kesinti / teslim * 100 : 0;
   double get kantar => gunler.fold<double>(0, (a, g) => a + g.kantar);
+
+  /// Çiftlik kantarında tartımı olan kayıtların portal (fireli) miktarı: kantar farkı yalnız bunlarla karşılaştırılır.
+  double get kantarliTeslim => gunler.fold<double>(0, (a, g) => a + (g.kantar > 0 ? g.teslim : 0));
   double get ekGelir => gunler.fold<double>(0, (a, g) => a + g.ekGelir);
   double? get polar {
     var t = 0.0, n = 0.0;

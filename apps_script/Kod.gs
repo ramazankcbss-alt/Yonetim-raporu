@@ -1301,50 +1301,111 @@ function teslimatTopla_(g, k) {
   x.kantar += k.kantar || 0;
 }
 
+/**
+ * Bir TarKop xlsx dosyasındaki tartım satırları. Tablo başlığı (Tarih + Tartım No + Net Miktar) her sayfada
+ * herhangi bir satırda olabilir; başlık satırında ya da üstündeki iki satırda geçen çiftlik adı tabloya,
+ * çiftlik adı veya "kantar" yazan ek sütun çiftlik kantarına atanır. Plaka ve satıcı no okunmaz (KVKK).
+ */
+function tarkopTablolari_(blob) {
+  var out = [], CIFT = /(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|TAŞAĞIL|ORMANLIK|FİDANLIK)/;
+  xlsxSatirlari_(blob).forEach(function (satirlar) {
+    var s = null;
+    for (var i = 0; i < satirlar.length; i++) {
+      var h = satirlar[i], yeni = {}, baslikVar = false;
+      Object.keys(h).forEach(function (k) {
+        var x = String(h[k]).toLocaleLowerCase('tr').trim();
+        if (x === 'tarih') { yeni.tarih = k; baslikVar = true; }
+        else if (x.indexOf('tartım no') === 0) yeni.tartim = k;
+        else if (x.indexOf('net miktar') === 0) yeni.net = k;
+        else if (x.indexOf('fabpolar') === 0) yeni.polar = k;
+        else if (x.indexOf('fireli miktar') === 0) yeni.fireli = k;
+      });
+      if (yeni.tarih && yeni.tartim && yeni.net) {
+        yeni.ciftlik = '';
+        var tanimli = {};
+        [yeni.tarih, yeni.tartim, yeni.net, yeni.polar, yeni.fireli].forEach(function (k) { if (k) tanimli[k] = 1; });
+        // Önce başlık satırı, sonra üstündeki satırlar (en yakın bilgi geçerli).
+        for (var j = i; j >= Math.max(0, i - 2); j--) {
+          Object.keys(satirlar[j]).forEach(function (k) {
+            var x = String(satirlar[j][k]), ust = x.toLocaleUpperCase('tr'), m = CIFT.exec(ust);
+            if (m && !yeni.ciftlik) yeni.ciftlik = ciftlikAdi_(m[1].toLocaleLowerCase('tr'));
+            if (!yeni.kantar && k !== 'A' && !tanimli[k] && !/portal/i.test(x) && (m || /kantar/i.test(x)) && !/kantar adı/i.test(x)) yeni.kantar = k;
+          });
+        }
+        s = yeni;
+        continue;
+      }
+      if (baslikVar) { s = null; continue; } // tartım tablosu olmayan başka bir tablo başladı
+      if (!s) continue;
+      var tn = h[s.tartim], tr = h[s.tarih];
+      if (typeof tn !== 'number' || typeof tr !== 'number') continue;
+      out.push({ tartim: tn, tarih: tr, net: h[s.net], fireli: s.fireli ? h[s.fireli] : null, polar: s.polar ? h[s.polar] : null,
+        kantar: s.kantar ? h[s.kantar] : null, ciftlik: s.ciftlik });
+    }
+  });
+  return out;
+}
+
+/**
+ * Pancar teslimatı: portaldan indirilen TarKop dosyası sezonun tamamını kümülatif içerdiği için yalnızca
+ * Drive'a en son yüklenen dosya okunur (eski sürümler toplanmaz). Adında "karşılaştırma" geçen çalışma
+ * dosyalarından yalnızca tartım no eşleşmesiyle çiftlik ve çiftlik kantarı bilgisi alınır.
+ */
 function tarkopOku_(g, kaynaklar) {
-  var it = DriveApp.searchFiles("title contains 'TarKop' and trashed = false");
+  var dosyalar = [], it = DriveApp.searchFiles("title contains 'TarKop' and trashed = false");
   while (it.hasNext()) {
     var f = it.next();
     if (!/\.xlsx$/i.test(f.getName()) || f.getMimeType() === 'application/vnd.google-apps.shortcut') continue;
-    var ciftlik = ciftlikAdi_((/(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|TAŞAĞIL|ORMANLIK|FİDANLIK)/i.exec(f.getName()) || [])[1] || 'Aslım');
-    var say = 0, gor = {};
-    xlsxSatirlari_(f.getBlob()).forEach(function (satirlar) {
-      var bi = -1, s = {};
-      for (var i = 0; i < Math.min(satirlar.length, 10) && bi < 0; i++) {
-        var h = satirlar[i];
-        Object.keys(h).forEach(function (k) {
-          var x = String(h[k]).toLocaleLowerCase('tr').trim();
-          if (x === 'tarih') s.tarih = k;
-          else if (x.indexOf('tartım no') === 0) s.tartim = k;
-          else if (x.indexOf('net miktar') === 0) s.net = k;
-          else if (x.indexOf('fabpolar') === 0) s.polar = k;
-          else if (x.indexOf('fireli miktar') === 0) s.fireli = k;
-        });
-        if (s.tarih && s.net && s.tartim) {
-          bi = i;
-          for (var j = 0; j < i; j++) Object.keys(satirlar[j]).forEach(function (k) {
-            var x = String(satirlar[j][k]);
-            if (/kantar/i.test(x) && !/portal/i.test(x)) s.kantar = k;
-          });
-        } else s = {};
-      }
-      if (bi < 0) return;
-      for (var r = bi + 1; r < satirlar.length; r++) {
-        var x = satirlar[r], tn = x[s.tartim], tr = x[s.tarih];
-        if (typeof tn !== 'number' || typeof tr !== 'number' || gor[tn]) continue;
-        gor[tn] = 1; say++;
-        var t = Utilities.formatDate(new Date(Date.UTC(1899, 11, 30) + Math.round(tr) * 86400000), 'UTC', 'yyyy-MM-dd');
-        // Dosyada miktarlar ton; kg'a çevrilir.
-        var net = typeof x[s.net] === 'number' ? x[s.net] * 1000 : 0;
-        var fireli = typeof x[s.fireli] === 'number' ? x[s.fireli] * 1000 : net;
-        teslimatTopla_(g, { urun: 'Şeker Pancarı', ciftlik: ciftlik, kaynak: 'TarKop', alici: 'Konya Şeker',
-          tarih: t, teslim: fireli, net: net, polar: polarDuzelt_(x[s.polar]),
-          kantar: s.kantar && typeof x[s.kantar] === 'number' ? x[s.kantar] : 0 });
-      }
-    });
-    kaynaklar.push({ ad: f.getName(), urun: 'Şeker Pancarı', ciftlik: ciftlik, satir: say,
-      guncelleme: Utilities.formatDate(f.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm') });
+    dosyalar.push(f);
   }
+  if (!dosyalar.length) return;
+  var yardimci = function (f) { return /karşılaştırma|karsilastirma/i.test(f.getName()); };
+  var adaylar = dosyalar.filter(function (f) { return !yardimci(f); });
+  if (!adaylar.length) adaylar = dosyalar.slice();
+  adaylar.sort(function (a, b) { return b.getDateCreated().getTime() - a.getDateCreated().getTime(); });
+  var ana = adaylar[0];
+
+  var ek = {};
+  dosyalar.forEach(function (f) {
+    if (f.getId() === ana.getId()) return;
+    var n = 0;
+    tarkopTablolari_(f.getBlob()).forEach(function (r) {
+      var e = ek[r.tartim] || (ek[r.tartim] = {});
+      if (r.ciftlik) { e.ciftlik = r.ciftlik; n++; }
+      if (typeof r.kantar === 'number' && r.kantar > 0) e.kantar = r.kantar;
+    });
+    kaynaklar.push({ ad: f.getName() + ' (yalnızca çiftlik ve kantar eşleştirmesi)', urun: 'Şeker Pancarı', ciftlik: '', satir: n,
+      guncelleme: Utilities.formatDate(f.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm') });
+  });
+
+  var adCiftlik = (/(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|TAŞAĞIL|ORMANLIK|FİDANLIK)/i.exec(ana.getName()) || [])[1];
+  // Aynı tartım no birden fazla satırda gelebilir (bir sefer iki parçaya bölünmüş): net miktarlar toplanır,
+  // sefer ve fireli miktar bir kez sayılır. Birebir aynı satırlar yalnızca bir kez alınır.
+  var tartimlar = {}, sira = [];
+  tarkopTablolari_(ana.getBlob()).forEach(function (r) {
+    var x = tartimlar[r.tartim];
+    if (!x) { x = tartimlar[r.tartim] = { r: r, netler: {}, net: 0, fireli: 0 }; sira.push(r.tartim); }
+    var nk = String(r.net);
+    if (!x.netler[nk] && typeof r.net === 'number') { x.netler[nk] = 1; x.net += r.net; }
+    if (typeof r.fireli === 'number' && r.fireli > x.fireli) x.fireli = r.fireli;
+  });
+  var say = 0;
+  sira.forEach(function (tn) {
+    var x = tartimlar[tn], r = { tartim: tn, tarih: x.r.tarih, net: x.net, fireli: x.fireli || null, polar: x.r.polar,
+      kantar: x.r.kantar, ciftlik: x.r.ciftlik };
+    say++;
+    var e = ek[r.tartim] || {};
+    var ciftlik = r.ciftlik || e.ciftlik || (adCiftlik ? ciftlikAdi_(adCiftlik) : 'Çiftlik belirtilmemiş');
+    var t = Utilities.formatDate(new Date(Date.UTC(1899, 11, 30) + Math.round(r.tarih) * 86400000), 'UTC', 'yyyy-MM-dd');
+    // Dosyada miktarlar ton; kg'a çevrilir. Çiftlik kantarı kg.
+    var net = typeof r.net === 'number' ? r.net * 1000 : 0;
+    var fireli = typeof r.fireli === 'number' ? r.fireli * 1000 : net;
+    var kantar = typeof r.kantar === 'number' ? r.kantar : (e.kantar || 0);
+    teslimatTopla_(g, { urun: 'Şeker Pancarı', ciftlik: ciftlik, kaynak: 'TarKop', alici: 'Konya Şeker',
+      tarih: t, teslim: fireli, net: net, polar: polarDuzelt_(r.polar), kantar: kantar });
+  });
+  kaynaklar.unshift({ ad: ana.getName() + ' (güncel portal dosyası)', urun: 'Şeker Pancarı', ciftlik: '', satir: say,
+    guncelleme: Utilities.formatDate(ana.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm') });
 }
 
 function patatesOku_(g, kaynaklar) {
@@ -1394,7 +1455,7 @@ function elleTeslimatOku_(g, kaynaklar, elle) {
 }
 
 function urunTeslimatlari_() {
-  return onbellekli_('teslimat_v1', 600, function () {
+  return onbellekli_('teslimat_v2', 600, function () {
     var g = {}, kaynaklar = [], hatalar = [], elle = [];
     [tarkopOku_, patatesOku_, elleTeslimatOku_].forEach(function (f) {
       try { f(g, kaynaklar, elle); } catch (e) { hatalar.push(String(e).slice(0, 200)); }
@@ -1419,7 +1480,7 @@ function teslimatKaydet_(g) {
     sh.setFrozenRows(1);
   }
   var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
-  CacheService.getScriptCache().remove('teslimat_v1');
+  CacheService.getScriptCache().remove('teslimat_v2');
   if (g.tur === 'teslimatSil') {
     var no = parseInt(g.satir, 10);
     if (!(no >= 2) || no > sh.getLastRow()) return { ok: false, hata: 'Kayıt bulunamadı.' };

@@ -219,7 +219,8 @@ class _UrunKarti extends StatelessWidget {
           if (d.kesinti > 0)
             _Satir('Düşülen fire / kesinti', '${_ton(d.kesinti)} (%${sayi(d.kesintiOrani, ondalik: 1)})', renk: Renk.turuncu),
           _Satir('Bedele esas (net)', _ton(d.net), kalin: true),
-          if (d.kantar > 0) _Satir('Çiftlik kantarı', '${_ton(d.kantar)} (fark ${_ton(d.teslim - d.kantar)})'),
+          if (d.kantar > 0)
+            _Satir('Çiftlik kantarı', '${_ton(d.kantar)} (aynı seferlerde portal ${_ton(d.kantarliTeslim)}, fark ${_ton(d.kantarliTeslim - d.kantar)})'),
           if (d.polar != null) _Satir('Ortalama polar', '%${sayi(d.polar, ondalik: 2)}'),
           if (d.ilerleme != null)
             Padding(
