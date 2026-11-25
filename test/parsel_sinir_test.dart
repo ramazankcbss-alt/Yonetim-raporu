@@ -67,7 +67,7 @@ void main() {
     expect(p.first.cesit(0), 'Halis');
     expect(p.first.bolgeler.single.$1, 'P');
     expect(p.last.urunler, [('Arpa', 30.0)]);
-    expect(p.last.not, contains('KMZ\'de farklı'));
+    expect(p.last.not, isNot(contains('KMZ\'de farklı')));
   });
 
   test('sezona özel sınır kaydı yalnızca o sezona uygulanır', () {

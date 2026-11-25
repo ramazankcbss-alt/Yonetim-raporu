@@ -223,12 +223,7 @@ function girisParseli(p, g, bagli, gelen) {
   y.giris = true;
   return y;
 }
-function kmzNotu(y, k) {
-  if (!k || !k.urunler.length || !k.not) return y;
-  function oz(x) { return x.urunler.map(function (u) { return urunAnahtari(u[0]) + ' ' + Math.round(u[1]); }).join('+'); }
-  if (oz(y) === oz(k)) return y;
-  return kopya(y, { not: [y.not, "KMZ'de farklı → " + k.not.replace('KMZ: ', '')].filter(Boolean).join(' · ') });
-}
+function kmzNotu(y) { return y; } // KMZ ile farklılıkta uygulama kaydı geçerlidir
 function katmanda(katman, cf, ad) {
   if (!katman) return null;
   for (var i = 0; i < katman.ciftlikler.length; i++) {

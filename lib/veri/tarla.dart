@@ -524,18 +524,8 @@ TarlaSezonu girisSezonu(TarlaSezonu taban, List<SezonParsel> l,
   );
 }
 
-/// Uygulamadan girilen kayıt KMZ'deki çizimden farklıysa KMZ'deki hâli nota eklenir (kontrol için).
-TarlaParsel _kmzNotu(TarlaParsel y, TarlaParsel? k) {
-  if (k == null || k.urunler.isEmpty || k.not.isEmpty) return y;
-  String ozet(TarlaParsel x) => [
-        for (final u in x.urunler) '${urunAnahtari(u.$1)} ${u.$2.round()}',
-      ].join('+');
-  if (ozet(y) == ozet(k)) return y;
-  return TarlaParsel(
-      ad: y.ad, tip: y.tip, urunler: y.urunler, beyan: y.beyan, olculen: y.olculen, etiket: y.etiket,
-      not: [if (y.not.isNotEmpty) y.not, 'KMZ\'de farklı → ${k.not.replaceFirst('KMZ: ', '')}'].join(' · '),
-      koord: y.koord, bolme: y.bolme, baglar: y.baglar, cesitler: y.cesitler, bolgeler: y.bolgeler);
-}
+/// Karar (25.11.2026): KMZ ile farklılıkta uygulama kaydı geçerlidir; KMZ'deki hâl nota eklenmez.
+TarlaParsel _kmzNotu(TarlaParsel y, TarlaParsel? k) => y;
 
 /// Başka parsellerden bu parsele bağlanan parçalar: (kaynak parsel, ürün, dekar).
 List<(String, String, double)> gelenParcalar(List<SezonParsel> l, String sezon, TarlaCiftlik c, String hedef) => [
