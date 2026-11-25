@@ -6,6 +6,7 @@ import '../tema.dart';
 import '../veri/model.dart';
 import 'araclar.dart';
 import 'bakim_onarim.dart';
+import 'ciftlik_rapor.dart';
 import 'esk.dart';
 import 'gecmis.dart';
 import 'hastalik.dart';
@@ -53,6 +54,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.amber,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => MaliEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.query_stats_outlined,
+          baslik: 'Çiftlikler Rapor 2026',
+          aciklama: 'Kâr/zarar ile süt, et ve tarım birim maliyetleri — artış ve azalış nedenleriyle',
+          renk: Renk.mavi,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const CiftlikRaporEkran())),
         ),
         _Bolum(
           ikon: Icons.insights_outlined,
