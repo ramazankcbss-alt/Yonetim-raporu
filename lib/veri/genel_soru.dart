@@ -14,20 +14,55 @@ import 'tarla.dart' show ParselIcerik;
 
 /// Cevabın bir bölümü: başlık, paragraflar ve verinin alındığı kaynak.
 class CevapBolumu {
-  const CevapBolumu(this.baslik, this.paragraflar, this.kaynak);
+  const CevapBolumu(this.baslik, this.paragraflar, this.kaynak, {this.ozet});
   final String baslik;
   final List<String> paragraflar;
   final String kaynak;
+
+  /// Kısa cevap (sohbette önce gösterilir); yoksa ilk paragraf kullanılır.
+  final String? ozet;
+  String get kisa => ozet ?? (paragraflar.isEmpty ? '' : paragraflar.first);
+}
+
+/// Sohbetteki bir önceki sorunun bağlamı: takip sorularında çiftlik, ürün,
+/// konu ve dönem buradan devralınır.
+class SoruBaglami {
+  const SoruBaglami({this.ciftlikler = const {}, this.urunler = const {}, this.konular = const {}, this.donem, this.metin = ''});
+  final Set<String> ciftlikler, urunler, konular;
+  final Donem? donem;
+
+  /// Önceki sorunun çiftlik adları çıkarılmış hâli (Çiftlikler Rapor'a iletilir).
+  final String metin;
 }
 
 class GenelYanit {
-  const GenelYanit({required this.soru, required this.bolumler, this.anlasildi = true, this.bulgular = const []});
+  const GenelYanit({
+    required this.soru,
+    required this.bolumler,
+    this.anlasildi = true,
+    this.bulgular = const [],
+    this.baglam = const SoruBaglami(),
+    this.oneriler = const [],
+    this.devralinan = '',
+  });
   final String soru;
   final List<CevapBolumu> bolumler;
   final bool anlasildi;
 
   /// Çiftlikler Rapor'dan gelen olumsuz sonuç ve tutarsızlıklar.
   final List<Bulgu> bulgular;
+
+  /// Bu sorunun bağlamı (bir sonraki soruya aktarılır).
+  final SoruBaglami baglam;
+
+  /// Konuşmayı ilerletmek için önerilen takip soruları.
+  final List<String> oneriler;
+
+  /// Önceki sorudan devralınanların açıklaması (ör. "Şekersüt · süt · geçen hafta").
+  final String devralinan;
+
+  /// Sohbette gösterilen kısa cevap satırları.
+  List<String> get ozet => [for (final b in bolumler) if (b.kisa.isNotEmpty) b.kisa];
 }
 
 /// Dönem: [bas]–[son] (dahil) ve okunur adı.
@@ -87,7 +122,7 @@ const _durakKelimeler = {
 };
 
 class _Soru {
-  _Soru(String ham, DateTime bugun) : s = ' ${trKucuk(ham)} ' {
+  _Soru(String ham, DateTime bugun, [SoruBaglami? onceki]) : s = ' ${trKucuk(ham)} ' {
     for (final e in _ciftlikler.entries) {
       if (e.value.any(s.contains)) ciftlikler.add(e.key);
     }
@@ -99,12 +134,47 @@ class _Soru {
     }
     // "Ekim ayı" ay adıdır, ekim (tohum) değil.
     if (RegExp(r'ekim ay|ekim 20\d\d').hasMatch(s) && !RegExp(r'ekim alan|ekili|ekiliş|ekim plan').hasMatch(s)) konular.remove('ekim');
-    donem = _donem(bugun);
+    var d = _donem(bugun);
     kelimeler = [
       for (final k in s.split(RegExp(r"[^a-zçğıöşü0-9]+")))
         if (k.length >= 4 && !_durakKelimeler.contains(k) && !_aylar.contains(k)) k,
     ];
+    // Takip sorusu: eksik kalan çiftlik, ürün, konu ve dönem önceki sorudan devralınır.
+    final o = onceki;
+    if (o != null && (o.konular.isNotEmpty || o.ciftlikler.isNotEmpty || o.urunler.isNotEmpty)) {
+      final kelimeSayisi = s.trim().split(' ').length;
+      final takip = konular.isEmpty ||
+          kelimeSayisi <= 5 ||
+          RegExp(r'^ (peki|ya |neden|niye|bunun|bunlar|aynı|o |onun|şimdi|ayrıca|bir de|ama|ve |nasıl|detay|ayrıntı)').hasMatch(s);
+      final hepsi = RegExp(r'tüm çiftlik|bütün çiftlik|hepsi|genel toplam|tüm işletme').hasMatch(s);
+      if (takip) {
+        if (konular.isEmpty) {
+          konular.addAll(o.konular);
+          devralinan.add('konu');
+        }
+        if (RegExp(r'neden|niye|sebep|nedeni').hasMatch(s) && (o.konular.contains('sut') || o.konular.contains('finans'))) {
+          konular.add('finans');
+        }
+        if (ciftlikler.isEmpty && !hepsi && o.ciftlikler.isNotEmpty) {
+          ciftlikler.addAll(o.ciftlikler);
+          devralinan.add(o.ciftlikler.join(', '));
+        }
+        if (urunler.isEmpty && o.urunler.isNotEmpty) {
+          urunler.addAll(o.urunler);
+          devralinan.add(o.urunler.join(', '));
+        }
+        if (!d.acik && o.donem != null && o.donem!.acik) {
+          d = o.donem!;
+          devralinan.add(d.ad);
+        }
+        oncekiMetin = o.metin;
+      }
+    }
+    donem = d;
   }
+
+  final devralinan = <String>[];
+  String oncekiMetin = '';
 
   final String s;
   final ciftlikler = <String>{};
@@ -112,6 +182,17 @@ class _Soru {
   final konular = <String>{};
   late final Donem donem;
   late final List<String> kelimeler;
+
+  /// Sorunun çiftlik adları çıkarılmış hâli.
+  String get metinCiftliksiz {
+    var t = s;
+    for (final l in _ciftlikler.values) {
+      for (final k in l) {
+        t = t.replaceAll(k, ' ');
+      }
+    }
+    return t.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
 
   bool var_(String k) => konular.contains(k);
 
@@ -163,8 +244,9 @@ bool _ciftlikEslesir(Set<String> secili, String kayit) {
 }
 
 /// Soruyu uygulamadaki verilerle cevaplar.
-GenelYanit genelCevapla(RaporVerisi v, String soru, {CiftlikRaporu? rapor, List<HastalikKaydi> hastalik = const [], DateTime? bugun}) {
-  final q = _Soru(soru, bugun ?? DateTime.now());
+GenelYanit genelCevapla(RaporVerisi v, String soru,
+    {CiftlikRaporu? rapor, List<HastalikKaydi> hastalik = const [], DateTime? bugun, SoruBaglami? onceki}) {
+  final q = _Soru(soru, bugun ?? DateTime.now(), onceki);
   final b = <CevapBolumu>[];
   var bulgular = <Bulgu>[];
   final konuYok = q.konular.isEmpty;
@@ -174,12 +256,17 @@ GenelYanit genelCevapla(RaporVerisi v, String soru, {CiftlikRaporu? rapor, List<
   // Yalnızca çiftlik adı geçiyorsa o çiftliğin özeti verilir.
   final ciftlikOzeti = konuYok && q.urunler.isEmpty && q.ciftlikler.isNotEmpty;
 
-  if (q.var_('sut') || ciftlikOzeti && q.ciftlikler.any((c) => c == 'Şekersüt' || c == 'Pan-Gev')) _sut(v, q, b);
+  // Maliyet / fiyat / kâr sorusunda süt miktarı ancak açıkça istenirse verilir.
+  final miktar = RegExp(r' kg|ne kadar süt|süt ne kadar|sağmal|sağılan|üretim|litre süt|kaç litre|sürü|hayvan sayı|kaç hayvan').hasMatch(q.s);
+  final finansSorusu = q.var_('finans') && rapor != null;
+  if ((q.var_('sut') && (!finansSorusu || miktar)) || ciftlikOzeti && q.ciftlikler.any((c) => c == 'Şekersüt' || c == 'Pan-Gev')) {
+    _sut(v, q, b);
+  }
   if (q.var_('dogum')) _dogum(v, q, b);
   if (q.var_('faaliyet') || ciftlikOzeti) _faaliyet(v, q, b);
   if (q.var_('ekim') || urunSorusu) _ekim(v, q, b);
   if (q.var_('hasat') || urunSorusu) _hasat(v, q, b);
-  if (q.var_('urun') || urunSorusu) _urunTakibi(v, q, b);
+  if ((q.var_('urun') && !(finansSorusu && !RegExp(r'teslim|kantar|sefer|ürün takibi').hasMatch(q.s))) || urunSorusu) _urunTakibi(v, q, b);
   if (q.var_('esk') || ciftlikOzeti && q.ciftlikler.contains('Taşağıl')) _esk(v, q, b);
   if (q.var_('besi')) _besi(v, q, b);
   if (q.var_('hastalik')) _hastalik(hastalik, q, b);
@@ -190,15 +277,25 @@ GenelYanit genelCevapla(RaporVerisi v, String soru, {CiftlikRaporu? rapor, List<
   if (q.var_('gecmis')) _gecmis(v, q, b);
   if (q.var_('bulgu') || ciftlikOzeti) _bulgu(v, q, b);
   if (rapor != null && (q.var_('finans') || q.var_('bulgu') && b.isEmpty)) {
-    final y = cevapla(rapor, soru);
+    // Takip sorusunda önceki sorunun konusu ve bu sorunun çiftlikleri birlikte iletilir.
+    final metin = [...q.ciftlikler, ...q.urunler, soru, if (q.oncekiMetin.isNotEmpty) q.oncekiMetin].join(' ');
+    final y = cevapla(rapor, metin);
     if (y.anlasildi) {
-      b.add(CevapBolumu('Kâr / zarar ve maliyet', y.paragraflar, 'Çiftlikler Rapor (${rapor.kaynak}; Maliyet Takip)'));
+      b.insert(0, CevapBolumu('Kâr / zarar ve maliyet', y.paragraflar, 'Çiftlikler Rapor (${rapor.kaynak}; Maliyet Takip)'));
       bulgular = y.bulgular;
     }
   }
   if (b.isEmpty) _metinArama(v, q, b);
+  final baglam = SoruBaglami(
+    ciftlikler: {...q.ciftlikler},
+    urunler: {...q.urunler},
+    konular: {...q.konular},
+    donem: q.donem.acik ? q.donem : null,
+    metin: q.metinCiftliksiz,
+  );
+  final devralinan = q.devralinan.isEmpty ? '' : 'Önceki sorudan devam: ${q.devralinan.join(' · ')}';
   if (b.isEmpty) {
-    return GenelYanit(soru: soru, anlasildi: false, bolumler: [
+    return GenelYanit(soru: soru, anlasildi: false, baglam: baglam, devralinan: devralinan, oneriler: genelOrnekSorular.take(4).toList(), bolumler: [
       CevapBolumu(
           'Veri bulunamadı',
           [
@@ -210,7 +307,33 @@ GenelYanit genelCevapla(RaporVerisi v, String soru, {CiftlikRaporu? rapor, List<
           ''),
     ]);
   }
-  return GenelYanit(soru: soru, bolumler: b, bulgular: bulgular);
+  return GenelYanit(
+      soru: soru, bolumler: b, bulgular: bulgular, baglam: baglam, devralinan: devralinan, oneriler: _oneriler(q, b, rapor != null));
+}
+
+/// Cevaba göre konuşmayı ilerletecek takip soruları.
+List<String> _oneriler(_Soru q, List<CevapBolumu> b, bool raporVar) {
+  final l = <String>[];
+  final basliklar = {for (final x in b) x.baslik};
+  final c = q.ciftlikler.length == 1 ? q.ciftlikler.first : null;
+  if (c == 'Şekersüt') l.add('Peki Pan-Gev’de?');
+  if (c == 'Pan-Gev') l.add('Peki Şekersüt’te?');
+  if (c == null && q.ciftlikler.isEmpty && basliklar.contains('Süt ve sürü')) l.add('Sadece Şekersüt');
+  if (q.ciftlikler.isNotEmpty) l.add('Tüm çiftlikler');
+  if (q.donem.ad.startsWith('son 7') || q.donem.ad == 'bu hafta') {
+    l.add('Geçen hafta');
+  } else if (q.donem.acik) {
+    l.add('Geçen ay');
+  } else {
+    l.add('Bu ay');
+  }
+  if (basliklar.contains('Süt ve sürü') && raporVar) l.add('Süt maliyeti neden yüksek?');
+  if (basliklar.contains('Kâr / zarar ve maliyet')) l.add('Tutarsızlıklar neler?');
+  if (basliklar.contains('Tarım faaliyetleri')) l.add('Ekim alanları');
+  if (basliklar.contains('Ekim alanları')) l.add('Hasat ve verim');
+  if (basliklar.contains('ESK – Taşağıl')) l.add('ESK 2025');
+  if (basliklar.contains('Doğum, ölüm ve kesim')) l.add('Hastalıklar');
+  return l.take(5).toList();
 }
 
 // ----------------------------------------------------------------- süt ve sürü
@@ -227,7 +350,7 @@ void _sut(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
     if (q.ciftlikler.isEmpty || q.ciftlikler.contains('Pan-Gev')) ('Pan-Gev', (GunlukSatir x) => x.erentepe),
   ];
   if (ciftlikler.isEmpty) return;
-  final par = <String>[];
+  final par = <String>[], kisa = <String>[];
   if (p.isEmpty) {
     par.add('${d.ad} için günlük süt kaydı yok. Kayıtlar ${tarihKisa(l.first.tarih)} – ${tarihKisa(son)} arasını kapsıyor.');
   } else {
@@ -244,13 +367,15 @@ void _sut(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
       final top = f(p.last).toplam;
       final ort = sagmal > 0 ? sut / gun / sagmal : 0.0;
       final oSut = o.isEmpty ? 0.0 : o.fold<double>(0, (t, x) => t + f(x).sut) / o.length;
+      kisa.add('$ad ${sayi(sut / gun)} kg/gün${o.isEmpty ? '' : _yuzde(sut / gun, oSut)}, inek başı ${sayi(ort, ondalik: 1)} kg');
       par.add('$ad: toplam ${sayi(sut)} kg süt (günlük ortalama ${sayi(sut / gun)} kg${o.isEmpty ? '' : _yuzde(sut / gun, oSut)}), '
           'satılan ${sayi(sat)} kg; ortalama ${sayi(sagmal)} sağmal, inek başı ${sayi(ort, ondalik: 1)} kg/gün. '
           'Son gün (${tarihKisa(p.last.tarih)}) sürü ${sayi(top)} baş, sağmal ${sayi(f(p.last).sagmal)}, kuru/gebe ${sayi(f(p.last).kuruGebe)}.');
     }
     if (o.isNotEmpty) par.add('Parantezdeki değişim, bir önceki eşit uzunluktaki dönemin (${tarihKisa(o.first.tarih)} – ${tarihKisa(o.last.tarih)}) günlük ortalamasına göredir.');
   }
-  b.add(CevapBolumu('Süt ve sürü', par, 'Hayvan_Günlük sayfası (işletme günlük raporları)'));
+  b.add(CevapBolumu('Süt ve sürü', par, 'Hayvan_Günlük sayfası (işletme günlük raporları)',
+      ozet: kisa.isEmpty ? null : 'Süt (${d.ad}): ${kisa.join('; ')}.'));
 }
 
 void _dogum(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
@@ -278,7 +403,7 @@ void _dogum(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
         'ölen dana ${sayi(a[4])}, yavru atma/ölü doğum ${sayi(a[5])}, kesim/satış ${sayi(a[6])}, satılan/transfer dana ${sayi(a[7])}.');
   }
   if (par.length == 1) par.add('Bu dönemde doğum, ölüm veya kesim kaydı yok.');
-  b.add(CevapBolumu('Doğum, ölüm ve kesim', par, 'Hayvan_Özet sayfası'));
+  b.add(CevapBolumu('Doğum, ölüm ve kesim', par, 'Hayvan_Özet sayfası', ozet: '${par.first} ${par[1]}'));
 }
 
 // ----------------------------------------------------------------- tarım

@@ -48,4 +48,23 @@ void main() {
     final y = genelCevapla(v, 'parselinde', bugun: bugun);
     expect(y.bolumler.first.paragraflar.join(' '), contains('sulama'));
   });
+
+  test('takip sorusu önceki sorunun konusunu ve dönemini devralır', () {
+    final ilk = genelCevapla(v, 'Bu hafta Şekersüt süt ne kadar?', bugun: bugun);
+    final y = genelCevapla(v, 'Peki Pan-Gev’de?', bugun: bugun, onceki: ilk.baglam);
+    final m = y.bolumler.firstWhere((x) => x.baslik == 'Süt ve sürü').paragraflar.join(' ');
+    expect(m, contains('Pan-Gev'));
+    expect(m, isNot(contains('Şekersüt:')));
+    expect(y.devralinan, contains('bu hafta'));
+    expect(y.ozet.first, startsWith('Süt'));
+    expect(y.oneriler, contains('Peki Şekersüt’te?'));
+  });
+
+  test('takip sorusu çiftliği devralır, "tüm çiftlikler" kaldırır', () {
+    final ilk = genelCevapla(v, 'Şekersüt süt', bugun: bugun);
+    final y = genelCevapla(v, 'Geçen hafta', bugun: bugun, onceki: ilk.baglam);
+    expect(y.baglam.ciftlikler, {'Şekersüt'});
+    final t = genelCevapla(v, 'Tüm çiftlikler', bugun: bugun, onceki: y.baglam);
+    expect(t.baglam.ciftlikler, isEmpty);
+  });
 }
