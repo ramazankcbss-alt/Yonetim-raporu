@@ -1,5 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:yonetim_raporu/ekranlar/tarla.dart' show bosluguDoldur;
+import 'package:yonetim_raporu/ekranlar/tarla.dart' show bosluguBul, bosluguDoldur;
 import 'package:yonetim_raporu/veri/model.dart';
 import 'package:yonetim_raporu/veri/tarla.dart';
 
@@ -97,5 +99,22 @@ void main() {
     expect(xs.reduce((a, b) => a < b ? a : b), closeTo(0, 0.05));
     // Çakışma yoksa şekil aynen kalır.
     expect(identical(bosluguDoldur(sekil, [[(20.0, 20.0), (21.0, 20.0), (21.0, 21.0)]]), sekil), isTrue);
+  });
+
+  test('boşluğu doldur: komşu kavislere daire oturur, açık kenarlar daire yayı olur', () {
+    // r=10 pivot boşluğu; solda ve sağda kavisli kenarlı komşu parseller, üst ve alt açık.
+    List<(double, double)> yay(double a0, double a1) => [
+          for (var i = 0; i <= 20; i++)
+            (10 * math.cos(a0 + (a1 - a0) * i / 20), 10 * math.sin(a0 + (a1 - a0) * i / 20)),
+          for (var i = 20; i >= 0; i--)
+            (20 * math.cos(a0 + (a1 - a0) * i / 20), 20 * math.sin(a0 + (a1 - a0) * i / 20)),
+        ];
+    final sol = yay(math.pi * 0.6, math.pi * 1.4), sag = yay(-math.pi * 0.4, math.pi * 0.4);
+    final b = bosluguBul((1.5, -2), [sol, sag])!;
+    final uz = [for (final p in b) math.sqrt(p.$1 * p.$1 + p.$2 * p.$2)];
+    expect(uz.reduce(math.max), lessThan(10.3));
+    expect(uz.reduce(math.min), greaterThan(9.8));
+    // Parselin içine dokunulursa boşluk yok.
+    expect(bosluguBul((-15, 0), [sol, sag]), isNull);
   });
 }

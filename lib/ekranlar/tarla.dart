@@ -659,6 +659,103 @@ List<(double, double)> bosluguDoldur(List<(double, double)> sekil, Iterable<List
   return [for (final e in _sadelestir(en, 1.2)) t(e)];
 }
 
+/// Boşluğu doldur: [n] noktasından her yöne ışın atılır, komşu parsel kenarlarına çarpan noktalara daire
+/// oturtulur (pivot boşluğu), sonra daire merkezinden ışınlar daireyle ve komşu kenarlarla sınırlanır.
+/// Sonuç boşluğun şeklidir; açık kenarlarda daire yayı kalır. Bulunamazsa null.
+List<(double, double)>? bosluguBul((double, double) n, List<List<(double, double)>> parseller) {
+  if (parseller.any((k) => k.length > 2 && _icinde(n, k))) return null;
+  double? isin((double, double) o, double aci) {
+    final dx = math.cos(aci), dy = math.sin(aci);
+    double? en;
+    for (final k in parseller) {
+      for (var i = 0; i < k.length; i++) {
+        final a = k[i], b = k[(i + 1) % k.length];
+        final ex = b.$1 - a.$1, ey = b.$2 - a.$2;
+        final den = dx * ey - dy * ex;
+        if (den.abs() < 1e-15) continue;
+        final t = ((a.$1 - o.$1) * ey - (a.$2 - o.$2) * ex) / den;
+        final u = ((a.$1 - o.$1) * dy - (a.$2 - o.$2) * dx) / den;
+        if (t > 0 && u >= 0 && u <= 1 && (en == null || t < en)) en = t;
+      }
+    }
+    return en;
+  }
+
+  const m = 96;
+  var noktalar = <(double, double)>[];
+  for (var i = 0; i < m; i++) {
+    final a = i * 2 * math.pi / m;
+    final t = isin(n, a);
+    if (t != null) noktalar.add((n.$1 + t * math.cos(a), n.$2 + t * math.sin(a)));
+  }
+  if (noktalar.length < 8) return null;
+  double ort(Iterable<double> l) => l.reduce((a, b) => a + b) / l.length;
+  final uz = [for (final p in noktalar) math.sqrt(math.pow(p.$1 - n.$1, 2) + math.pow(p.$2 - n.$2, 2))]..sort();
+  final medyan = uz[uz.length ~/ 2];
+  // Uzaktaki (boşluğun açık tarafından kaçan) ışınlar atılır.
+  noktalar = [for (final p in noktalar) if (math.sqrt(math.pow(p.$1 - n.$1, 2) + math.pow(p.$2 - n.$2, 2)) <= medyan * 1.6) p];
+  (double, double, double)? daire;
+  for (var tur = 0; tur < 3 && noktalar.length >= 6; tur++) {
+    // Kasa yöntemi: x² + y² + Dx + Ey + F = 0 (merkeze göre kaydırılmış koordinatlarla)
+    final cx0 = ort(noktalar.map((p) => p.$1)), cy0 = ort(noktalar.map((p) => p.$2));
+    var sxx = 0.0, sxy = 0.0, syy = 0.0, sx = 0.0, sy = 0.0, sxz = 0.0, syz = 0.0, sz = 0.0;
+    for (final p in noktalar) {
+      final x = p.$1 - cx0, y = p.$2 - cy0, z = x * x + y * y;
+      sxx += x * x; sxy += x * y; syy += y * y; sx += x; sy += y; sxz += x * z; syz += y * z; sz += z;
+    }
+    final nn = noktalar.length.toDouble();
+    // [sxx sxy sx; sxy syy sy; sx sy n] [D E F] = -[sxz syz sz]
+    final a = [
+      [sxx, sxy, sx, -sxz],
+      [sxy, syy, sy, -syz],
+      [sx, sy, nn, -sz],
+    ];
+    for (var i = 0; i < 3; i++) {
+      var p = i;
+      for (var r = i + 1; r < 3; r++) {
+        if (a[r][i].abs() > a[p][i].abs()) p = r;
+      }
+      final g = a[i];
+      a[i] = a[p];
+      a[p] = g;
+      if (a[i][i].abs() < 1e-30) return null;
+      for (var r = 0; r < 3; r++) {
+        if (r == i) continue;
+        final f = a[r][i] / a[i][i];
+        for (var c = i; c < 4; c++) {
+          a[r][c] -= f * a[i][c];
+        }
+      }
+    }
+    final d = a[0][3] / a[0][0], e = a[1][3] / a[1][1], f = a[2][3] / a[2][2];
+    final cx = -d / 2, cy = -e / 2, r2 = cx * cx + cy * cy - f;
+    if (r2 <= 0) return null;
+    daire = (cx + cx0, cy + cy0, math.sqrt(r2));
+    final (dx, dy, r) = daire;
+    final art = [for (final p in noktalar) (math.sqrt(math.pow(p.$1 - dx, 2) + math.pow(p.$2 - dy, 2)) - r).abs()]..sort();
+    final esik = math.max(art[art.length ~/ 2] * 2.5, r * 0.01);
+    noktalar = [for (final p in noktalar) if ((math.sqrt(math.pow(p.$1 - dx, 2) + math.pow(p.$2 - dy, 2)) - r).abs() <= esik) p];
+  }
+  if (daire == null) return null;
+  final (cx, cy, r) = daire;
+  if (r > medyan * 3) return null;
+  final merkez = (cx, cy);
+  return [
+    for (var i = 0; i < m; i++)
+      () {
+        final a = i * 2 * math.pi / m;
+        final t = math.min(r, isin(merkez, a) ?? r);
+        return (cx + t * math.cos(a), cy + t * math.sin(a));
+      }(),
+  ];
+}
+
+/// Sadeleştirme toleransı: şeklin boyutunun binde ikisi (düzlem birimiyle).
+double _dekarCm(List<(double, double)> k) {
+  final (x0, y0, x1, y1) = _kutu(k);
+  return math.max(x1 - x0, y1 - y0) * 0.002;
+}
+
 /// Douglas–Peucker: [eps] mesafesinden az sapan ara noktaları atar (kapalı çokgen).
 List<Offset> _sadelestir(List<Offset> l, double eps) {
   if (l.length < 4) return l;
@@ -1070,7 +1167,7 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
   bool get _duzenleniyor => (_sekil == 'sinir' && _duzenParsel != null && !_yenidenCiz) || (_sekil == 'yeni' && _yeniDuzen);
 
   bool get _noktaDokunusu =>
-      _sekil == 'nokta' || (_sekil == 'yeni' && !_yeniDuzen) || (_sekil == 'sinir' && (_duzenParsel == null || _yenidenCiz));
+      _sekil == 'nokta' || _sekil == 'doldur' || (_sekil == 'yeni' && !_yeniDuzen) || (_sekil == 'sinir' && (_duzenParsel == null || _yenidenCiz));
 
   void _noktaEkle(Offset e, Size size) {
     final t = _g.tersDonusum(size);
@@ -1078,6 +1175,21 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
       switch (_sekil) {
         case 'nokta':
           _noktalar.add(e);
+        case 'doldur':
+          final b = bosluguBul(t(e), [for (final x in _g.sirali) _g.poligon[x]!]);
+          if (b == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Boşluk bulunamadı: parsellerin arasındaki boş alanın ortasına dokunun (parselin içine değil).'))));
+          } else {
+            final o = bosluguDoldur(b, [for (final x in _g.sirali) _g.poligon[x]!]);
+            final sade = [for (final c in _sadelestir([for (final c in o) Offset(c.$1, c.$2)], _dekarCm(o))) (c.dx, c.dy)];
+            _duzenBirak();
+            _sekil = 'yeni';
+            _yeniDuzen = true;
+            _duzen = sade.length >= 3 ? sade : o;
+            WidgetsBinding.instance.addPostFrameCallback((_) => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Boşluk dolduruldu. Gerekirse köşeleri düzeltip "Parseli kaydet"e basın.'))));
+          }
         case 'yeni':
           _duzen.add(t(e));
         case 'sinir' when _yenidenCiz:
@@ -1402,8 +1514,8 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
           InteractiveViewer(
             transformationController: _ctl,
             maxScale: widget.maxOlcek,
-            panEnabled: !_cizim || const {'nokta', 'yeni', 'sinir'}.contains(_sekil),
-            scaleEnabled: !_cizim || const {'nokta', 'yeni', 'sinir'}.contains(_sekil),
+            panEnabled: !_cizim || const {'nokta', 'yeni', 'sinir', 'doldur'}.contains(_sekil),
+            scaleEnabled: !_cizim || const {'nokta', 'yeni', 'sinir', 'doldur'}.contains(_sekil),
             child: LayoutBuilder(builder: (context, k) {
               final d = _g.donusum(k.biggest);
               final resim = AnimatedBuilder(
@@ -1536,6 +1648,7 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                               ('kare', 'Kare', Icons.crop_square),
                               ('daire', 'Daire', Icons.circle_outlined),
                               ('nokta', 'Nokta', Icons.polyline_outlined),
+                              if (widget.sinirKaydet != null) ('doldur', 'Boşluğu doldur', Icons.format_color_fill),
                               if (widget.sinirKaydet != null) ('sinir', 'Sınır düzenle', Icons.edit_location_alt_outlined),
                               if (widget.sinirKaydet != null) ('yeni', 'Yeni parsel', Icons.add_location_alt_outlined),
                             ])
@@ -1557,6 +1670,8 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
                                 'kare' => 'Parselin içinde bir köşeden karşı köşeye parmağınızı sürükleyin; dikdörtgen bölge olur.',
                                 'daire' => 'Bölgenin ortasına basıp dışa doğru sürükleyin; daire bölge olur.',
                                 'nokta' => 'Bölgenin köşelerine sırayla dokunun (en az 3 nokta), sonra "Bölgeyi kapat".',
+                                'doldur' => 'Parsellerin arasındaki boşluğun (ör. pivot yeri) ortasına dokunun: komşu parsellerin '
+                                    'kenarlarına göre daire bulunur ve boşluk doldurulur; sonra düzeltip kaydedersiniz.',
                                 'sinir' when _duzenParsel == null =>
                                   'Sınırını değiştirmek istediğiniz parsele dokunun. Haritayı iki parmakla yakınlaştırıp kaydırabilirsiniz.',
                                 'sinir' when _yenidenCiz =>

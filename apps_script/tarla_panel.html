@@ -669,7 +669,7 @@ function cizimAcKapa() { C.acik = !C.acik; cizimSifirla(); C.bekleyen = null; ci
 function cizimSifirla() { C.bas = C.son = null; C.noktalar = []; C.duzenP = null; C.duzen = []; C.secKose = null; C.surukle = null; C.yenidenCiz = false; C.yeniDuzen = false; C.tasi = null; }
 function modSec(m) { C.mod = m; C.bekleyen = null; cizimSifirla(); yenidenKur(); }
 function yenidenKur() { if (!H) return; var c = H.c, sz = H.sz, T = H.T; haritaKur(c, sz); H.T = T; uygula(); cizimPaneli(); }
-var MODLAR = [['cizgi', 'Çizgi'], ['kare', 'Kare'], ['daire', 'Daire'], ['nokta', 'Nokta'], ['sinir', 'Sınır düzenle'], ['yeni', 'Yeni parsel']];
+var MODLAR = [['cizgi', 'Çizgi'], ['kare', 'Kare'], ['daire', 'Daire'], ['nokta', 'Nokta'], ['doldur', 'Boşluğu doldur'], ['sinir', 'Sınır düzenle'], ['yeni', 'Yeni parsel']];
 function cizimPaneli() {
   var el = document.getElementById('cizimPanel'); if (!el) return;
   el.style.display = C.acik ? 'block' : 'none'; if (!C.acik) return;
@@ -686,6 +686,7 @@ function cizimPaneli() {
   else if (C.mod === 'daire') h += 'Bölgenin ortasına basıp dışa doğru sürükleyin; daire bölge olur.';
   else if (C.mod === 'nokta') h += 'Bölgenin köşelerine sırayla dokunun (en az 3 nokta), sonra "Bölgeyi kapat".<div class="kucukDugmeler"><button onclick="C.noktalar.pop();uygula();cizimPaneli()"' + (C.noktalar.length ? '' : ' disabled') + '>↶ Son noktayı sil</button>' +
     '<button class="ana" onclick="sekilBitir()"' + (C.noktalar.length < 3 ? ' disabled' : '') + '>✓ Bölgeyi kapat (' + C.noktalar.length + ')</button></div>';
+  else if (C.mod === 'doldur') h += 'Parsellerin arasındaki boşluğun (ör. pivot yeri) ortasına dokunun: komşu parsellerin kenarlarına göre daire bulunur ve boşluk doldurulur; sonra düzeltip kaydedersiniz.';
   else if (C.mod === 'sinir' && !C.duzenP) h += 'Sınırını değiştirmek istediğiniz parsele dokunun. İki parmakla yakınlaştırıp kaydırabilirsiniz.';
   else if (C.mod === 'sinir' || C.mod === 'yeni') {
     h += C.mod === 'yeni' ? (C.yeniDuzen ? 'Yeni parsel: köşeleri sürükleyin, kenar ortasındaki küçük noktadan köşe ekleyin, şeklin içinden tutup taşıyın.' + alan :
@@ -794,7 +795,7 @@ function dokunmaKur(kap) {
     if (cizer === 'kose') { cizer = false; if (!C.tasi) C.secKose = C.surukle; C.surukle = null; C.tasi = null; uygula(); cizimPaneli(); bas = null; return; }
     if (bas && !bas.kaydi && Date.now() - bas.t < 600 && e.type === 'pointerup') {
       var simdi = Date.now();
-      if (C.acik && (C.mod === 'nokta' || (C.mod === 'yeni' && !C.yeniDuzen) || (C.mod === 'sinir' && (C.yenidenCiz || !C.duzenP)))) { dokunusCizim(n); bas = null; return; }
+      if (C.acik && (C.mod === 'nokta' || C.mod === 'doldur' || (C.mod === 'yeni' && !C.yeniDuzen) || (C.mod === 'sinir' && (C.yenidenCiz || !C.duzenP)))) { dokunusCizim(n); bas = null; return; }
       if (simdi - sonDokunus < 300) { sonDokunus = 0; clearTimeout(dokunmaKur.z); yakinlasNokta(2, n[0], n[1]); }
       else {
         sonDokunus = simdi; clearTimeout(dokunmaKur.z);
@@ -808,6 +809,13 @@ function dokunmaKur(kap) {
 }
 function dokusCizimYok() {}
 function dokunusCizim(n) {
+  if (C.mod === 'doldur') {
+    var pl = H.G.map(function (g) { return g.k; }), b = bosluguBul(duzlemden(n), pl);
+    if (!b) return durum('Boşluk bulunamadı: parsellerin arasındaki boş alanın ortasına dokunun (parselin içine değil).');
+    var o = bosluguDoldur(b, pl), q = kutu(o), sade = sadelestir(o, Math.max(q[2] - q[0], q[3] - q[1]) * 0.002);
+    cizimSifirla(); C.mod = 'yeni'; C.yeniDuzen = true; C.duzen = sade.length >= 3 ? sade : o; uygula(); cizimPaneli();
+    return durum('Boşluk dolduruldu. Gerekirse köşeleri düzeltip "Parseli kaydet"e basın.');
+  }
   if (C.mod === 'nokta') C.noktalar.push(duzlemden(n));
   else if (C.mod === 'yeni' || C.yenidenCiz) C.duzen.push(duzlemden(n));
   else if (C.mod === 'sinir') { var x = parselBul(n); if (x) { var g = gOf(H.c.parseller[x.i].ad); if (g) { C.duzenP = g.p.ad; C.duzen = g.k.map(function (q) { return q.slice(); }); C.secKose = null; } } }
@@ -924,6 +932,44 @@ function bosluguDoldur(sekil, parseller) {
   } while ((ci1 !== ci0 || cj1 !== cj0) && ++sinirSay < nx * ny * 4);
   if (yol.length < 3) return sekil;
   return sadelestir(yol, hc * 0.9);
+}
+/** Boşluğu doldur: dokunulan noktadan ışınlarla komşu kenarlar bulunur, onlara daire oturtulur; daire merkezinden
+ * ışınlar daire ve komşu kenarlarla sınırlanır. Bulunamazsa null. */
+function bosluguBul(n, parseller) {
+  if (parseller.some(function (k) { return k.length > 2 && icinde(n, k); })) return null;
+  function isin(o, aci) {
+    var dx = Math.cos(aci), dy = Math.sin(aci), en = null;
+    parseller.forEach(function (k) { for (var i = 0; i < k.length; i++) { var a = k[i], b = k[(i + 1) % k.length], ex = b[0] - a[0], ey = b[1] - a[1], den = dx * ey - dy * ex;
+      if (Math.abs(den) < 1e-15) continue; var t = ((a[0] - o[0]) * ey - (a[1] - o[1]) * ex) / den, u = ((a[0] - o[0]) * dy - (a[1] - o[1]) * dx) / den;
+      if (t > 0 && u >= 0 && u <= 1 && (en == null || t < en)) en = t; } });
+    return en;
+  }
+  var m = 96, l = [];
+  for (var i = 0; i < m; i++) { var a = i * 2 * Math.PI / m, t = isin(n, a); if (t != null) l.push([n[0] + t * Math.cos(a), n[1] + t * Math.sin(a)]); }
+  if (l.length < 8) return null;
+  function uz(p, o) { return Math.hypot(p[0] - o[0], p[1] - o[1]); }
+  var u = l.map(function (p) { return uz(p, n); }).sort(function (a, b) { return a - b; }), medyan = u[u.length >> 1];
+  l = l.filter(function (p) { return uz(p, n) <= medyan * 1.6; });
+  var daire = null;
+  for (var tur = 0; tur < 3 && l.length >= 6; tur++) {
+    var cx0 = 0, cy0 = 0; l.forEach(function (p) { cx0 += p[0]; cy0 += p[1]; }); cx0 /= l.length; cy0 /= l.length;
+    var sxx = 0, sxy = 0, syy = 0, sx = 0, sy = 0, sxz = 0, syz = 0, sz = 0;
+    l.forEach(function (p) { var x = p[0] - cx0, y = p[1] - cy0, z = x * x + y * y; sxx += x * x; sxy += x * y; syy += y * y; sx += x; sy += y; sxz += x * z; syz += y * z; sz += z; });
+    var A = [[sxx, sxy, sx, -sxz], [sxy, syy, sy, -syz], [sx, sy, l.length, -sz]];
+    for (var i2 = 0; i2 < 3; i2++) { var pv = i2; for (var r = i2 + 1; r < 3; r++) if (Math.abs(A[r][i2]) > Math.abs(A[pv][i2])) pv = r;
+      var g = A[i2]; A[i2] = A[pv]; A[pv] = g; if (Math.abs(A[i2][i2]) < 1e-30) return null;
+      for (var r2 = 0; r2 < 3; r2++) { if (r2 === i2) continue; var f = A[r2][i2] / A[i2][i2]; for (var c = i2; c < 4; c++) A[r2][c] -= f * A[i2][c]; } }
+    var D = A[0][3] / A[0][0], E = A[1][3] / A[1][1], F = A[2][3] / A[2][2], cx = -D / 2, cy = -E / 2, r2v = cx * cx + cy * cy - F;
+    if (r2v <= 0) return null;
+    daire = [cx + cx0, cy + cy0, Math.sqrt(r2v)];
+    var art = l.map(function (p) { return Math.abs(uz(p, daire) - daire[2]); }).sort(function (a, b) { return a - b; });
+    var esik = Math.max(art[art.length >> 1] * 2.5, daire[2] * 0.01);
+    l = l.filter(function (p) { return Math.abs(uz(p, daire) - daire[2]) <= esik; });
+  }
+  if (!daire || daire[2] > medyan * 3) return null;
+  var sonuc = [];
+  for (var j = 0; j < m; j++) { var a2 = j * 2 * Math.PI / m, t2 = Math.min(daire[2], isin(daire, a2) || daire[2]); sonuc.push([daire[0] + t2 * Math.cos(a2), daire[1] + t2 * Math.sin(a2)]); }
+  return sonuc;
 }
 function sadelestir(l, eps) {
   function uzak(p, a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], u = Math.hypot(dx, dy); return u === 0 ? Math.hypot(p[0] - a[0], p[1] - a[1]) : Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / u; }
