@@ -30,6 +30,7 @@ void main() {
     expect(b.any((x) => x.baslik.contains('Taşağıl verisi güncel değil')), isTrue);
     expect(b.any((x) => x.baslik.contains('yem toplamı eksik')), isTrue);
     expect(b.any((x) => x.tur == BulguTuru.olumsuz && x.baslik.contains('satış fiyatının üstünde')), isTrue);
+    expect(b.any((x) => x.baslik.startsWith('Buğday – ortak gider')), isTrue);
   });
 
   test('maliyet takip soruları', () {

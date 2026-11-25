@@ -253,6 +253,19 @@ List<Bulgu> maliyetTakipBulgulari(CiftlikRaporu r) {
     l.add(Bulgu(BulguTuru.tutarsizlik, 'Tarım ortak giderleri dağıtılmamış',
         '${mn(m.ortakToplam)} ortak gider ürün maliyetlerine yansıtılmamış; ürün bazında dekar maliyetleri olduğundan düşük görünür.', {'tarım', 'Tarımsal Alan'}));
   }
+  final bugday = r.tarimUrun('Tarımsal Alan', 'Buğday', 2026);
+  final bm = [for (final e in m.ekilis) if (e.urun == 'Buğday') e];
+  if (bugday != null && bugday.satisKg > 0 && bugday.fiyat != null && bm.isNotEmpty) {
+    final maliyet = bm.fold(0.0, (s, e) => s + e.toplam);
+    final dekar = bm.fold(0.0, (s, e) => s + (e.dekar ?? 0));
+    final kg = maliyet / bugday.satisKg, kgPayli = (maliyet + dekar * m.ortakDekarBasi) / bugday.satisKg;
+    if (kgPayli > bugday.fiyat!) {
+      l.add(Bulgu(BulguTuru.olumsuz, 'Buğday – ortak gider payıyla maliyet satış fiyatını aşıyor',
+          'Maliyet takibine göre kg maliyeti ${tl2(kg)}, tarım ortak gider payı eklendiğinde ${tl2(kgPayli)}; satış fiyatı ${tl2(bugday.fiyat)}. '
+              'Gelir tablosundaki ${tl2(bugday.birimMaliyet)}/kg maliyet ortak giderleri içermediği için kârlılık olduğundan yüksek görünüyor.',
+          {'tarım', 'Buğday', 'Tarımsal Alan'}));
+    }
+  }
   final urunler = <String, List<MtEkilis>>{};
   for (final e in m.ekilis) {
     (urunler[e.urun] ??= []).add(e);
