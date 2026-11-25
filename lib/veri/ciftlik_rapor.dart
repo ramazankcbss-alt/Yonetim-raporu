@@ -8,6 +8,8 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart' show rootBundle;
 
+import '../bicim.dart';
+
 const raporAylari = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
 /// Maliyet kalemleri (SMM detayındaki sıra).
@@ -269,3 +271,96 @@ class CiftlikRaporu {
 
   double tesvikTutar(int yil, String kalem) => tesvik[(yil, kalem)] ?? 0;
 }
+
+// ------------------------------------------------------------------ biçim ve neden metinleri
+
+/// 12.345.678 → "12,3 mn ₺"; işaret korunur.
+String mn(double v) => '${v < 0 ? '−' : ''}${sayi(v.abs() / 1e6, ondalik: 1)} mn ₺';
+
+/// Kâr ise "12,3 mn ₺ kâr", zarar ise "4,1 mn ₺ zarar".
+String kz(double v) => '${sayi(v.abs() / 1e6, ondalik: 1)} mn ₺ ${v >= 0 ? 'kâr' : 'zarar'}';
+
+/// 31,36 ₺
+String tl2(double? v) => v == null ? '—' : '${v < 0 ? '−' : ''}${sayi(v.abs(), ondalik: 2)} ₺';
+
+/// +2,70 ₺ / −1,10 ₺
+String tl2f(double? v) => v == null ? '—' : '${v > 0 ? '+' : v < 0 ? '−' : ''}${sayi(v.abs(), ondalik: 2)} ₺';
+
+/// +%34
+String yuzde(double v) => '${v >= 0 ? '+' : '−'}%${sayi(v.abs())}';
+
+List<(String, String)> karZararNedenleri(CiftlikRaporu r) {
+  const k = kKonsolide;
+  final l = <(String, String)>[];
+  final fin25 = r.d25(k, 'Finansman giderleri'), fin26 = r.d26(k, 'Finansman giderleri');
+  if (fin25 - fin26 > 500000) {
+    l.add(('Finansman yükü azaldı', 'Kısa vadeli borçlanma gideri 2025 aynı dönemde ${mn(fin25)} iken 2026’da ${mn(fin26)}.'));
+  }
+  final od25 = r.d25(k, 'Olağandışı giderler'), od26 = r.d26(k, 'Olağandışı giderler');
+  if (od25 - od26 > 500000) {
+    l.add(('Olağandışı giderler düştü',
+        '2025 aynı dönemde ${mn(od25)} (ağırlıklı olarak Taşağıl’ın çalışmayan kısım amortismanı) iken 2026’da ${mn(od26)}.'));
+  }
+  // faaliyet dışı gelirin en çok olduğu çiftlik
+  final cs = [for (final c in r.ciftlikler) if (c != kKonsolide && c != kCiftliklerimiz) c]
+    ..sort((a, b) => r.faaliyetDisi(b).compareTo(r.faaliyetDisi(a)));
+  if (cs.isNotEmpty) {
+    final c = cs.first;
+    final b = r.d26(c, 'Brüt satış kârı/zararı');
+    l.add(('Faaliyet dışı gelirler sonucu belirliyor',
+        '$c’te ${mn(r.d26(c, 'Diğer olağan gelirler (649)'))} diğer olağan gelir ve ${mn(r.d26(c, 'Olağandışı gelirler (679)'))} olağandışı gelir yer alıyor'
+        '${b < 0 ? '; bu nedenle brüt zarara (${mn(b)}) rağmen net sonuç ${kz(r.d26(c, 'Dönem net kârı/zararı'))}' : ''}. '
+        'Bu gelirlerin içeriği dosyada ayrıştırılmamıştır; muhasebeden teyit edilmesi önerilir.'));
+  }
+  final tb26 = r.d26('Tarımsal Alan', 'Brüt satış kârı/zararı'), tb25 = r.d25('Tarımsal Alan', 'Brüt satış kârı/zararı');
+  l.add(('Tarım', 'Tarımsal Alan brüt kârı ${mn(tb26)} (2025 aynı dönem ${mn(tb25)}); ayrıntı Tarım sekmesinde.'));
+  final t = [
+    for (final x in ['Tarımsal teşvik', 'Buzağı teşviki', 'Süt teşviki'])
+      if (r.tesvikTutar(2026, x) > 0) '${x.toLowerCase()} ${mn(r.tesvikTutar(2026, x))}',
+  ];
+  if (t.isNotEmpty) l.add(('Teşvik gelirleri', '2026’da ${t.join(', ')} gelir kaydedilmiştir.'));
+  l.add(('ESK-Taşağıl', 'ESK’ya verilen besi hizmeti ve sap satışında brüt sonuç ${mn(r.d26(kEsk, 'Brüt satış kârı/zararı'))}, '
+      'dönem net sonucu ${kz(r.d26(kEsk, 'Dönem net kârı/zararı'))} (Et / Besi sekmesi).'));
+  final ag = r.d26('Aslım', 'Faaliyet giderleri'), aa = r.d26('Aslım', 'Amortisman');
+  if (ag + aa > 0) {
+    l.add(('Aslım', 'Üretim yokken genel yönetim gideri ${mn(ag)} ve amortisman ${mn(aa)} taşınmaktadır.'));
+  }
+  return l;
+}
+
+/// Bir ürünün maliyet değişim nedenleri (artan ilk 3 kalem, fiyat etkisi, zirve ay).
+List<(String, String)> birimNedenleri(CiftlikRaporu r, String urun, String ad, String birim) {
+  final a = r.donemOrt(urun, 2025), b = r.donemOrt(urun, 2026);
+  if (a.bos || b.bos) return const [];
+  final fark = b.birimMaliyet - a.birimMaliyet;
+  final kalemler = r.kalemFarklari(urun);
+  final artan = [for (final k in kalemler) if (k.fark > 0.05) k].take(3).toList();
+  final azalan = [for (final k in kalemler.reversed) if (k.fark < -0.05) k].take(2).toList();
+  final l = <(String, String)>[];
+  l.add((
+    '$ad – birim maliyet ${fark >= 0 ? 'yükseldi' : 'düştü'}',
+    '${a.donem} ortalaması ${tl2(a.birimMaliyet)}/$birim iken ${b.donem} ortalaması ${tl2(b.birimMaliyet)}/$birim (${tl2f(fark)}). '
+        '${artan.isEmpty ? '' : 'Artışa en çok katkı veren kalemler: ${artan.map((k) => '${k.kalem.toLowerCase()} ${tl2f(k.fark)}').join(', ')}. '}'
+        '${azalan.isEmpty ? '' : 'Azalan kalemler: ${azalan.map((k) => '${k.kalem.toLowerCase()} ${tl2f(k.fark)}').join(', ')}.'}'
+  ));
+  if (a.fiyat != null && b.fiyat != null) {
+    final bk = b.birimKar!;
+    l.add((
+      '$ad – fiyat ve kârlılık',
+      'Satış fiyatı ${tl2(a.fiyat)}’den ${tl2(b.fiyat)}’ye (${tl2f(b.fiyat! - a.fiyat!)}) çıktı. '
+          '${bk >= 0 ? '$birim başına ${tl2(bk)} kâr elde ediliyor' : 'Fiyat maliyetin altında kaldığı için $birim başına ${tl2(-bk)} zarar ediliyor'} '
+          '(2025: ${tl2f(a.birimKar)}).'
+    ));
+  }
+  final z = r.zirveAy(urun, 2026);
+  if (z != null) {
+    final (ay, k) = z;
+    l.add((
+      '$ad – en yüksek maliyetli ay',
+      '${ay.donem}: ${tl2(ay.birimMaliyet)}/$birim. Bu ayda dönem ortalamasına göre en çok artan kalem ${k.toLowerCase()} '
+          '(${tl2(ay.bilesenBirim(k))}/$birim, ortalama ${tl2(b.bilesen(k))}/$birim).'
+    ));
+  }
+  return l;
+}
+

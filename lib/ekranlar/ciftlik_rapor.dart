@@ -1,27 +1,14 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bicim.dart';
 import '../tema.dart';
 import '../veri/ciftlik_rapor.dart';
+import '../veri/ciftlik_soru.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
-
-/// 12.345.678 → "12,3 mn ₺"; işaret korunur.
-String mn(double v) => '${v < 0 ? '−' : ''}${sayi(v.abs() / 1e6, ondalik: 1)} mn ₺';
-
-/// Kâr ise "12,3 mn ₺ kâr", zarar ise "4,1 mn ₺ zarar".
-String kz(double v) => '${sayi(v.abs() / 1e6, ondalik: 1)} mn ₺ ${v >= 0 ? 'kâr' : 'zarar'}';
-
-/// 31,36 ₺
-String tl2(double? v) => v == null ? '—' : '${v < 0 ? '−' : ''}${sayi(v.abs(), ondalik: 2)} ₺';
-
-/// +2,70 ₺ / −1,10 ₺
-String tl2f(double? v) => v == null ? '—' : '${v > 0 ? '+' : v < 0 ? '−' : ''}${sayi(v.abs(), ondalik: 2)} ₺';
-
-/// +%34
-String yuzde(double v) => '${v >= 0 ? '+' : '−'}%${sayi(v.abs())}';
 
 /// Çiftlikler Rapor 2026: kâr/zarar ve süt, et, tarım birim maliyetleri,
 /// artış ve azalışların nedenleriyle birlikte.
@@ -38,7 +25,7 @@ class CiftlikRaporEkran extends StatelessWidget {
       builder: (context, s) {
         final r = s.data;
         return DefaultTabController(
-          length: 5,
+          length: 6,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Çiftlikler Rapor 2026'),
@@ -50,6 +37,7 @@ class CiftlikRaporEkran extends StatelessWidget {
                 indicatorColor: Colors.white,
                 tabs: [
                   Tab(text: 'Kâr / Zarar'),
+                  Tab(text: 'Soru Sor'),
                   Tab(text: 'Süt'),
                   Tab(text: 'Et / Besi'),
                   Tab(text: 'Tarım'),
@@ -66,6 +54,7 @@ class CiftlikRaporEkran extends StatelessWidget {
                     ? const Center(child: CircularProgressIndicator())
                     : TabBarView(children: [
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Kâr / Zarar', child: _KarZarar(r: r)),
+                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Soru Sor', child: _SoruSor(r: r)),
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Süt', child: _Sut(r: r)),
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Et / Besi', child: _Et(r: r)),
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Tarım', child: _Tarim(r: r)),
@@ -238,45 +227,6 @@ class _Ozet extends StatelessWidget {
         '${fd > brut ? 'Esas faaliyetten gelen brüt satış kârı ${mn(brut)} düzeyinde kalmış; sonucun büyük bölümü ${mn(fd)} net faaliyet dışı gelirden kaynaklanmaktadır.' : 'Sonucun ana kaynağı ${mn(brut)} brüt satış kârıdır.'}';
     return BilgiKutusu(yazi: yazi);
   }
-}
-
-List<(String, String)> karZararNedenleri(CiftlikRaporu r) {
-  const k = kKonsolide;
-  final l = <(String, String)>[];
-  final fin25 = r.d25(k, 'Finansman giderleri'), fin26 = r.d26(k, 'Finansman giderleri');
-  if (fin25 - fin26 > 500000) {
-    l.add(('Finansman yükü azaldı', 'Kısa vadeli borçlanma gideri 2025 aynı dönemde ${mn(fin25)} iken 2026’da ${mn(fin26)}.'));
-  }
-  final od25 = r.d25(k, 'Olağandışı giderler'), od26 = r.d26(k, 'Olağandışı giderler');
-  if (od25 - od26 > 500000) {
-    l.add(('Olağandışı giderler düştü',
-        '2025 aynı dönemde ${mn(od25)} (ağırlıklı olarak Taşağıl’ın çalışmayan kısım amortismanı) iken 2026’da ${mn(od26)}.'));
-  }
-  // faaliyet dışı gelirin en çok olduğu çiftlik
-  final cs = [for (final c in r.ciftlikler) if (c != kKonsolide && c != kCiftliklerimiz) c]
-    ..sort((a, b) => r.faaliyetDisi(b).compareTo(r.faaliyetDisi(a)));
-  if (cs.isNotEmpty) {
-    final c = cs.first;
-    final b = r.d26(c, 'Brüt satış kârı/zararı');
-    l.add(('Faaliyet dışı gelirler sonucu belirliyor',
-        '$c’te ${mn(r.d26(c, 'Diğer olağan gelirler (649)'))} diğer olağan gelir ve ${mn(r.d26(c, 'Olağandışı gelirler (679)'))} olağandışı gelir yer alıyor'
-        '${b < 0 ? '; bu nedenle brüt zarara (${mn(b)}) rağmen net sonuç ${kz(r.d26(c, 'Dönem net kârı/zararı'))}' : ''}. '
-        'Bu gelirlerin içeriği dosyada ayrıştırılmamıştır; muhasebeden teyit edilmesi önerilir.'));
-  }
-  final tb26 = r.d26('Tarımsal Alan', 'Brüt satış kârı/zararı'), tb25 = r.d25('Tarımsal Alan', 'Brüt satış kârı/zararı');
-  l.add(('Tarım', 'Tarımsal Alan brüt kârı ${mn(tb26)} (2025 aynı dönem ${mn(tb25)}); ayrıntı Tarım sekmesinde.'));
-  final t = [
-    for (final x in ['Tarımsal teşvik', 'Buzağı teşviki', 'Süt teşviki'])
-      if (r.tesvikTutar(2026, x) > 0) '${x.toLowerCase()} ${mn(r.tesvikTutar(2026, x))}',
-  ];
-  if (t.isNotEmpty) l.add(('Teşvik gelirleri', '2026’da ${t.join(', ')} gelir kaydedilmiştir.'));
-  l.add(('ESK-Taşağıl', 'ESK’ya verilen besi hizmeti ve sap satışında brüt sonuç ${mn(r.d26(kEsk, 'Brüt satış kârı/zararı'))}, '
-      'dönem net sonucu ${kz(r.d26(kEsk, 'Dönem net kârı/zararı'))} (Et / Besi sekmesi).'));
-  final ag = r.d26('Aslım', 'Faaliyet giderleri'), aa = r.d26('Aslım', 'Amortisman');
-  if (ag + aa > 0) {
-    l.add(('Aslım', 'Üretim yokken genel yönetim gideri ${mn(ag)} ve amortisman ${mn(aa)} taşınmaktadır.'));
-  }
-  return l;
 }
 
 class _AylikGrafik extends StatelessWidget {
@@ -460,42 +410,6 @@ class _FarkTablosu extends StatelessWidget {
       vurguluSonSatir: true,
     );
   }
-}
-
-/// Bir ürünün maliyet değişim nedenleri (artan ilk 3 kalem, fiyat etkisi, zirve ay).
-List<(String, String)> birimNedenleri(CiftlikRaporu r, String urun, String ad, String birim) {
-  final a = r.donemOrt(urun, 2025), b = r.donemOrt(urun, 2026);
-  if (a.bos || b.bos) return const [];
-  final fark = b.birimMaliyet - a.birimMaliyet;
-  final kalemler = r.kalemFarklari(urun);
-  final artan = [for (final k in kalemler) if (k.fark > 0.05) k].take(3).toList();
-  final azalan = [for (final k in kalemler.reversed) if (k.fark < -0.05) k].take(2).toList();
-  final l = <(String, String)>[];
-  l.add((
-    '$ad – birim maliyet ${fark >= 0 ? 'yükseldi' : 'düştü'}',
-    '${a.donem} ortalaması ${tl2(a.birimMaliyet)}/$birim iken ${b.donem} ortalaması ${tl2(b.birimMaliyet)}/$birim (${tl2f(fark)}). '
-        '${artan.isEmpty ? '' : 'Artışa en çok katkı veren kalemler: ${artan.map((k) => '${k.kalem.toLowerCase()} ${tl2f(k.fark)}').join(', ')}. '}'
-        '${azalan.isEmpty ? '' : 'Azalan kalemler: ${azalan.map((k) => '${k.kalem.toLowerCase()} ${tl2f(k.fark)}').join(', ')}.'}'
-  ));
-  if (a.fiyat != null && b.fiyat != null) {
-    final bk = b.birimKar!;
-    l.add((
-      '$ad – fiyat ve kârlılık',
-      'Satış fiyatı ${tl2(a.fiyat)}’den ${tl2(b.fiyat)}’ye (${tl2f(b.fiyat! - a.fiyat!)}) çıktı. '
-          '${bk >= 0 ? '$birim başına ${tl2(bk)} kâr elde ediliyor' : 'Fiyat maliyetin altında kaldığı için $birim başına ${tl2(-bk)} zarar ediliyor'} '
-          '(2025: ${tl2f(a.birimKar)}).'
-    ));
-  }
-  final z = r.zirveAy(urun, 2026);
-  if (z != null) {
-    final (ay, k) = z;
-    l.add((
-      '$ad – en yüksek maliyetli ay',
-      '${ay.donem}: ${tl2(ay.birimMaliyet)}/$birim. Bu ayda dönem ortalamasına göre en çok artan kalem ${k.toLowerCase()} '
-          '(${tl2(ay.bilesenBirim(k))}/$birim, ortalama ${tl2(b.bilesen(k))}/$birim).'
-    ));
-  }
-  return l;
 }
 
 // ----------------------------------------------------------------- Süt
@@ -718,5 +632,176 @@ class _Kapsam extends StatelessWidget {
             ('Güncelleme', 'Dosyanın yeni sürümü geldiğinde veri araclar/ciftlik_rapor/uret.py ile yeniden üretilir.'),
           ], baslik: 'Kapsam ve notlar'),
         ],
+      );
+}
+
+// ----------------------------------------------------------------- Soru Sor
+
+const _ornekSorular = [
+  'Şekersüt süt maliyeti neden arttı?',
+  'Mayıs ayında Pan-Gev yem maliyeti ne kadar?',
+  'En çok zarar eden çiftlik hangisi?',
+  'Buğday fiyatı 2025’e göre ne kadar değişti?',
+  'ESK besi hizmeti neden zarar ediyor?',
+  'Konsolide net kâr neden arttı?',
+  'Teşvikler ne kadar?',
+  'Tutarsızlıklar neler?',
+];
+
+/// Rapor verisi üzerinde soru-cevap. Sorular yalnızca bu cihazda saklanır.
+class _SoruSor extends StatefulWidget {
+  const _SoruSor({required this.r});
+  final CiftlikRaporu r;
+  @override
+  State<_SoruSor> createState() => _SoruSorState();
+}
+
+class _SoruSorState extends State<_SoruSor> {
+  static const _anahtar = 'ciftlik_rapor_sorular';
+  final _kutu = TextEditingController();
+  final _sorular = <String>[];
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      if (!mounted) return;
+      setState(() => _sorular.addAll(p.getStringList(_anahtar) ?? const []));
+    });
+  }
+
+  @override
+  void dispose() {
+    _kutu.dispose();
+    super.dispose();
+  }
+
+  Future<void> _kaydet() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList(_anahtar, _sorular);
+  }
+
+  void _sor([String? hazir]) {
+    final q = (hazir ?? _kutu.text).trim();
+    if (q.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _sorular
+        ..remove(q)
+        ..insert(0, q);
+      if (_sorular.length > 20) _sorular.removeRange(20, _sorular.length);
+      _kutu.clear();
+    });
+    _kaydet();
+  }
+
+  void _sil(String q) {
+    setState(() => _sorular.remove(q));
+    _kaydet();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.r;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 2, bottom: 8),
+          child: Text(
+              'Sorunuzu yazın; yanıt rapor dosyasındaki gelir tabloları, satış ve maliyet kayıtlarından hesaplanır. '
+              'İlgili olumsuz sonuçlar ve veri tutarsızlıkları yanıtın altında kırmızı olarak işaretlenir. '
+              'Sorular yalnızca bu cihazda saklanır.',
+              style: TextStyle(fontSize: 12.5, color: Renk.soluk, height: 1.4)),
+        ),
+        Row(children: [
+          Expanded(
+            child: TextField(
+              controller: _kutu,
+              minLines: 1,
+              maxLines: 3,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _sor(),
+              decoration: const InputDecoration(hintText: 'Örn. Şekersüt süt maliyeti neden arttı?'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton.filled(tooltip: 'Sor', onPressed: _sor, icon: const Icon(Icons.send)),
+        ]),
+        const SizedBox(height: 10),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final o in _ornekSorular) ActionChip(label: Text(o, style: const TextStyle(fontSize: 12)), onPressed: () => _sor(o)),
+        ]),
+        const SizedBox(height: 12),
+        if (_sorular.isEmpty)
+          const BilgiKutusu(yazi: 'Henüz soru sorulmadı. Yukarıdaki örneklerden birine dokunabilir ya da kendi sorunuzu yazabilirsiniz.'),
+        for (final q in _sorular) _YanitKarti(y: cevapla(r, q), sil: () => _sil(q)),
+      ],
+    );
+  }
+}
+
+class _YanitKarti extends StatelessWidget {
+  const _YanitKarti({required this.y, required this.sil});
+  final Yanit y;
+  final VoidCallback sil;
+
+  @override
+  Widget build(BuildContext context) {
+    final olumsuz = y.bulgular.where((b) => b.tur == BulguTuru.olumsuz).toList();
+    final tutarsiz = y.bulgular.where((b) => b.tur == BulguTuru.tutarsizlik).toList();
+    return Panel(
+      baslik: y.soru,
+        eylem: IconButton(tooltip: 'Soruyu kaldır', icon: const Icon(Icons.close, size: 18), onPressed: sil),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (!y.anlasildi)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: BilgiKutusu(uyari: true, yazi: 'Soru tam anlaşılamadı; çiftlik, ürün veya kalem adı ekleyerek yeniden sorun.'),
+            ),
+          for (final p in y.paragraflar)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(p, style: const TextStyle(fontSize: 13.5, color: Renk.yazi, height: 1.45)),
+            ),
+          if (olumsuz.isNotEmpty) _BulguListesi(baslik: 'Olumsuz sonuçlar', bulgular: olumsuz),
+          if (tutarsiz.isNotEmpty) _BulguListesi(baslik: 'Veri tutarsızlıkları', bulgular: tutarsiz),
+        ]),
+    );
+  }
+}
+
+class _BulguListesi extends StatelessWidget {
+  const _BulguListesi({required this.baslik, required this.bulgular});
+  final String baslik;
+  final List<Bulgu> bulgular;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Renk.kirmiziAcik,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Renk.kirmizi.withValues(alpha: 0.35)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Icon(bulgular.first.tur == BulguTuru.olumsuz ? Icons.trending_down : Icons.report_problem_outlined, size: 18, color: Renk.kirmizi),
+            const SizedBox(width: 6),
+            Text('$baslik (${bulgular.length})', style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.kirmizi)),
+          ]),
+          for (final b in bulgular)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(text: '${b.baslik}: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  TextSpan(text: b.aciklama),
+                ]),
+                style: const TextStyle(fontSize: 13, color: Renk.yazi, height: 1.4),
+              ),
+            ),
+        ]),
       );
 }
