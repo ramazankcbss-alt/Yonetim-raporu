@@ -66,4 +66,23 @@ void main() {
     expect(p.last.urunler, [('Arpa', 30.0)]);
     expect(p.last.not, contains('KMZ\'de farklı'));
   });
+
+  test('sezona özel sınır kaydı yalnızca o sezona uygulanır', () {
+    const kare = [(1.0, 1.0), (2.0, 1.0), (2.0, 2.0), (1.0, 2.0)];
+    final eski = TarlaSezonu(sezon: '2023-2024', kaynak: 'KMZ', tarih: '', tur: 'ayri', ciftlikler: [
+      TarlaCiftlik(ad: 'Örnek', parseller: [TarlaParsel(ad: 'A', tip: 'parsel', urunler: const [('Arpa', 10)], koord: kare)]),
+    ]);
+    final esas = TarlaSezonu(sezon: '2025-2026', kaynak: 'KMZ', tarih: '', ciftlikler: [
+      TarlaCiftlik(ad: 'Örnek', parseller: [TarlaParsel(ad: 'A', tip: 'parsel', urunler: const [('Arpa', 10)], koord: kare)]),
+    ]);
+    final l = [const ParselSinir(ciftlik: 'Örnek', parsel: '2023-2024|Yeni', koord: kare, durum: 'Aktif')];
+    final a = sinirUygula(eski, l, sezon: '2023-2024');
+    expect(a.tur, 'ayri');
+    expect([for (final p in a.ciftlikler.single.parseller) p.ad], ['A', 'Yeni']);
+    expect(sinirUygula(esas, l).ciftlikler.single.parseller.length, 1);
+    final ss = tarlaSezonlari([esas, eski], const [], sinirlar: l);
+    expect(ss.first.sezon, '2023-2024');
+    expect(ss.first.ciftlikler.single.parseller.any((p) => p.ad == 'Yeni'), isTrue);
+    expect(ss[1].ciftlikler.single.parseller.any((p) => p.ad.contains('Yeni')), isFalse);
+  });
 }

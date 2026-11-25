@@ -639,7 +639,9 @@ List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l, {
   final kmz = sinirlar.isEmpty ? esaslar.first : sinirUygula(esaslar.first, sinirlar);
   TarlaSezonu? bul(String sezon, String tur) => paket.where((k) => k.sezon == sezon && k.tur == tur).firstOrNull;
   final s1 = oncekiSezon(kmz.sezon), s3 = sonrakiSezon(kmz.sezon);
-  final ayri = bul(oncekiSezon(s1), 'ayri');
+  final ayri0 = bul(oncekiSezon(s1), 'ayri');
+  // Eski sezonun kendi sınır kayıtları ("2023-2024|parsel") yalnızca o sezona uygulanır.
+  final ayri = ayri0 == null || sinirlar.isEmpty ? ayri0 : sinirUygula(ayri0, sinirlar, sezon: ayri0.sezon);
   final k1 = bul(s1, 'katman'), k3 = bul(s3, 'katman');
   // Parsel düzeni farklı en eski sezon (2023-2024): kendi çizimleri, uygulamadan girilen kayıtlar üzerine.
   TarlaSezonu? s0;
@@ -674,8 +676,16 @@ Map<(String, String), List<(double, double)>> gecerliSinirlar(List<ParselSinir> 
 final _sinirOnbellek = <String, List<(double, double)>>{};
 
 /// Yeniden çizilen sınırları KMZ parsellerine uygular; KMZ'de olmayan parseller haritaya eklenir.
-TarlaSezonu sinirUygula(TarlaSezonu kmz, List<ParselSinir> l) {
-  final m = gecerliSinirlar(l);
+/// [sezon] verilirse yalnızca o sezona ait kayıtlar ("2023-2024|parsel adı") uygulanır (parsel düzeni farklı
+/// eski sezon); verilmezse sezonsuz kayıtlar (tüm sezonların esas haritası).
+TarlaSezonu sinirUygula(TarlaSezonu kmz, List<ParselSinir> l, {String? sezon}) {
+  final m = <(String, String), List<(double, double)>>{
+    for (final e in gecerliSinirlar(l).entries)
+      if (sezon == null && !e.key.$2.contains('|'))
+        e.key: e.value
+      else if (sezon != null && e.key.$2.startsWith('$sezon|'))
+        (e.key.$1, e.key.$2.substring(sezon.length + 1)): e.value,
+  };
   if (m.isEmpty) return kmz;
   TarlaParsel yeni(TarlaParsel p, List<(double, double)> k) => TarlaParsel(
       ad: p.ad, tip: p.tip, urunler: p.urunler, beyan: p.beyan, olculen: p.olculen, etiket: p.etiket, not: p.not,
@@ -687,6 +697,7 @@ TarlaSezonu sinirUygula(TarlaSezonu kmz, List<ParselSinir> l) {
     onceki: kmz.onceki,
     sonraki: kmz.sonraki,
     giris: kmz.giris,
+    tur: kmz.tur,
     ciftlikler: [
       for (final c in kmz.ciftlikler)
         TarlaCiftlik(ad: c.ad, tesis: c.tesis, notlar: c.notlar, gorseller: c.gorseller, parseller: [
