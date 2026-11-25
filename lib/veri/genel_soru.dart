@@ -417,7 +417,7 @@ void _urunTakibi(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
     for (final x in v.urunTeslimat.gunler)
       if (_ciftlikEslesir(q.ciftlikler, x.ciftlik) &&
           (q.urunler.isEmpty || q.urunler.any(trKucuk(x.urun).contains)) &&
-          (!q.donem.acik || (DateTime.tryParse(x.tarih) case final d? when q.donem.icinde(d))))
+          (!q.donem.acik || _donemde(q.donem, x.tarih)))
         x,
   ];
   if (g.isNotEmpty) {
@@ -437,6 +437,11 @@ void _urunTakibi(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
     }
   }
   if (par.isNotEmpty) b.add(CevapBolumu('Ürün takibi', par, 'Ürün Takibi (Tarımsal Faaliyet dosyası, teslimat ve kantar kayıtları)'));
+}
+
+bool _donemde(Donem d, String tarih) {
+  final t = DateTime.tryParse(tarih);
+  return t != null && d.icinde(t);
 }
 
 // ----------------------------------------------------------------- hayvancılık diğer
