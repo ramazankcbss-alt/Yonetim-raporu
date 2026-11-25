@@ -9,6 +9,7 @@ import 'bakim_onarim.dart';
 import 'ciftlik_rapor.dart';
 import 'esk.dart';
 import 'gecmis.dart';
+import 'genel_soru.dart';
 import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
@@ -33,12 +34,20 @@ class AsistanEkran extends StatelessWidget {
         const Padding(
           padding: EdgeInsets.only(left: 2, bottom: 8),
           child: Text(
-            'Toplantılarını kaydeder, ESK, geçmiş yıllar, araç, bakım onarım ve hastalık '
+            'Sorularınızı cevaplar; toplantılarını kaydeder, ESK, geçmiş yıllar, araç, bakım onarım ve hastalık '
             'verilerini tek yerde toplar.',
             style: TextStyle(fontSize: 13.5, color: Renk.soluk, height: 1.4),
           ),
         ),
         const _AnlikGuncelle(),
+        _Bolum(
+          ikon: Icons.question_answer_outlined,
+          baslik: 'Soru Sor',
+          aciklama: 'Merak ettiğiniz konuyu sorun; cevap uygulamadaki tüm verilerden, kaynağıyla birlikte hazırlanır',
+          renk: Renk.anaKoyu,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => GenelSoruEkran(veri: veri))),
+        ),
         _Bolum(
           ikon: Icons.agriculture_outlined,
           baslik: 'ESK – Et ve Süt Kurumu',
@@ -57,8 +66,8 @@ class AsistanEkran extends StatelessWidget {
         ),
         _Bolum(
           ikon: Icons.query_stats_outlined,
-          baslik: 'Çiftlikler Rapor 2026',
-          aciklama: 'Kâr/zarar ile süt, et ve tarım birim maliyetleri — artış ve azalış nedenleriyle',
+          baslik: 'Çiftlikler Rapor',
+          aciklama: '2025, 2026 ve 2027 yılları: kâr/zarar ile süt, et ve tarım birim maliyetleri — artış ve azalış nedenleriyle',
           renk: Renk.mavi,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CiftlikRaporEkran())),
