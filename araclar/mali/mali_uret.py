@@ -13,10 +13,18 @@ Kurallar (Tarım ve Hayvancılık Direktörlüğü kararları, Kasım 2026):
 KVKK: şahıs tedarikçi adı ve fatura numarası, kalem açıklaması, plaka ve personel
 bilgisi çıktıya yazılmaz.
 
-Kullanım: python3 -I mali_uret.py KAYNAK.xlsx CIKTI.json
+Kullanım: python3 -I mali_uret.py KAYNAK.xlsx CIKTI.json [MUHASEBE.xlsx [MUHASEBE_LINK]]
+
+MUHASEBE.xlsx: muhasebenin gönderdiği "2026 Fatura" (SAP fatura listesi). Verilirse
+muhasebe faturaları ayrı bölüm olarak çıktıya eklenir ve birim fatura raporuyla
+fatura numarası üzerinden karşılaştırılır (eksik, fazla, tutarı ya da üretim yeri farklı
+kayıtlar). KVKK: muhasebe dosyasındaki "Kullanıcı adı" sütunu okunmaz.
 """
 import openpyxl, datetime, collections, re, json, sys
 KAYNAK, CIKTI = sys.argv[1], sys.argv[2]
+MUHASEBE = sys.argv[3] if len(sys.argv) > 3 else None
+L5 = sys.argv[4] if len(sys.argv) > 4 else 'https://drive.google.com/file/d/1SZdjPUrz3_1aHcWn5xBQJSpMeqBntKMw/view'
+F5 = '2026 Fatura (muhasebe)'
 def s(v): return '' if v is None else str(v).strip()
 def sayi(v):
     if isinstance(v,(int,float)): return float(v)
@@ -309,9 +317,136 @@ fmt=lambda v,pb: f"{v:,.2f}".replace(',','X').replace('.',',').replace('X','.')+
 kontrol('Bilgi','Döviz olarak işlenen satırlar',f'{len(dl)} satır · '+' · '.join(fmt(v,k) for k,v in sorted(dt.items())),
  'L sütununa para birimiyle (EUR, USD) yazılmış tutarlar döviz faturası olarak işlendi; TL toplamlarına katılmaz, döviz toplamı ayrıca gösterilir. Dosyada kur bilgisi olmadığından TL karşılığı hesaplanmadı. Satır sayısı kopya satırları da içerir; rapordaki döviz toplamı kopyalar bir kez sayılarak hesaplanır. "TL" ekiyle yazılmış tutarlar TL olarak okundu.',F3,L3,'','','TL karşılığı gerekiyorsa fatura tarihindeki kurla ayrı bir sütuna yazın.',
  [[T(x['tarih']),BIRIM[x['sayfa']],None,None,f"{x['sayfa']} › satır {x['satir']}{fnoY(x['fno'],x['firma'])}",'',f"Hücrede \"{mtk[(x['sayfa'],x['satir'])]['ham']}\" yazıyor; {fmt(x['tutar'],x['pb'])} olarak işlendi."] for x in dl])
-kontrol('Bilgi','Kaynak dosya','1 dosya',
+kontrol('Bilgi','Kaynak dosya',f'{1+bool(MUHASEBE)} dosya',
  f'{F3}: 6 sayfa, {len(gel)} kalem, {len(G)} fatura. Tutarlar dosyanın L sütunundaki TOPLAM TUTAR olduğu gibi alındı; KDV ayrımı yapılmadı (KDV bilgisi M sütununda açıklama olarak yer alır). TL faturalar TL, döviz faturalar kendi para biriminde. Ödeme durumu bu dosyada olmadığı için ödenen/ödenmemiş ayrımı yapılmaz. Satır numaraları Excel satırlarıdır (başlık satırı 1).',F3,L3)
 kontrol('Bilgi','KVKK','—','Şahıs işletmeleri ve gerçek kişi tedarikçilerin adları ve fatura numaraları gösterilmez ("Şahıs / teyitsiz tedarikçi"); yerlerini sayfa ve satır numarasıyla bulabilirsiniz. Plaka, kalem açıklaması ve personel ücret ayrıntısı aktarılmaz.')
-out=dict(surum=3,olusturma=datetime.date.today().isoformat(),kaynak=F3,kdv='',dosyalar=[['gelen',F3,L3]],fatura=fat,acik=[],kontrol=K)
+# ---------------------------------------------------------------- muhasebe karşılaştırması
+muh=[]; muhBilgi={}
+def lev(a,b):
+    if abs(len(a)-len(b))>2: return 9
+    d=list(range(len(b)+1))
+    for i,ca in enumerate(a,1):
+        p,d[0]=d[0],i
+        for j,cb in enumerate(b,1):
+            p,d[j]=d[j],min(d[j]+1,d[j-1]+1,p+(ca!=cb))
+    return d[-1]
+def benzer(no): return no.replace('O','0').replace('I','1')
+def fk(firma): return re.sub(r'[^A-Z0-9]','',trn(firma))[:5]
+if MUHASEBE:
+    mw=openpyxl.load_workbook(MUHASEBE,read_only=True,data_only=True).worksheets[0]
+    rows=list(mw.iter_rows(values_only=True))
+    bas=[s(x) for x in rows[0]]
+    def kol(ad): return bas.index(ad) if ad in bas else None
+    c=dict(firma=kol('Satıcı adı'),ref=kol('Referans'),tarih=kol('Belge tarihi'),brut=kol('Fatura brüt tutarı'),net=kol('Tutar'),
+           metin=kol('Kısa metin'),uy=kol('Üretim yeri'))   # "Kullanıcı adı" okunmaz (KVKK)
+    MF=collections.OrderedDict()
+    for i,r in enumerate(rows[1:],start=2):
+        if not isinstance(r[c['tarih']],datetime.datetime): continue
+        ham=s(r[c['ref']]); k=(nrm(ham),fk(r[c['firma']]))
+        f=MF.setdefault(k,dict(ham=ham,satir=[],tarih=r[c['tarih']],firma=s(r[c['firma']]),brut=0.0,net=0.0,uy=set(),kat=collections.Counter()))
+        b=sayi(r[c['brut']]) or 0.0; n=sayi(r[c['net']]) or 0.0
+        f['satir'].append(i); f['brut']+=b; f['net']+=n; f['uy'].add(s(r[c['uy']]).split('.')[0]); f['kat'][kategori(r[c['metin']])]+=abs(n) or 1
+        f['tarih']=min(f['tarih'],r[c['tarih']])
+    son=max(f['tarih'] for f in MF.values()); ilk=min(f['tarih'] for f in MF.values())
+    # birim raporu faturaları (kopya satırlar bir kez)
+    PF=collections.OrderedDict()
+    for x in gel:
+        if id(x) in atlaX or not x['fno'] or x['pb']!='TRY': continue
+        f=PF.setdefault((nrm(x['fno']),fk(x['firma'])),dict(ham=x['fno'],xs=[],tarih=x['tarih'],firma=x['firma'],tutar=0.0,uy=set()))
+        f['xs'].append(x); f['tutar']+=x['tutar']; f['uy'].add(x['uyKod'] or x['kod']); f['tarih']=min(f['tarih'],x['tarih'])
+    def myer(f): 
+        sat=f['satir']; rng=f"satır {sat[0]}" if len(sat)==1 else f"satır {sat[0]}–{sat[-1]}"
+        return f"{F5} › {rng}"+fnoY(f['ham'],f['firma'])
+    eslesme={}   # personel anahtarı (fatura no, tedarikçi) → muhasebe anahtarı
+    noyaGore=collections.defaultdict(list)
+    for mk in MF: noyaGore[mk[0]].append(mk)
+    kullanilan=set()
+    for k,f in PF.items():
+        if k in MF: eslesme[k]=k; kullanilan.add(k)
+    for k,f in PF.items():   # aynı no, tedarikçi adı farklı yazılmış: tek aday ve yakın tarih
+        if k in eslesme: continue
+        ad=[mk for mk in noyaGore.get(k[0],[]) if mk not in kullanilan and abs((MF[mk]['tarih']-f['tarih']).days)<=31]
+        if len(ad)==1: eslesme[k]=ad[0]; kullanilan.add(ad[0])
+    noFarkli=[]
+    for k,f in PF.items():
+        if k in eslesme or f['tarih']>son or not k[0]: continue
+        aday=None
+        for mk in MF:
+            if mk in kullanilan or abs((MF[mk]['tarih']-f['tarih']).days)>31: continue
+            if mk[1]!=k[1] and not (len(noyaGore.get(mk[0],[]))==1): continue
+            if benzer(mk[0])==benzer(k[0]) or lev(mk[0],k[0])<=2:
+                aday=mk; break
+        if aday:
+            eslesme[k]=aday; kullanilan.add(aday); noFarkli.append((k,aday))
+    def tutarUyar(pt,m_):
+        lo,hi=min(m_['net'],m_['brut']),max(m_['net'],m_['brut'])
+        return lo-max(2,abs(lo)*0.01)<=pt<=hi+max(2,abs(hi)*0.01)
+    tutarF=[(k,mk) for k,mk in eslesme.items() if not tutarUyar(PF[k]['tutar'],MF[mk])]
+    def ipucu(p_,m_):
+        pt=p_['tutar']; sayfa={x['sayfa'] for x in p_['xs']}
+        for ref in (m_['brut'],m_['net']):
+            if not ref: continue
+            r=pt/ref
+            if r>=1.8 and abs(r-round(r))<0.05:
+                return f" Birim raporundaki tutar muhasebenin {round(r)} katı; fatura {'birden fazla çiftlik sayfasına' if len(sayfa)>1 else 'aynı sayfaya'} mükerrer işlenmiş olabilir."
+            if abs(r-10)<0.2 or abs(r-0.1)<0.002:
+                return ' Tutarda basamak (virgül) hatası olabilir.'
+        if pt==0: return ' Birim raporunda tutar girilmemiş.'
+        return ''
+    uyF=[(k,mk) for k,mk in eslesme.items() if PF[k]['uy'] and MF[mk]['uy'] and not (PF[k]['uy'] & MF[mk]['uy'])]
+    birimdeYok=[mk for mk in MF if mk not in set(eslesme.values())]
+    muhdeYok=[k for k,f in PF.items() if k not in eslesme and f['tarih']<=son]
+    sonraki=[k for k,f in PF.items() if k not in eslesme and f['tarih']>son]
+    gecersiz=[mk for mk in MF if not re.search(r'\d{6}',mk[0])]
+    durum={}
+    for mk in birimdeYok: durum[mk]='Birim raporunda yok'
+    for k,mk in tutarF: durum[mk]='Tutar farklı'
+    for k,mk in noFarkli: durum.setdefault(mk,'Fatura no farklı yazılmış')
+    ters={mk:k for k,mk in eslesme.items()}
+    for mk,f in MF.items():
+        pk=ters.get(mk)
+        muh.append([T(f['tarih']),BIRIM_TEK,hesap(f['firma']),f['kat'].most_common(1)[0][0],tedarikci(f['firma']).rstrip('.'),round(f['brut'],2),'TRY','','',
+                    durum.get(mk,'Uyumlu'),myer(f),yer(PF[pk]['xs']) if pk else '',round(f['net'],2)])
+    def pDet(k,yap,mk=None):
+        f=PF[k]; m_=MF.get(mk) if mk else None
+        return [T(f['tarih']),BIRIM_TEK,round(f['tutar'],2),round(m_['brut'],2) if m_ else None,yer(f['xs']),myer(m_) if m_ else '',yap]
+    def mDet(mk,yap):
+        m_=MF[mk]
+        return [T(m_['tarih']),BIRIM_TEK,None,round(m_['brut'],2),myer(m_)+f" · {tedarikci(m_['firma']).rstrip('.')}",'',yap]
+    AY=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık']
+    donem=f"{AY[ilk.month-1]}–{AY[son.month-1]} {son.year}"
+    tb=sum(MF[mk]['brut'] for mk in birimdeYok); tp=sum(PF[k]['tutar'] for k in muhdeYok)
+    kontrol('Uyuşmayan kayıtlar','Muhasebede kayıtlı, birim fatura raporunda olmayan faturalar',f'{len(birimdeYok)} fatura · {m(tb)}',
+     f'Muhasebenin 2026 fatura listesinde ({donem}) bulunan ancak personelin tuttuğu {F3} dosyasında fatura numarasıyla bulunamayan faturalar. Birim raporunda eksik kayıt olduğunu gösterir.',
+     F5,L5,F3,L3,'Faturalar ilgili çiftlik sayfasına işlenmeli; fatura numarası farklı yazıldıysa düzeltilmeli.',
+     [mDet(mk,'Birim fatura raporuna işlenmeli.') for mk in sorted(birimdeYok,key=lambda x: MF[x]['tarih'])])
+    kontrol('Uyuşmayan kayıtlar','Birim fatura raporunda olup muhasebede bulunmayan faturalar',f'{len(muhdeYok)} fatura · {m(tp)}',
+     f'Personelin tuttuğu raporda {donem} dönemine ait olduğu hâlde muhasebe listesinde fatura numarasıyla bulunamayan faturalar. Fatura muhasebeye ulaşmamış ya da numarası hatalı yazılmış olabilir. {AY[son.month-1]} sonrası tarihli {len(sonraki)} fatura muhasebe listesinde henüz yer almadığından karşılaştırmaya alınmadı.',
+     F3,L3,F5,L5,'Fatura aslı muhasebeye iletilmeli ya da fatura numarası düzeltilmeli.',
+     [pDet(k,'Muhasebe kaydı bulunamadı.') for k in sorted(muhdeYok,key=lambda x: PF[x]['tarih'])])
+    kontrol('Uyuşmayan kayıtlar','Tutarı muhasebeden farklı faturalar',f'{len(tutarF)} fatura',
+     'Aynı fatura numarasında birim raporundaki tutar, muhasebedeki KDV hariç ve KDV dahil tutarların hiçbiriyle uyuşmuyor. Kalem eksik ya da fazla girilmiş, tutar yanlış yazılmış olabilir.',
+     F3,L3,F5,L5,'Fatura aslıyla karşılaştırılıp birim raporundaki kalemler düzeltilmeli.',
+     [pDet(k,f"Birim raporu {tl(PF[k]['tutar'])}; muhasebe KDV hariç {tl(MF[mk]['net'])}, KDV dahil {tl(MF[mk]['brut'])}."+ipucu(PF[k],MF[mk]),mk) for k,mk in sorted(tutarF,key=lambda x: PF[x[0]]['tarih'])])
+    kontrol('Tutarsızlık','Fatura numarası iki dosyada farklı yazılmış',f'{len(noFarkli)} fatura',
+     'Tarih ve tedarikçisi uyan, fatura numarası bir iki karakter farklı yazılmış kayıtlar (ör. I yerine 1, eksik rakam). Eşleştirilerek karşılaştırıldı.',
+     F3,L3,F5,L5,'Birim raporundaki fatura numarası muhasebedeki numarayla aynı yazılmalı.',
+     [pDet(k,(f"Muhasebede {MF[mk]['ham']} olarak kayıtlı." if tuzel(MF[mk]['firma']) else 'Muhasebede numara farklı yazılmış (şahıs tedarikçi; numara gösterilmez).'),mk) for k,mk in noFarkli])
+    if uyF:
+        kontrol('Uyarı','Üretim yeri iki dosyada farklı',f'{len(uyF)} fatura',
+         'Birim raporunda faturanın işlendiği çiftlik sayfası ile muhasebedeki üretim yeri kodu uyuşmuyor; gider farklı çiftliğe yazılmış olabilir.',
+         F3,L3,F5,L5,'Doğru üretim yeri teyit edilmeli.',
+         [pDet(k,f"Birim raporu {', '.join(sorted(PF[k]['uy']))}, muhasebe {', '.join(sorted(MF[mk]['uy']))}.",mk) for k,mk in uyF])
+    if gecersiz:
+        kontrol('Tutarsızlık','Muhasebede fatura numarası geçersiz kayıtlar',f'{len(gecersiz)} kayıt',
+         'Muhasebe listesinde "Referans" (fatura no) alanı fatura numarası biçiminde değil; birim raporuyla eşleştirilemiyor.',F5,L5,'','','Muhasebeden doğru fatura numarası istenmeli.',
+         [mDet(mk,f"Referans: \"{MF[mk]['ham']}\".") for mk in gecersiz])
+    kontrol('Eşleşen kayıtlar','Muhasebe ile birim raporunda eşleşen faturalar',f'{len(eslesme)} fatura',
+     f'{donem} döneminde fatura numarasıyla iki dosyada da bulunan faturalar; bunların {len(eslesme)-len(tutarF)} tanesinin tutarı uyumlu.',F3,L3,F5,L5)
+    kontrol('Bilgi','Muhasebe 2026 fatura listesi',f'{len(MF)} fatura · KDV dahil {m(sum(f["brut"] for f in MF.values()))}',
+     f'{F5}: {len(rows)-1} kalem, {len(MF)} fatura, {donem}. KDV hariç toplam {m(sum(f["net"] for f in MF.values()))}. Muhasebe listesi "Muhasebe" sekmesinde ayrı gösterilir; birim raporuyla karşılaştırma fatura numarasıyla yapılır. KVKK: kullanıcı adı sütunu okunmaz; şahıs tedarikçi adı ve fatura numarası gösterilmez.',F5,L5)
+    muhBilgi=dict(kaynak=F5,link=L5,donem=donem,kdv='dahil')
+out=dict(surum=4,olusturma=datetime.date.today().isoformat(),kaynak=F3,kdv='',dosyalar=[['gelen',F3,L3]]+([['muhasebe',F5,L5]] if MUHASEBE else []),
+         fatura=fat,acik=[],kontrol=K,muhasebe=muh,muhasebeBilgi=muhBilgi)
 json.dump(out,open(CIKTI,'w'),ensure_ascii=False,separators=(',',':'))
 import os; print(os.path.getsize(CIKTI),len(fat),collections.Counter(f[6] for f in fat),round(sum(f[5] for f in fat if f[6]=='TRY')),round(sum(f[12] for f in fat)),[(k[1][:35],k[2]) for k in K])

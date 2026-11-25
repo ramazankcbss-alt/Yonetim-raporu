@@ -123,6 +123,35 @@ void main() {
     expect(find.text('1.000 TL'), findsWidgets);
     expect(find.text('500,00 EUR'), findsWidgets);
   });
+  testWidgets('muhasebe listesi ayrı sekmede', (t) async {
+    t.view.physicalSize = const Size(2400, 5000);
+    t.view.devicePixelRatio = 1.5;
+    addTearDown(t.view.reset);
+    final j = <String, dynamic>{
+      'hayvanOzet': [], 'hayvanGunluk': [], 'tarim': [],
+      'mali': {
+        'kdv': '',
+        'fatura': [
+          ['2026-10-16', 'Tarım ve Hayvancılık', 'Grup içi', 'Yem ve kaba yem', 'X A.Ş.', 1000.0, 'TRY', '', '', 'Uyumlu', '', 'ASLIM-2026 › satır 5', 1000.0],
+        ],
+        'muhasebe': [
+          ['2026-10-16', 'Tarım ve Hayvancılık', 'Grup içi', 'Yem ve kaba yem', 'X A.Ş.', 1200.0, 'TRY', '', '', 'Uyumlu', '2026 Fatura (muhasebe) › satır 2', 'ASLIM-2026 › satır 5', 1000.0],
+          ['2026-10-20', 'Tarım ve Hayvancılık', 'Grup dışı', 'Diğer', 'Y A.Ş.', 600.0, 'TRY', '', '', 'Birim raporunda yok', '2026 Fatura (muhasebe) › satır 3', '', 500.0],
+        ],
+        'muhasebeBilgi': {'kaynak': '2026 Fatura (muhasebe)', 'donem': 'Ocak–Ekim 2026', 'link': 'https://drive.google.com/m'},
+        'acik': [],
+        'kontrol': [],
+      },
+    };
+    final v = RaporVerisi.json(j);
+    expect(v.mali.muhasebe, hasLength(2));
+    expect(v.mali.muhasebeDonem, 'Ocak–Ekim 2026');
+    await t.pumpWidget(MaterialApp(theme: temaOlustur(), home: MaliEkran(veri: v)));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Muhasebe'));
+    await t.pumpAndSettle();
+    expect(find.textContaining('birim raporunda yok 1'), findsOneWidget);
+  });
   test('düzeltme talebi metni', () {
     final k = MaliKontrol(
       bolum: 'Tutarsızlık',

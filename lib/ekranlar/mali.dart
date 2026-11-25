@@ -23,8 +23,9 @@ class MaliEkran extends StatelessWidget {
       builder: (context, _) {
         final m = (VeriDeposu.ben.veri ?? veri).mali;
         final acikVar = m.acik.isNotEmpty;
+        final muhVar = m.muhasebe.isNotEmpty;
         return DefaultTabController(
-          length: acikVar ? 6 : 5,
+          length: 5 + (acikVar ? 1 : 0) + (muhVar ? 1 : 0),
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Mali Raporlar'),
@@ -40,6 +41,7 @@ class MaliEkran extends StatelessWidget {
                   const Tab(text: 'Haftalık'),
                   const Tab(text: 'Aylık'),
                   const Tab(text: 'Yıllık'),
+                  if (muhVar) const Tab(text: 'Muhasebe'),
                   if (acikVar) const Tab(text: 'Açık bakiyeler'),
                   const Tab(text: 'Karşılaştırma'),
                 ],
@@ -57,6 +59,7 @@ class MaliEkran extends StatelessWidget {
                     GonderAlani(konu: 'Mali Raporlar – Haftalık', child: _Donem(veri: m, donem: MaliDonem.hafta)),
                     GonderAlani(konu: 'Mali Raporlar – Aylık', child: _Donem(veri: m, donem: MaliDonem.ay)),
                     GonderAlani(konu: 'Mali Raporlar – Yıllık', child: _Donem(veri: m, donem: MaliDonem.yil)),
+                    if (muhVar) GonderAlani(konu: 'Mali Raporlar – Muhasebe', child: _Muhasebe(veri: m)),
                     if (acikVar) GonderAlani(konu: 'Mali Raporlar – Açık bakiyeler', child: _Acik(veri: m)),
                     GonderAlani(konu: 'Mali Raporlar – Karşılaştırma', child: _Karsilastirma(veri: m)),
                   ]),
@@ -64,6 +67,36 @@ class MaliEkran extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Muhasebenin gönderdiği 2026 fatura listesi: birim raporundan ayrı, aylık.
+class _Muhasebe extends StatelessWidget {
+  const _Muhasebe({required this.veri});
+  final MaliVeri veri;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = veri.muhasebe;
+    final say = <String, int>{};
+    for (final f in l) {
+      say.update(f.kontrol, (n) => n + 1, ifAbsent: () => 1);
+    }
+    final uyumsuz = l.length - (say['Uyumlu'] ?? 0);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+        child: BilgiKutusu(
+          uyari: uyumsuz > 0,
+          yazi: '${veri.muhasebeKaynak.isEmpty ? 'Muhasebe fatura listesi' : veri.muhasebeKaynak}'
+              '${veri.muhasebeDonem.isEmpty ? '' : ' · ${veri.muhasebeDonem}'}: ${l.length} fatura, tutarlar KDV dahil. '
+              'Birim fatura raporundan ayrı gösterilir. ${uyumsuz > 0 ? '$uyumsuz faturada birim raporuyla fark var '
+                  '(${say.entries.where((e) => e.key != 'Uyumlu').map((e) => '${e.key.toLowerCase()} ${e.value}').join(', ')}); '
+                  'ayrıntılar Karşılaştırma sekmesinde.' : 'Tüm faturalar birim raporuyla uyumlu.'}',
+        ),
+      ),
+      Expanded(child: _Donem(veri: MaliVeri(faturalar: l, kdv: 'dahil'), donem: MaliDonem.ay)),
+    ]);
   }
 }
 
@@ -358,7 +391,8 @@ class _Karsilastirma extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
       children: [
         const BilgiKutusu(
-            yazi: 'Gelen fatura raporundaki hatalı ya da tutarsız kayıtlar ve uygulamadaki diğer verilerle '
+            yazi: 'Gelen fatura raporundaki hatalı ya da tutarsız kayıtlar; muhasebenin 2026 fatura listesiyle '
+                'karşılaştırma (eksik, fazla, tutarı ya da üretim yeri farklı faturalar) ve uygulamadaki diğer verilerle '
                 '(ESK, hayvancılık, bakım onarım) karşılaştırma. Her bulgunun altındaki "Nerede?" ile '
                 'sayfa ve satır numaraları açılır.'),
         if (hatalar.isNotEmpty)

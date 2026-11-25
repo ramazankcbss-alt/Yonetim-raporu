@@ -170,7 +170,23 @@ class MaliKontrol {
 }
 
 class MaliVeri {
-  const MaliVeri({this.faturalar = const [], this.acik = const [], this.kontrol = const [], this.olusturma, this.kaynak = '', this.kdv = 'dahil'});
+  const MaliVeri({
+    this.faturalar = const [],
+    this.acik = const [],
+    this.kontrol = const [],
+    this.olusturma,
+    this.kaynak = '',
+    this.kdv = 'dahil',
+    this.muhasebe = const [],
+    this.muhasebeKaynak = '',
+    this.muhasebeDonem = '',
+    this.muhasebeLink = '',
+  });
+
+  /// Muhasebenin gönderdiği 2026 fatura listesi (SAP), fatura bazında; tutarlar KDV dahil.
+  /// Her faturanın kontrol alanı birim fatura raporuyla karşılaştırma sonucudur.
+  final List<MaliFatura> muhasebe;
+  final String muhasebeKaynak, muhasebeDonem, muhasebeLink;
 
   final List<MaliFatura> faturalar;
   final List<MaliAcik> acik;
@@ -197,7 +213,16 @@ class MaliVeri {
       olusturma: tarihOku(j['olusturma']),
       kaynak: (j['kaynak'] ?? '').toString(),
       kdv: (j['kdv'] ?? 'dahil').toString(),
+      muhasebe: l('muhasebe', MaliFatura.oku)..sort((a, b) => a.tarih.compareTo(b.tarih)),
+      muhasebeKaynak: _bilgi(j, 'kaynak'),
+      muhasebeDonem: _bilgi(j, 'donem'),
+      muhasebeLink: _bilgi(j, 'link'),
     );
+  }
+
+  static String _bilgi(Map j, String k) {
+    final b = j['muhasebeBilgi'];
+    return b is Map ? (b[k] ?? '').toString() : '';
   }
 }
 
@@ -264,11 +289,11 @@ List<MapEntry<DateTime, List<MaliFatura>>> maliDonemler(List<MaliFatura> l, Mali
 /// (şahıs tedarikçilerin fatura numaraları veride zaten yoktur).
 String duzeltmeTalebi(List<MaliKontrol> bulgular, {String imza = 'Ramazan Kocabaş\nTarım ve Hayvancılık Grup Müdürü'}) {
   final b = StringBuffer()
-    ..writeln('Konu: 2026 Gelen Fatura Raporları – kayıt düzeltme talebi')
+    ..writeln('Konu: 2026 fatura kayıtları – düzeltme talebi')
     ..writeln()
     ..writeln('Merhaba,')
-    ..writeln('2026 Çiftlikler İş Birimi Gelen Fatura Raporları dosyasında aşağıdaki kayıtlarda tutarsızlık '
-        'tespit edilmiştir. Bu hususların incelenerek düzeltilmesini rica ederim.');
+    ..writeln('2026 Çiftlikler İş Birimi Gelen Fatura Raporları ve muhasebe 2026 fatura listesinde aşağıdaki kayıtlarda '
+        'tutarsızlık tespit edilmiştir. Bu hususların incelenerek düzeltilmesini rica ederim.');
   var no = 0;
   final linkler = <String>{};
   for (final k in bulgular) {
