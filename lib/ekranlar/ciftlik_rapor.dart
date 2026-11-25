@@ -7,6 +7,7 @@ import '../bicim.dart';
 import '../tema.dart';
 import '../veri/ciftlik_rapor.dart';
 import '../veri/ciftlik_soru.dart';
+import '../veri/maliyet_analiz.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 
@@ -25,7 +26,7 @@ class CiftlikRaporEkran extends StatelessWidget {
       builder: (context, s) {
         final r = s.data;
         return DefaultTabController(
-          length: 6,
+          length: 7,
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Çiftlikler Rapor 2026'),
@@ -41,6 +42,7 @@ class CiftlikRaporEkran extends StatelessWidget {
                   Tab(text: 'Süt'),
                   Tab(text: 'Et / Besi'),
                   Tab(text: 'Tarım'),
+                  Tab(text: 'Maliyet Takip'),
                   Tab(text: 'Kapsam'),
                 ],
               ),
@@ -58,6 +60,7 @@ class CiftlikRaporEkran extends StatelessWidget {
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Süt', child: _Sut(r: r)),
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Et / Besi', child: _Et(r: r)),
                         GonderAlani(konu: 'Çiftlikler Rapor 2026 – Tarım', child: _Tarim(r: r)),
+                        GonderAlani(konu: 'Çiftlikler Rapor 2026 – Maliyet Takip', child: _MaliyetTakip(r: r)),
                         _Kapsam(r: r),
                       ]),
           ),
@@ -625,7 +628,8 @@ class _Kapsam extends StatelessWidget {
                   'detayı. Besi-düve yem tüketimi sayfasından sonraki sayfalar okunamamıştır.'
             ),
             ('Dönem', '2026 verileri Ocak–Eylül dönemini kapsar; karşılaştırmalar 2025’in aynı dokuz ayıyla yapılmıştır.'),
-            ('Süt', 'Şekersüt ve Pan-Gev’de süt üretimi Ağustos 2025’te başladığından süt birim maliyeti 2025 Ağustos–Aralık ortalamasıyla karşılaştırılmıştır.'),
+            ('Süt', 'Şekersüt ve Pan-Gev gelir tablosu dosyasında Ağustos 2025’ten itibaren yer aldığından süt birim maliyeti 2025 Ağustos–Aralık ortalamasıyla karşılaştırılmıştır. Daha eski aylar için Maliyet Takip sekmesine bakılabilir.'),
+            ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyasındaki özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları; İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme ayrıntısı olduğundan özet tablolar üzerinden kullanılmıştır. Formül hatalı hücreler hesaba katılmamıştır.'),
             ('Alternatif sayfalar', 'Dosyadaki “2” uzantılı çiftlik sayfaları konsolide toplamla örtüşmediğinden kullanılmamıştır.'),
             ('Çiftliklerimiz (ESK hariç)', 'Konsolide toplamdan 1604 Taşağıl (ESK besi hizmeti) çıkarılarak hesaplanmıştır.'),
             ('KVKK', 'Rapor yalnızca çiftlik bazında toplam tutar ve birim maliyet içerir; kişi adı, personel, ücret ayrıntısı, alıcı adı ve küpe numarası yoktur.'),
@@ -804,4 +808,197 @@ class _BulguListesi extends StatelessWidget {
             ),
         ]),
       );
+}
+
+// ----------------------------------------------------------------- Maliyet Takip
+
+/// "ÇİFTLİKLER : MALİYET TAKİP 2026" dosyasının analizi.
+class _MaliyetTakip extends StatelessWidget {
+  const _MaliyetTakip({required this.r});
+  final CiftlikRaporu r;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = r.mt;
+    if (m == null) {
+      return const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(uyari: true, yazi: 'Maliyet takip verisi bulunamadı.'));
+    }
+    final bulgular = maliyetTakipBulgulari(r);
+    final olumsuz = [for (final b in bulgular) if (b.tur == BulguTuru.olumsuz) b];
+    final tutarsiz = [for (final b in bulgular) if (b.tur == BulguTuru.tutarsizlik) b];
+    String s2(double? v) => v == null ? '—' : sayi(v, ondalik: 2);
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        BilgiKutusu(
+            yazi: 'Kaynak: “${m.kaynak}”. Hayvancılık, süt ve karkas maliyetleri, canlı hayvan maliyeti, tarım ekiliş maliyetleri ve yem tüketimi '
+                'aylık olarak incelenmiştir. Formül hatası (#REF!) içeren hücreler hesaba katılmamış, aşağıda tutarsızlık olarak listelenmiştir.'),
+        if (olumsuz.isNotEmpty || tutarsiz.isNotEmpty)
+          Panel(
+            baslik: 'Olumsuz sonuçlar ve tutarsızlıklar',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (olumsuz.isNotEmpty) _BulguListesi(baslik: 'Olumsuz sonuçlar', bulgular: olumsuz),
+              if (tutarsiz.isNotEmpty) _BulguListesi(baslik: 'Veri tutarsızlıkları', bulgular: tutarsiz),
+            ]),
+          ),
+        // Hayvancılık
+        for (final c in m.hayvanCiftlikleri)
+          if (m.hayvanAylar(c, 2026).isNotEmpty)
+            Panel(
+              baslik: '$c – hayvan başı aylık maliyet (2026)',
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                VeriTablosu(
+                  ilkSutunGenislik: 80,
+                  basliklar: const ['Ay', 'Hayvan', 'Toplam', 'Baş/ay', 'Baş/gün', 'Yem', 'İşçilik', 'Amortisman', 'Diğer'],
+                  satirlar: [
+                    for (final a in m.hayvanAylar(c, 2026))
+                      [
+                        raporAylari[a.ay - 1],
+                        sayi(a.hayvan),
+                        mn(a.toplam!),
+                        sayi(a.basinaAylik),
+                        sayi(a.basinaGunluk),
+                        sayi(a.basina(a.yem)),
+                        sayi(a.basina(a.iscilik)),
+                        sayi(a.basina(a.amortisman)),
+                        sayi(a.basina(a.diger)),
+                      ],
+                    ['Ort.', '', '', sayi(m.donemBasina(c, 2026, 'Toplam')), '', sayi(m.donemBasina(c, 2026, 'Yem')), sayi(m.donemBasina(c, 2026, 'İşçilik')),
+                      sayi(m.donemBasina(c, 2026, 'Amortisman')), sayi(m.donemBasina(c, 2026, 'Diğer'))],
+                  ],
+                  vurguluSonSatir: true,
+                ),
+                for (final (b, a) in hayvanNedenleri(m, c))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text.rich(TextSpan(children: [
+                      TextSpan(text: '$b: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                      TextSpan(text: a),
+                    ]), style: const TextStyle(fontSize: 13, height: 1.4)),
+                  ),
+              ]),
+            ),
+        // Süt litre maliyeti
+        Panel(
+          baslik: '1 litre süt maliyeti (₺)',
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            VeriTablosu(
+              ilkSutunGenislik: 80,
+              basliklar: const ['Ay', 'Şekersüt 2025', 'Şekersüt 2026', 'Satış', 'Pan-Gev 2025', 'Pan-Gev 2026', 'Satış'],
+              satirlar: [
+                for (var ay = 1; ay <= 12; ay++)
+                  if (m.sut.any((x) => x.ay == ay && x.yil >= 2025))
+                    [
+                      raporAylari[ay - 1],
+                      for (final c in const ['Şekersüt', 'Pan-Gev']) ...[
+                        s2(m.sutAylar(c, 2025).where((x) => x.ay == ay).firstOrNull?.maliyet),
+                        s2(m.sutAylar(c, 2026).where((x) => x.ay == ay).firstOrNull?.maliyet),
+                        s2(m.sutAylar(c, 2026).where((x) => x.ay == ay).firstOrNull?.satis),
+                      ],
+                    ],
+              ],
+            ),
+            for (final c in const ['Şekersüt', 'Pan-Gev'])
+              for (final (b, a) in sutTakipNedenleri(m, c))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text.rich(TextSpan(children: [
+                    TextSpan(text: '$b: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    TextSpan(text: a),
+                  ]), style: const TextStyle(fontSize: 13, height: 1.4)),
+                ),
+          ]),
+        ),
+        // Karkas
+        Panel(
+          baslik: '1 kg karkas maliyeti (₺)',
+          child: VeriTablosu(
+            ilkSutunGenislik: 80,
+            basliklar: const ['Ay', 'Aslım besi', 'Şekersüt dişi', 'Şekersüt besi', 'Pan-Gev dişi'],
+            satirlar: [
+              for (var ay = 1; ay <= 12; ay++)
+                if (m.karkas.any((x) => x.ay == ay))
+                  [
+                    raporAylari[ay - 1],
+                    for (final (c, t) in const [('Aslım', 'Besi'), ('Şekersüt', 'Dişi'), ('Şekersüt', 'Besi'), ('Pan-Gev', 'Dişi')])
+                      () {
+                        final x = m.karkas.where((k) => k.ciftlik == c && k.tur == t && k.ay == ay).firstOrNull;
+                        if (x == null) return '';
+                        if (x.maliyet == null || x.maliyet == 0) return x.not.isEmpty ? '—' : x.not;
+                        return s2(x.maliyet);
+                      }(),
+                  ],
+            ],
+          ),
+        ),
+        // Canlı maliyet
+        if (m.canli.isNotEmpty)
+          Panel(
+            baslik: 'Canlı hayvan maliyeti – kayar ortalama (₺/baş)',
+            child: () {
+              final aylar = {for (final x in m.canli) x.ay}.toList()..sort();
+              final gruplar = <String>[];
+              for (final x in m.canli) {
+                final g = '${x.ciftlik} · ${x.kategori.toLowerCase()}';
+                if (!gruplar.contains(g)) gruplar.add(g);
+              }
+              return VeriTablosu(
+                ilkSutunGenislik: 170,
+                basliklar: ['Grup', for (final a in aylar) raporAylari[a - 1].substring(0, 3), 'Değişim'],
+                satirlar: [
+                  for (final g in gruplar)
+                    () {
+                      final l = [for (final x in m.canli) if ('${x.ciftlik} · ${x.kategori.toLowerCase()}' == g) x];
+                      return [
+                        g,
+                        for (final a in aylar) sayi(l.where((x) => x.ay == a).firstOrNull?.maliyet),
+                        l.length >= 2 && l.first.maliyet > 0 ? yuzde((l.last.maliyet / l.first.maliyet - 1) * 100) : '—',
+                      ];
+                    }(),
+                ],
+              );
+            }(),
+          ),
+        // Tarım
+        Panel(
+          baslik: 'Tarım – ekiliş bazında maliyet (Ağustos 2025 – Eylül 2026)',
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            VeriTablosu(
+              ilkSutunGenislik: 150,
+              metinSutunlari: const {0, 1},
+              basliklar: const ['Ürün', 'Çiftlik', 'Dekar', 'Maliyet', '₺/da', 'Ortak paylı ₺/da'],
+              satirlar: [
+                for (final d in dekarSatirlari(m))
+                  [d.e.urun, d.e.ciftlik, sayi(d.e.dekar), mn(d.e.toplam), sayi(d.dekarBasi), sayi(d.payliDekarBasi)],
+                ['Ortak giderler', '', sayi(m.toplamDekar), mn(m.ortakToplam), sayi(m.ortakDekarBasi), ''],
+              ],
+              vurguluSonSatir: true,
+            ),
+            for (final (b, a) in tarimTakipNedenleri(r))
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: '$b: ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  TextSpan(text: a),
+                ]), style: const TextStyle(fontSize: 13, height: 1.4)),
+              ),
+          ]),
+        ),
+        // Yem
+        Panel(
+          baslik: 'Yem – ana kalemlerde birim fiyat değişimi (Ocak → Eylül 2026)',
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            for (final g in m.yemGruplari)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(text: '$g (9 ay ${mn(m.yemGenel[g] ?? 0)}): ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  TextSpan(text: yemFiyatDegisimleri(m, g).join('; ')),
+                ]), style: const TextStyle(fontSize: 13, height: 1.4)),
+              ),
+          ]),
+        ),
+      ],
+    );
+  }
 }

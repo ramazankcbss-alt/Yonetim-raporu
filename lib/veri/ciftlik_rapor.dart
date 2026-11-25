@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../bicim.dart';
+import 'maliyet_takip.dart';
 
 const raporAylari = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
@@ -168,6 +169,7 @@ class CiftlikRaporu {
     required this.birim,
     required this.tarim,
     required this.tesvik,
+    this.mt,
   });
 
   final String baslik, kaynak, donem;
@@ -179,7 +181,10 @@ class CiftlikRaporu {
   /// (yıl, kalem) → tutar
   final Map<(int, String), double> tesvik;
 
-  static CiftlikRaporu coz(String metin) {
+  /// "ÇİFTLİKLER : MALİYET TAKİP 2026" verisi (yoksa null).
+  final MaliyetTakip? mt;
+
+  static CiftlikRaporu coz(String metin, {String? maliyetTakip}) {
     final j = jsonDecode(metin) as Map<String, dynamic>;
     List<Map<String, dynamic>> l(String k) => (j[k] as List).cast<Map<String, dynamic>>();
     return CiftlikRaporu(
@@ -194,11 +199,17 @@ class CiftlikRaporu {
       birim: [for (final x in l('birim')) BirimAy.json(x)],
       tarim: [for (final x in l('tarim')) TarimUrun.json(x)],
       tesvik: {for (final x in l('tesvik')) (x['yil'] as int, x['kalem'] as String): (x['tutar'] as num).toDouble()},
+      mt: maliyetTakip == null ? null : MaliyetTakip.coz(maliyetTakip),
     );
   }
 
-  static Future<CiftlikRaporu> yukle() async =>
-      coz(await rootBundle.loadString('assets/veri/ciftlik_rapor_2026.json'));
+  static Future<CiftlikRaporu> yukle() async {
+    String? mt;
+    try {
+      mt = await rootBundle.loadString('assets/veri/maliyet_takip_2026.json');
+    } catch (_) {}
+    return coz(await rootBundle.loadString('assets/veri/ciftlik_rapor_2026.json'), maliyetTakip: mt);
+  }
 
   /// Seçicide gösterilen çiftlikler (dosyadaki sırayla, toplamlar başta).
   List<String> get ciftlikler {

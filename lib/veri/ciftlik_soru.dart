@@ -4,6 +4,8 @@
 // veri cihaz dışına gönderilmez.
 import '../bicim.dart';
 import 'ciftlik_rapor.dart';
+import 'maliyet_analiz.dart';
+import 'maliyet_takip.dart';
 
 enum BulguTuru { olumsuz, tutarsizlik }
 
@@ -125,6 +127,171 @@ List<Bulgu> tumBulgular(CiftlikRaporu r) {
           'Satış ${sayi(t.satisKg)} kg, maliyete alınan ${sayi(t.smmKg)} kg. Birim maliyet ve kâr bu farktan etkilenir.', etiket));
     }
   }
+  if (r.mt != null) l.addAll(maliyetTakipBulgulari(r));
+  return l;
+}
+
+/// "ÇİFTLİKLER : MALİYET TAKİP 2026" dosyasındaki olumsuz sonuçlar ve tutarsızlıklar.
+List<Bulgu> maliyetTakipBulgulari(CiftlikRaporu r) {
+  final m = r.mt!;
+  const k = 'Maliyet takip';
+  final l = <Bulgu>[];
+  String cTag(String c) => c == 'Taşağıl' ? kEsk : c;
+
+  // --- formül / kopya hataları
+  for (final h in m.refHatalari) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, '$k – ${h.bolum} ${h.yil} formül hatası',
+        '“${h.sayfa}” sayfasında ${h.bolum} ${h.yil} bölümünde ${h.adet} hücre #REF! hatası veriyor; bu aylar hesaplanamıyor.',
+        {cTag(h.bolum), 'hayvan', 'finans'}));
+  }
+  if (m.ozetRef > 0) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, '$k – ÖZET sayfası kullanılamıyor',
+        'ÖZET sayfasında ${m.ozetRef} hücre #REF! hatası veriyor; sayfa kopuk bağlantılar nedeniyle güncel değil.', {'hayvan', 'finans', 'Aslım', kEsk}));
+  }
+  if (m.toplamPangevKopya >= 3) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, '$k – 2025 TOPLAM bloğu hatalı',
+        'Hayvancılık TOPLAM bloğunun 2025 sütunları Pan-Gev değerleriyle birebir aynı (${m.toplamPangevKopya} ay); diğer çiftlikler toplama girmiyor.',
+        {'hayvan', 'finans', 'Pan-Gev'}));
+  }
+  if (m.tasagilKopya) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, '$k – Taşağıl verisi güncel değil',
+        'Taşağıl 2026 Ocak değerleri 2025 Ocak ile aynı (kopya); Şubat–Eylül 2026 maliyet ve hayvan sayısı girilmemiş.', {kEsk, 'et', 'hayvan'}));
+  }
+  if (m.sutTabloDisi.isNotEmpty) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, '$k – süt maliyeti sayfasında başıboş hücreler',
+        '${m.sutTabloDisi.join(', ')} hücrelerinde tabloyla ilişkisiz değerler var.', {'süt'}));
+  }
+  for (final (g, mz, q) in m.yemToplamsiz) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, '$k – $g yem toplamı eksik',
+        '$mz için 9 ayda ${sayi(q)} kg tüketim girilmiş ancak tutarı TOPLAM sütununa alınmamış; yem gideri olduğundan düşük görünür.',
+        {g.split(' ').first, 'yem', 'süt'}));
+  }
+
+  // --- iki dosya arası karşılaştırma: süt litre maliyeti ve fiyat
+  for (final (c, u) in const [('Şekersüt', kSekersut), ('Pan-Gev', kPangev)]) {
+    final farkli = <String>[], fiyatFarkli = <String>[];
+    for (final s in m.sutAylar(c, 2026)) {
+      final b = r.birimAylar(u).where((x) => x.yil == 2026 && x.ayNo == s.ay).firstOrNull;
+      if (b == null) continue;
+      if ((b.birimMaliyet - s.maliyet).abs() > 0.5) {
+        farkli.add('${raporAylari[s.ay - 1]} (takip ${tl2(s.maliyet)}, muhasebe ${tl2(b.birimMaliyet)})');
+      }
+      if (s.satis != null && b.fiyat != null && (b.fiyat! - s.satis!).abs() > 1) {
+        fiyatFarkli.add('${raporAylari[s.ay - 1]} (takip ${tl2(s.satis)}, faturalanan ort. ${tl2(b.fiyat)})');
+      }
+    }
+    if (farkli.isNotEmpty) {
+      l.add(Bulgu(BulguTuru.tutarsizlik, '$c – litre maliyeti iki dosyada farklı', '${farkli.join('; ')}.', {c, 'süt', for (final a in raporAylari) if (farkli.any((x) => x.startsWith(a))) a}));
+    }
+    if (fiyatFarkli.isNotEmpty) {
+      l.add(Bulgu(BulguTuru.tutarsizlik, '$c – süt satış fiyatı ile faturalanan fiyat farklı',
+          '${fiyatFarkli.join('; ')}. Fark iskonto, iade veya fiyat farkı faturasından kaynaklanıyor olabilir.', {c, 'süt'}));
+    }
+    // olumsuz: maliyet > satış (takip)
+    final zarar = [for (final s in m.sutAylar(c, 2026)) if (s.satis != null && s.maliyet > s.satis!) s];
+    if (zarar.isNotEmpty) {
+      l.add(Bulgu(BulguTuru.olumsuz, '$c – litre maliyeti satış fiyatının üstünde',
+          zarar.map((s) => '${raporAylari[s.ay - 1]} ${tl2(s.maliyet)} / ${tl2(s.satis)}').join('; '),
+          {c, 'süt', for (final s in zarar) raporAylari[s.ay - 1]}));
+    }
+  }
+
+  // --- Aslım: maliyet takipte maliyet var, gelir tablosunda satış maliyeti yok
+  final aslim = m.hayvanAylar('Aslım', 2026);
+  if (aslim.isNotEmpty) {
+    final t = aslim.fold(0.0, (s, h) => s + h.toplam!);
+    final smm = r.d26('Aslım', 'Satışların maliyeti');
+    if (t > 1e6 && smm.abs() < t * 0.1) {
+      l.add(Bulgu(BulguTuru.tutarsizlik, 'Aslım – iki dosya uyumsuz',
+          'Maliyet takipte Aslım için 2026’da ${mn(t)} hayvancılık maliyeti ve ${sayi(aslim.first.hayvan)}–${sayi(aslim.last.hayvan)} baş hayvan görünüyor; '
+              'gelir tablosunda Aslım satış maliyeti ${mn(smm)}. Bu maliyetin hangi işletmeye (ör. ESK hizmeti) yazıldığı teyit edilmeli.',
+          {'Aslım', kEsk, 'et', 'hayvan', 'finans'}));
+    }
+  }
+
+  // --- hayvan sayısı ani değişimleri ve hayvan başı maliyet artışı
+  for (final c in m.hayvanCiftlikleri) {
+    for (final yil in [2025, 2026]) {
+      final a = m.hayvanAylar(c, yil);
+      for (var i = 1; i < a.length; i++) {
+        final d = a[i].hayvan! / a[i - 1].hayvan! - 1;
+        if (d.abs() > 0.25 && (a[i].hayvan! - a[i - 1].hayvan!).abs() > 30) {
+          l.add(Bulgu(BulguTuru.tutarsizlik, '$c – ${raporAylari[a[i].ay - 1]} $yil hayvan sayısı değişimi',
+              '${sayi(a[i - 1].hayvan)} → ${sayi(a[i].hayvan)} baş (${yuzde(d * 100)}). Giriş/çıkış kaydıyla teyit edilmeli; hayvan başı maliyet bu aydan etkilenir.',
+              {c, 'hayvan', raporAylari[a[i].ay - 1]}));
+        }
+      }
+    }
+    final a = m.hayvanAylar(c, 2026);
+    if (a.length >= 2) {
+      final f = a.last.basinaAylik! / a.first.basinaAylik! - 1;
+      if (f > 0.2) {
+        l.add(Bulgu(BulguTuru.olumsuz, '$c – hayvan başı maliyet arttı',
+            '${raporAylari[a.first.ay - 1]} ${tl0(a.first.basinaAylik)} → ${raporAylari[a.last.ay - 1]} ${tl0(a.last.basinaAylik)} (${yuzde(f * 100)}).',
+            {c, 'hayvan', if (c != 'Aslım') 'süt' else 'et'}));
+      }
+    }
+  }
+
+  // --- tarım
+  for (final e in m.ekilis) {
+    final ay = e.aylik.entries.toList()..sort((a, b) => a.key.compareTo(b.key));
+    for (var i = 1; i < ay.length; i++) {
+      if (ay[i].value > 100000 && ay[i].value == ay[i - 1].value) {
+        l.add(Bulgu(BulguTuru.tutarsizlik, '${e.ciftlik} ${e.urun} – tekrarlanan tutar',
+            '${ay[i - 1].key} ve ${ay[i].key} aylarında aynı tutar (${tl0(ay[i].value)}) girilmiş; kopyalama hatası olabilir.', {'tarım', e.urun, cTag(e.ciftlik)}));
+      }
+    }
+  }
+  if (m.ortakYazili != null && (m.ortakYazili! - m.ortakToplam).abs() > m.ortakToplam * 0.01) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, 'Tarım ortak giderleri – toplam hücresi hatalı',
+        'Aylık işçilik, amortisman ve diğer giderlerin toplamı ${mn(m.ortakToplam)}; dosyadaki TOPLAM hücresinde ${mn(m.ortakYazili!)} yazıyor '
+            '(fark ${mn(m.ortakToplam - m.ortakYazili!)}). Raporda aylık kalemlerin toplamı esas alınmıştır.',
+        {'tarım', 'Tarımsal Alan'}));
+  }
+  if (m.ortakToplam > 0) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, 'Tarım ortak giderleri dağıtılmamış',
+        '${mn(m.ortakToplam)} ortak gider ürün maliyetlerine yansıtılmamış; ürün bazında dekar maliyetleri olduğundan düşük görünür.', {'tarım', 'Tarımsal Alan'}));
+  }
+  final urunler = <String, List<MtEkilis>>{};
+  for (final e in m.ekilis) {
+    (urunler[e.urun] ??= []).add(e);
+  }
+  for (final e in urunler.entries) {
+    final l2 = [for (final x in e.value) if (x.dekarBasi != null) x]..sort((a, b) => b.dekarBasi!.compareTo(a.dekarBasi!));
+    if (l2.length >= 2 && l2.first.dekarBasi! > l2.last.dekarBasi! * 1.15) {
+      l.add(Bulgu(BulguTuru.olumsuz, '${e.key} – ${l2.first.ciftlik} dekar maliyeti yüksek',
+          '${l2.first.ciftlik} ${tl0(l2.first.dekarBasi)}/da, ${l2.last.ciftlik} ${tl0(l2.last.dekarBasi)}/da (${yuzde((l2.first.dekarBasi! / l2.last.dekarBasi! - 1) * 100)}).',
+          {'tarım', e.key, cTag(l2.first.ciftlik)}));
+    }
+  }
+
+  // --- karkas ve canlı maliyet
+  for (final x in m.karkas) {
+    if (x.maliyet != null && x.maliyet! > 0 && x.maliyet! < 50) {
+      l.add(Bulgu(BulguTuru.tutarsizlik, '${x.ciftlik} ${x.tur.toLowerCase()} karkas – ${raporAylari[x.ay - 1]}',
+          'Kg karkas maliyeti ${tl2(x.maliyet)}; olağan aralığın çok altında, hesaplama veya giriş hatası olabilir.', {cTag(x.ciftlik), 'et', 'karkas'}));
+    }
+    if (x.not.length == 1) {
+      l.add(Bulgu(BulguTuru.tutarsizlik, '${x.ciftlik} karkas – ${raporAylari[x.ay - 1]} açıklama',
+          'Açıklama hücresinde anlamsız tek karakter (“${x.not}”) var.', {cTag(x.ciftlik), 'karkas'}));
+    }
+  }
+  final sonCanli = m.canli.fold(0, (s, x) => x.ay > s ? x.ay : s);
+  if (sonCanli > 0 && sonCanli < 9) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, 'Canlı hayvan maliyeti güncellenmemiş',
+        'Kayar ortalama (canlı maliyet) tablosu ${raporAylari[sonCanli - 1]} ayından sonra doldurulmamış.', {'et', 'hayvan', 'canlı'}));
+  }
+  if (m.canli.any((x) => x.kategori == 'Başlıksız sütun')) {
+    l.add(Bulgu(BulguTuru.tutarsizlik, 'Aslım canlı maliyet – başlıksız sütun',
+        'Kayar ortalama tablosunda Aslım besi sütununun yanında başlığı olmayan bir değer sütunu var; neyi ifade ettiği belirtilmeli.', {'Aslım', 'canlı'}));
+  }
+  for (final x in m.canli) {
+    if (x.maliyet == 0) {
+      l.add(Bulgu(BulguTuru.tutarsizlik, '${x.ciftlik} ${x.kategori.toLowerCase()} – ${raporAylari[x.ay - 1]} canlı maliyet sıfır',
+          'Değer 0 girilmiş.', {x.ciftlik, 'canlı'}));
+    }
+  }
   return l;
 }
 
@@ -172,7 +339,12 @@ class _Soru {
     maliyet = _var(s, ['maliyet', 'pahalı', 'gider']) || bilesen != null;
     fiyat = _var(s, ['fiyat', 'bedel']);
     tesvik = _var(s, ['teşvik', 'tesvik', 'destek', 'prim ']);
-    tutarsiz = _var(s, ['tutarsız', 'tutarsiz', 'hata', 'yanlış', 'sorun', 'olumsuz', 'risk', 'uyarı']);
+    hayvanBasi = _var(s, ['hayvan başı', 'baş başı', 'hayvan sayısı', 'baş maliyet', 'hayvan maliyet', 'günlük maliyet']);
+    karkas = s.contains('karkas');
+    canli = _var(s, ['canlı', 'kayar']);
+    dekar = _var(s, ['dekar', 'ekiliş', 'ekilis', 'ortak gider']);
+    yemFiyat = s.contains('yem') && _var(s, ['fiyat', 'pahal', 'ucuz', 'kg']);
+        tutarsiz = _var(s, ['tutarsız', 'tutarsiz', 'hata', 'yanlış', 'sorun', 'olumsuz', 'risk', 'uyarı']);
     for (final e in const {
       'favök': 'FAVÖK (EBITDA)', 'ebitda': 'FAVÖK (EBITDA)', 'brüt': 'Brüt satış kârı/zararı', 'finansman': 'Finansman giderleri',
       'faiz': 'Finansman giderleri', 'genel yönetim': 'Faaliyet giderleri', 'faaliyet gider': 'Faaliyet giderleri',
@@ -192,10 +364,12 @@ class _Soru {
   final urunler = <String>{};
   bool sut = false, et = false, tarim = false, neden = false, enCok = false, enAz = false;
   bool maliyet = false, fiyat = false, tesvik = false, tutarsiz = false;
+  bool hayvanBasi = false, karkas = false, canli = false, dekar = false, yemFiyat = false;
   int? ay, yil;
   String? bilesen, kalem;
 
-  bool get bos => ciftlikler.isEmpty && !sut && !et && !tarim && kalem == null && !tesvik && !tutarsiz && !maliyet && !fiyat;
+  bool get takip => hayvanBasi || karkas || canli || dekar || yemFiyat;
+  bool get bos => ciftlikler.isEmpty && !sut && !et && !tarim && kalem == null && !tesvik && !tutarsiz && !maliyet && !fiyat && !takip;
 
   Set<String> get etiketler => {
         ...ciftlikler,
@@ -205,6 +379,11 @@ class _Soru {
         if (tarim) 'tarım',
         if (kalem != null || tesvik) 'finans',
         if (ay != null) raporAylari[ay! - 1],
+        if (hayvanBasi) 'hayvan',
+        if (karkas) 'karkas',
+        if (canli) 'canlı',
+        if (yemFiyat) 'yem',
+        if (dekar) 'tarım',
       };
 }
 
@@ -231,8 +410,17 @@ Yanit cevapla(CiftlikRaporu r, String soru) {
     );
   }
 
-  final suttan = q.sut || ((q.ciftlikler.contains('Şekersüt') || q.ciftlikler.contains('Pan-Gev')) && (q.maliyet || q.fiyat) && q.kalem == null);
-  final etten = q.et && !q.tarim && (q.maliyet || q.fiyat || q.kalem == null);
+  final mt = r.mt;
+  if (mt != null) {
+    if (q.hayvanBasi) p.addAll(_mtHayvan(mt, q));
+    if (q.karkas) p.addAll(_mtKarkas(mt, q));
+    if (q.canli) p.addAll(_mtCanli(mt, q));
+    if (q.yemFiyat) p.addAll(_mtYem(mt, q));
+    if (q.dekar || (q.tarim && !q.fiyat)) p.addAll(_mtTarim(r, mt, q));
+  }
+  final takipYanitladi = p.isNotEmpty;
+  final suttan = !q.hayvanBasi && !q.yemFiyat && (q.sut || ((q.ciftlikler.contains('Şekersüt') || q.ciftlikler.contains('Pan-Gev')) && (q.maliyet || q.fiyat) && q.kalem == null));
+  final etten = q.et && !q.tarim && !q.karkas && !q.canli && !q.hayvanBasi && (q.maliyet || q.fiyat || q.kalem == null);
 
   if (q.tesvik) p.addAll(_tesvik(r, q));
   if (suttan) {
@@ -248,8 +436,8 @@ Yanit cevapla(CiftlikRaporu r, String soru) {
     p.addAll(_birim(r, q, kEskHizmet, 'ESK besi hizmeti', 'birim'));
     if (q.ciftlikler.contains('Aslım') || q.ciftlikler.isEmpty) p.add(_ciftlikOzet(r, 'Aslım'));
   }
-  if (q.tarim) p.addAll(_tarim(r, q));
-  final finans = (!suttan && !etten && !q.tarim && !q.tesvik) || (q.kalem != null && !q.maliyet && !q.fiyat);
+  if (q.tarim && !(q.dekar && !q.fiyat)) p.addAll(_tarim(r, q));
+  final finans = (!suttan && !etten && !q.tarim && !q.tesvik && !takipYanitladi) || (q.kalem != null && !q.maliyet && !q.fiyat && !q.takip);
   if (finans && !(q.tutarsiz && q.kalem == null && q.ciftlikler.isEmpty)) p.addAll(_finans(r, q));
   if (p.isEmpty) p.add(_genelOzet(r));
 
@@ -299,6 +487,11 @@ List<String> _birim(CiftlikRaporu r, _Soru q, String urun, String ad, String bir
 
   if (q.ay != null) {
     final a = aylar.where((x) => x.ayNo == q.ay).firstOrNull;
+    final mts = r.mt?.sutAylar(ad, yil).where((x) => x.ay == q.ay).firstOrNull;
+    if (a == null && mts != null) {
+      return ['$ad ${raporAylari[q.ay! - 1]} $yil litre maliyeti (maliyet takip): ${tl2(mts.maliyet)}'
+          '${mts.satis == null ? '' : ', satış fiyatı ${tl2(mts.satis)} (litre başı ${tl2f(mts.satis! - mts.maliyet)})'}. Muhasebe verisinde bu ay henüz yok.'];
+    }
     if (a == null) return ['$ad için ${raporAylari[q.ay! - 1]} $yil kaydı yok veya kayıt tutarsız olduğu için kullanılmadı.'];
     final farklar = [for (final b in maliyetBilesenleri) (b, a.bilesenBirim(b) - d.bilesen(b))]..sort((x, y) => y.$2.compareTo(x.$2));
     p.add('$ad ${a.donem}: birim maliyet ${tl2(a.birimMaliyet)}/$birim (dönem ortalaması ${tl2(d.birimMaliyet)}), '
@@ -333,6 +526,7 @@ List<String> _birim(CiftlikRaporu r, _Soru q, String urun, String ad, String bir
 
   // genel / neden
   final n = birimNedenleri(r, urun, ad, birim);
+  if (r.mt != null && birim == 'L') p.addAll(sutTakipNedenleri(r.mt!, ad).map((x) => x.$2));
   if (n.isEmpty) {
     p.add('$ad ${d.donem}: birim maliyet ${tl2(d.birimMaliyet)}/$birim, fiyat ${tl2(d.fiyat)}, birim başı ${tl2f(d.birimKar)}.');
   } else {
@@ -425,4 +619,92 @@ List<String> _finans(CiftlikRaporu r, _Soru q) {
     }
   }
   return p;
+}
+
+
+// ------------------------------------------------------------------ maliyet takip yanıtları
+
+List<String> _mtHayvan(MaliyetTakip m, _Soru q) {
+  final cs = q.ciftlikler.where(m.hayvanCiftlikleri.contains).toList();
+  final l = <String>[];
+  for (final c in cs.isEmpty ? m.hayvanCiftlikleri : cs) {
+    final aylar = m.hayvanAylar(c, q.yil ?? 2026);
+    if (aylar.isEmpty) continue;
+    if (q.ay != null) {
+      final a = aylar.where((x) => x.ay == q.ay).firstOrNull;
+      if (a == null) continue;
+      l.add('$c ${raporAylari[a.ay - 1]} ${a.yil}: ${sayi(a.hayvan)} baş, toplam ${mn(a.toplam!)}, hayvan başı aylık ${tl0(a.basinaAylik)} '
+          '(günlük ${tl0(a.basinaGunluk)}); yem ${tl0(a.basina(a.yem))}, işçilik ${tl0(a.basina(a.iscilik))}, amortisman ${tl0(a.basina(a.amortisman))}, diğer ${tl0(a.basina(a.diger))}.');
+      continue;
+    }
+    if (q.enCok || q.enAz) {
+      final s = [...aylar]..sort((x, y) => y.basinaAylik!.compareTo(x.basinaAylik!));
+      final sec = q.enCok ? s.first : s.last;
+      l.add('$c hayvan başı maliyet en ${q.enCok ? 'yüksek' : 'düşük'}: ${raporAylari[sec.ay - 1]} ${tl0(sec.basinaAylik)} (${sayi(sec.hayvan)} baş).');
+      continue;
+    }
+    l.add('$c ${raporAylari[aylar.first.ay - 1]}–${raporAylari[aylar.last.ay - 1]} ${aylar.first.yil}: ortalama hayvan başı aylık ${tl0(m.donemBasina(c, aylar.first.yil, 'Toplam'))}. '
+        'Aylık: ${aylar.map((a) => '${raporAylari[a.ay - 1].substring(0, 3)} ${sayi(a.basinaAylik)}').join(', ')}.');
+    l.addAll(hayvanNedenleri(m, c).map((x) => '${x.$1}: ${x.$2}'));
+  }
+  return l;
+}
+
+List<String> _mtKarkas(MaliyetTakip m, _Soru q) {
+  final l = <String>[];
+  final gruplar = <String, List<MtKarkas>>{};
+  for (final x in m.karkas) {
+    if (q.ciftlikler.isNotEmpty && !q.ciftlikler.contains(x.ciftlik)) continue;
+    (gruplar['${x.ciftlik} ${x.tur.toLowerCase()}'] ??= []).add(x);
+  }
+  for (final e in gruplar.entries) {
+    final v = [for (final x in e.value) if (x.maliyet != null && x.maliyet! > 0) x];
+    if (q.ay != null) {
+      final a = e.value.where((x) => x.ay == q.ay).firstOrNull;
+      if (a != null) l.add('${e.key} ${raporAylari[a.ay - 1]}: ${a.maliyet == null || a.maliyet == 0 ? a.not : '${tl2(a.maliyet)}/kg${a.not.length > 1 ? ' (${a.not})' : ''}'}.');
+      continue;
+    }
+    if (v.isEmpty) continue;
+    final ort = v.fold(0.0, (s, x) => s + x.maliyet!) / v.length;
+    final s = [...v]..sort((a, b) => b.maliyet!.compareTo(a.maliyet!));
+    l.add('${e.key} kg karkas maliyeti: ${v.map((x) => '${raporAylari[x.ay - 1].substring(0, 3)} ${sayi(x.maliyet)}').join(', ')}. '
+        'Ortalama ${tl2(ort)}; en yüksek ${raporAylari[s.first.ay - 1]} (${tl2(s.first.maliyet)}), en düşük ${raporAylari[s.last.ay - 1]} (${tl2(s.last.maliyet)}).');
+  }
+  return l.isEmpty ? ['Karkas maliyeti kaydı bulunamadı.'] : l;
+}
+
+List<String> _mtCanli(MaliyetTakip m, _Soru q) {
+  final g = <String, List<MtCanli>>{};
+  for (final x in m.canli) {
+    if (q.ciftlikler.isNotEmpty && !q.ciftlikler.contains(x.ciftlik)) continue;
+    (g['${x.ciftlik} ${x.kategori.toLowerCase()}'] ??= []).add(x);
+  }
+  return [
+    for (final e in g.entries)
+      if (e.value.length >= 2)
+        '${e.key} canlı maliyet: ${tl0(e.value.first.maliyet)} (${raporAylari[e.value.first.ay - 1]}) → ${tl0(e.value.last.maliyet)} (${raporAylari[e.value.last.ay - 1]})'
+            '${e.value.first.maliyet > 0 ? ', ${yuzde((e.value.last.maliyet / e.value.first.maliyet - 1) * 100)}' : ''}.',
+  ];
+}
+
+List<String> _mtYem(MaliyetTakip m, _Soru q) {
+  final l = <String>[];
+  for (final g in m.yemGruplari) {
+    if (q.ciftlikler.isNotEmpty && !q.ciftlikler.any((c) => g.startsWith(c))) continue;
+    final y = yemFiyatDegisimleri(m, g);
+    if (y.isNotEmpty) l.add('$g (9 ay yem ${mn(m.yemGenel[g] ?? 0)}): ${y.join('; ')}.');
+  }
+  return l;
+}
+
+
+List<String> _mtTarim(CiftlikRaporu r, MaliyetTakip m, _Soru q) {
+  final l = <String>[];
+  for (final d in dekarSatirlari(m)) {
+    if (q.urunler.isNotEmpty && !q.urunler.any((u) => d.e.urun.startsWith(u.split(' ').first))) continue;
+    if (q.ciftlikler.isNotEmpty && !q.ciftlikler.any((c) => c == d.e.ciftlik || (c == kEsk && d.e.ciftlik == 'Taşağıl'))) continue;
+    l.add('${d.e.ciftlik} ${d.e.urun} (${sayi(d.e.dekar)} da): maliyet ${mn(d.e.toplam)}, dekar başı ${tl0(d.dekarBasi)}; ortak gider payıyla ${tl0(d.payliDekarBasi)}.');
+  }
+  if (q.neden || q.dekar || l.isNotEmpty) l.addAll(tarimTakipNedenleri(r).map((x) => '${x.$1}: ${x.$2}'));
+  return l;
 }
