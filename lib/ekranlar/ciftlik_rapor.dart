@@ -864,7 +864,7 @@ class _MaliyetTakip extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         BilgiKutusu(
-            yazi: 'Kaynak: “${m.kaynak}”. Hayvancılık, süt ve karkas maliyetleri, canlı hayvan maliyeti, tarım ekiliş maliyetleri ve yem tüketimi '
+            yazi: 'Kaynak: “${m.kaynak}”; süt litre maliyeti “2026 Yılı Çiftlik Raporları” muhasebe verisiyle eşleştirilmiştir. Hayvancılık, süt ve karkas maliyetleri, canlı hayvan maliyeti, tarım ekiliş maliyetleri ve yem tüketimi '
                 'aylık olarak incelenmiştir. Formül hatası (#REF!) içeren hücreler hesaba katılmamış, aşağıda tutarsızlık olarak listelenmiştir.'),
         if (olumsuz.isNotEmpty || tutarsiz.isNotEmpty)
           Panel(
@@ -922,20 +922,37 @@ class _MaliyetTakip extends StatelessWidget {
                   ilkSutunGenislik: 80,
                   basliklar: [
                     'Ay',
-                    for (final c in const ['Şekersüt', 'Pan-Gev']) ...[c, if (yil == 2026) 'Satış'],
+                    for (final c in const ['Şekersüt', 'Pan-Gev']) ...[
+                      yil == 2026 ? '$c takip' : c,
+                      if (yil == 2026) ...['$c muhasebe', '$c satış'],
+                    ],
                   ],
                   satirlar: [
                     for (var ay = 1; ay <= 12; ay++)
-                      if (m.sut.any((x) => x.ay == ay && x.yil == yil))
+                      if (m.sut.any((x) => x.ay == ay && x.yil == yil) ||
+                          (yil == 2026 && sutEslesme(r, 'Şekersüt', ay).muhasebe != null))
                         [
                           raporAylari[ay - 1],
-                          for (final c in const ['Şekersüt', 'Pan-Gev']) ...[
-                            s2(m.sutAylar(c, yil).where((x) => x.ay == ay).firstOrNull?.maliyet),
-                            if (yil == 2026) s2(m.sutAylar(c, yil).where((x) => x.ay == ay).firstOrNull?.satis),
-                          ],
+                          for (final c in const ['Şekersüt', 'Pan-Gev'])
+                            if (yil == 2026)
+                              ...() {
+                                final e = sutEslesme(r, c, ay);
+                                return [s2(e.takip), s2(e.muhasebe), e.satis == null ? '—' : '${s2(e.satis)}${e.satisMuhasebeden ? '*' : ''}'];
+                              }()
+                            else
+                              s2(m.sutAylar(c, yil).where((x) => x.ay == ay).firstOrNull?.maliyet),
                         ],
                   ],
                 ),
+                if (yil == 2026)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: Text(
+                        'Takip: “ÇİFTLİKLER : MALİYET TAKİP 2026” SÜT MALİYETİ sayfası. Muhasebe: “2026 Yılı Çiftlik Raporları” satılan mamul '
+                        'maliyeti ÷ üretilen litre. Satış: takip dosyasındaki fiyat; * işaretli aylarda takipte fiyat girilmediği için '
+                        'muhasebedeki faturalanan ortalama fiyat kullanılmıştır. Aynı ay iki kez girilmez, iki kaynak yan yana gösterilir.',
+                        style: TextStyle(fontSize: 12, height: 1.35)),
+                  ),
                 const SizedBox(height: 12),
               ],
             for (final c in const ['Şekersüt', 'Pan-Gev'])

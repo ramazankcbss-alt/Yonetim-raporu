@@ -124,3 +124,21 @@ List<(String, String)> tarimTakipNedenleri(CiftlikRaporu r) {
   }
   return out;
 }
+
+
+/// Bir ayın süt litre maliyeti: takip dosyası ve muhasebe (Çiftlik Raporları) yan yana.
+/// Satış fiyatı takipte yoksa muhasebedeki faturalanan ortalama kullanılır (mükerrer giriş yok).
+typedef SutEslesme = ({double? takip, double? muhasebe, double? satis, bool satisMuhasebeden});
+
+SutEslesme sutEslesme(CiftlikRaporu r, String c, int ay, {int yil = 2026}) {
+  final t = r.mt?.sutAylar(c, yil).where((x) => x.ay == ay).firstOrNull;
+  final u = c == 'Şekersüt' ? kSekersut : kPangev;
+  final b = r.birimAylar(u).where((x) => x.yil == yil && x.ayNo == ay && x.miktar > 0).firstOrNull;
+  final mf = b?.fiyat;
+  return (
+    takip: t?.maliyet,
+    muhasebe: b?.birimMaliyet,
+    satis: t?.satis ?? mf,
+    satisMuhasebeden: t?.satis == null && mf != null,
+  );
+}
