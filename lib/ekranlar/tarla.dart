@@ -654,7 +654,7 @@ List<(double, double)> bosluguDoldur(List<(double, double)> sekil, Iterable<List
       en = l;
     }
   }
-  final tum = _alan([for (final c in sekil) d(c)]);
+  final tum = _alan([for (final c in sekil) (d(c).dx, d(c).dy)]);
   if (en == null || enA < tum * 0.02) return sekil;
   return [for (final e in _sadelestir(en, 1.2)) t(e)];
 }
