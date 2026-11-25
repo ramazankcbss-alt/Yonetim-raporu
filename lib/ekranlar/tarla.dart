@@ -622,6 +622,80 @@ List<(int, Offset)> _ortaNoktalar(List<Offset> e, double olcek) => [
         if ((e[i] - e[(i + 1) % e.length]).distance * olcek > 44) (i, (e[i] + e[(i + 1) % e.length]) / 2)
     ];
 
+/// Çizilen şekli boşluğa oturtur: komşu parsellerle çakışan kısımlar çıkarılır, kalan en büyük parça yeni
+/// parselin sınırı olur (kenarlar komşu parsellerin sınırına denk gelir). Çakışma yoksa şekil aynen kalır.
+List<(double, double)> bosluguDoldur(List<(double, double)> sekil, Iterable<List<(double, double)>> parseller) {
+  if (sekil.length < 3) return sekil;
+  final (x0, y0, x1, y1) = _kutu(sekil);
+  final o = 4000 / math.max(x1 - x0, y1 - y0);
+  Offset d(_N n) => Offset((n.$1 - x0) * o, (n.$2 - y0) * o);
+  _N t(Offset e) => (x0 + e.dx / o, y0 + e.dy / o);
+  var yol = Path()..addPolygon([for (final c in sekil) d(c)], true);
+  var kesti = false;
+  for (final k in parseller) {
+    if (k.length < 3) continue;
+    final (a0, b0, a1, b1) = _kutu(k);
+    if (a1 < x0 || a0 > x1 || b1 < y0 || b0 > y1) continue;
+    yol = Path.combine(PathOperation.difference, yol, Path()..addPolygon([for (final c in k) d(c)], true));
+    kesti = true;
+  }
+  if (!kesti) return sekil;
+  List<Offset>? en;
+  var enA = 0.0;
+  for (final m in yol.computeMetrics()) {
+    final l = <Offset>[
+      for (double u = 0; u < m.length; u += 4)
+        if (m.getTangentForOffset(u) case final tg?) tg.position,
+    ];
+    if (l.length < 3) continue;
+    final a = _alan([for (final e in l) (e.dx, e.dy)]);
+    if (a > enA) {
+      enA = a;
+      en = l;
+    }
+  }
+  final tum = _alan([for (final c in sekil) d(c)]);
+  if (en == null || enA < tum * 0.02) return sekil;
+  return [for (final e in _sadelestir(en, 1.2)) t(e)];
+}
+
+/// Douglas–Peucker: [eps] mesafesinden az sapan ara noktaları atar (kapalı çokgen).
+List<Offset> _sadelestir(List<Offset> l, double eps) {
+  if (l.length < 4) return l;
+  double uzak(Offset p, Offset a, Offset b) {
+    final ab = b - a, uz = ab.distance;
+    if (uz == 0) return (p - a).distance;
+    return ((p.dx - a.dx) * ab.dy - (p.dy - a.dy) * ab.dx).abs() / uz;
+  }
+
+  List<Offset> parca(List<Offset> l) {
+    if (l.length < 3) return l;
+    var en = 0.0, i0 = 0;
+    for (var i = 1; i < l.length - 1; i++) {
+      final u = uzak(l[i], l.first, l.last);
+      if (u > en) {
+        en = u;
+        i0 = i;
+      }
+    }
+    if (en <= eps) return [l.first, l.last];
+    final a = parca(l.sublist(0, i0 + 1)), b = parca(l.sublist(i0));
+    return [...a.sublist(0, a.length - 1), ...b];
+  }
+
+  // Kapalı çokgeni en uzak iki noktadan ikiye bölüp her yarıyı sadeleştir.
+  var j = 0, enU = 0.0;
+  for (var i = 1; i < l.length; i++) {
+    final u = (l[i] - l[0]).distance;
+    if (u > enU) {
+      enU = u;
+      j = i;
+    }
+  }
+  final a = parca(l.sublist(0, j + 1)), b = parca([...l.sublist(j), l.first]);
+  return [...a.sublist(0, a.length - 1), ...b.sublist(0, b.length - 1)];
+}
+
 double _alan(List<_N> k) {
   var a = 0.0;
   for (var i = 0; i < k.length; i++) {
@@ -1112,10 +1186,14 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
     }
     if (hedef == null && widget.sinirKaydet != null) {
       // Parsel dışına çizilen şekil yeni parsel olur: önce şekil düzeltilir, sonra ad, ürün ve dekar girilir.
-      final yeni = _sekil == 'daire'
-          ? [for (var i = 0; i < 24; i++) (o.$1 + (duz[0].$1 - o.$1) * math.cos(i * math.pi / 12) - (duz[0].$2 - o.$2) * math.sin(i * math.pi / 12),
-              o.$2 + (duz[0].$1 - o.$1) * math.sin(i * math.pi / 12) + (duz[0].$2 - o.$2) * math.cos(i * math.pi / 12))]
+      // Komşu parsellerle çakışan kısımlar çıkarılır: şekil boşluğa oturur (kenarlar komşu sınırlara denk gelir).
+      final tam = _sekil == 'daire'
+          ? [for (var i = 0; i < 96; i++) (o.$1 + (duz[0].$1 - o.$1) * math.cos(i * math.pi / 48) - (duz[0].$2 - o.$2) * math.sin(i * math.pi / 48),
+              o.$2 + (duz[0].$1 - o.$1) * math.sin(i * math.pi / 48) + (duz[0].$2 - o.$2) * math.cos(i * math.pi / 48))]
           : duz;
+      final oturan = bosluguDoldur(tam, [for (final x in _g.sirali) _g.poligon[x]!]);
+      final oturdu = !identical(oturan, tam);
+      final yeni = oturdu || _sekil != 'daire' ? oturan : [for (var i = 0; i < tam.length; i += 4) tam[i]];
       setState(() {
         _noktalar.clear();
         _duzenBirak();
@@ -1123,9 +1201,12 @@ class _HaritaGorunumState extends State<_HaritaGorunum> {
         _yeniDuzen = true;
         _duzen = yeni;
       });
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Şekil parsel dışında: yeni parsel olarak düzeltip "Parseli kaydet"e basın. '
-              'Köşeleri sürükleyebilir, şeklin içinden tutup taşıyabilirsiniz.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(oturdu
+              ? 'Şekil boşluğa oturtuldu: komşu parsellerle çakışan kısımlar çıkarıldı. Gerekirse köşeleri düzeltip '
+                  '"Parseli kaydet"e basın.'
+              : 'Şekil parsel dışında: yeni parsel olarak düzeltip "Parseli kaydet"e basın. '
+                  'Köşeleri sürükleyebilir, şeklin içinden tutup taşıyabilirsiniz.')));
       return;
     }
     if (hedef == null || widget.bolgeEkle == null) {

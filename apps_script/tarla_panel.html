@@ -871,8 +871,10 @@ function sekilBitir(a, b) {
     // Parsel dışına çizilen şekil yeni parsel olur: önce şekil düzeltilir, sonra ad, ürün ve dekar girilir.
     var yeni = duz;
     if (tip === 'C') { var rr = Math.hypot(kod[1][0] - kod[0][0], kod[1][1] - kod[0][1]); yeni = []; for (var t2 = 0; t2 < 24; t2++) yeni.push([kod[0][0] + rr * Math.cos(t2 * Math.PI / 12), kod[0][1] + rr * Math.sin(t2 * Math.PI / 12)]); }
-    cizimSifirla(); C.mod = 'yeni'; C.yeniDuzen = true; C.duzen = yeni; uygula(); cizimPaneli();
-    return durum('Şekil parsel dışında: yeni parsel olarak düzeltip "Parseli kaydet"e basın.');
+    var oturan = bosluguDoldur(tip === 'C' ? duz : yeni, H.G.map(function (g) { return g.k; })), oturdu = oturan !== (tip === 'C' ? duz : yeni);
+    cizimSifirla(); C.mod = 'yeni'; C.yeniDuzen = true; C.duzen = oturdu ? oturan : yeni; uygula(); cizimPaneli();
+    return durum(oturdu ? 'Şekil boşluğa oturtuldu: komşu parsellerle çakışan kısımlar çıkarıldı. Gerekirse köşeleri düzeltip "Parseli kaydet"e basın.'
+      : 'Şekil parsel dışında: yeni parsel olarak düzeltip "Parseli kaydet"e basın.');
   }
   var q0 = kutu(hedef.k), w = q0[2] - q0[0], hh = q0[3] - q0[1];
   function px(x) { return (x - q0[0]) / w * 100; } function py(y) { return (y - q0[1]) / hh * 100; }
@@ -882,6 +884,54 @@ function sekilBitir(a, b) {
   var pay = bolgePaylari(hedef.k, [bolgePoligon(hedef.k, bolge)])[0];
   C.noktalar = []; uygula(); cizimPaneli();
   bolgeFormu(hedef.p, bolge, pay);
+}
+/** Çizilen şekli boşluğa oturtur: komşu parsellerle çakışan kısımlar çıkarılır (ızgara ile), kalan en büyük
+ * parçanın sınırı döner. Çakışma yoksa şekil aynen döner. */
+function bosluguDoldur(sekil, parseller) {
+  var q = kutu(sekil), N = 260, w = q[2] - q[0], h = q[3] - q[1], hc = Math.max(w, h) / N;
+  var nx = Math.ceil(w / hc) + 2, ny = Math.ceil(h / hc) + 2, x0 = q[0] - hc, y0 = q[1] - hc;
+  var yakin = parseller.filter(function (k) { if (k.length < 3) return false; var b = kutu(k); return !(b[2] < q[0] || b[0] > q[2] || b[3] < q[1] || b[1] > q[3]); });
+  if (!yakin.length) return sekil;
+  var izgara = new Uint8Array(nx * ny), kesti = false;
+  for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) {
+    var p = [x0 + (i + 0.5) * hc, y0 + (j + 0.5) * hc];
+    if (!icinde(p, sekil)) continue;
+    if (yakin.some(function (k) { return icinde(p, k); })) { kesti = true; continue; }
+    izgara[j * nx + i] = 1;
+  }
+  if (!kesti) return sekil;
+  // En büyük bağlı parça
+  var etiket = new Int32Array(nx * ny), enE = 0, enS = 0, e = 0;
+  for (var b0 = 0; b0 < nx * ny; b0++) {
+    if (!izgara[b0] || etiket[b0]) continue;
+    e++; var yigin = [b0], say = 0; etiket[b0] = e;
+    while (yigin.length) { var c = yigin.pop(), ci = c % nx, cj = (c - ci) / nx; say++;
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) { var a = ci + d[0], b = cj + d[1]; if (a < 0 || b < 0 || a >= nx || b >= ny) return; var k = b * nx + a; if (izgara[k] && !etiket[k]) { etiket[k] = e; yigin.push(k); } }); }
+    if (say > enS) { enS = say; enE = e; }
+  }
+  if (!enE) return sekil;
+  function dolu(i, j) { return i >= 0 && j >= 0 && i < nx && j < ny && etiket[j * nx + i] === enE; }
+  // Sınır izleme (Moore komşuluğu, hücre merkezleri)
+  var bas = -1; for (var k2 = 0; k2 < nx * ny && bas < 0; k2++) if (etiket[k2] === enE) bas = k2;
+  var yon = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+  var ci0 = bas % nx, cj0 = (bas - ci0) / nx, ci1 = ci0, cj1 = cj0, gel = 6, yol = [], sinirSay = 0;
+  do {
+    yol.push([x0 + (ci1 + 0.5) * hc, y0 + (cj1 + 0.5) * hc]);
+    var bulundu = false;
+    for (var t = 0; t < 8; t++) { var dn = (gel + 6 + t) % 8, a = ci1 + yon[dn][0], b2 = cj1 + yon[dn][1];
+      if (dolu(a, b2)) { ci1 = a; cj1 = b2; gel = dn; bulundu = true; break; } }
+    if (!bulundu) break;
+  } while ((ci1 !== ci0 || cj1 !== cj0) && ++sinirSay < nx * ny * 4);
+  if (yol.length < 3) return sekil;
+  return sadelestir(yol, hc * 0.9);
+}
+function sadelestir(l, eps) {
+  function uzak(p, a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], u = Math.hypot(dx, dy); return u === 0 ? Math.hypot(p[0] - a[0], p[1] - a[1]) : Math.abs((p[0] - a[0]) * dy - (p[1] - a[1]) * dx) / u; }
+  function parca(l) { if (l.length < 3) return l; var en = 0, i0 = 0; for (var i = 1; i < l.length - 1; i++) { var u = uzak(l[i], l[0], l[l.length - 1]); if (u > en) { en = u; i0 = i; } }
+    if (en <= eps) return [l[0], l[l.length - 1]]; var a = parca(l.slice(0, i0 + 1)), b = parca(l.slice(i0)); return a.slice(0, -1).concat(b); }
+  var j = 0, enU = 0; for (var i = 1; i < l.length; i++) { var u = Math.hypot(l[i][0] - l[0][0], l[i][1] - l[0][1]); if (u > enU) { enU = u; j = i; } }
+  var a = parca(l.slice(0, j + 1)), b = parca(l.slice(j).concat([l[0]]));
+  return a.slice(0, -1).concat(b.slice(0, -1));
 }
 function bolgePaylari(k, bolgeler) {
   var q = kutu(k), say = bolgeler.map(function () { return 0; }).concat([0]), top = 0, n = 70;

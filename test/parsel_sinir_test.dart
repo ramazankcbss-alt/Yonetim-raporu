@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:yonetim_raporu/ekranlar/tarla.dart' show bosluguDoldur;
 import 'package:yonetim_raporu/veri/model.dart';
 import 'package:yonetim_raporu/veri/tarla.dart';
 
@@ -84,5 +85,17 @@ void main() {
     expect(ss.first.sezon, '2023-2024');
     expect(ss.first.ciftlikler.single.parseller.any((p) => p.ad == 'Yeni'), isTrue);
     expect(ss[1].ciftlikler.single.parseller.any((p) => p.ad.contains('Yeni')), isFalse);
+  });
+
+  test('çizilen şekil boşluğa oturur: komşu parselle çakışan kısım çıkarılır', () {
+    // 0–10 karesi; sağ yarısında (5–10) mevcut parsel var → kalan yaklaşık 0–5.
+    const sekil = [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)];
+    const komsu = [(5.0, -2.0), (14.0, -2.0), (14.0, 12.0), (5.0, 12.0)];
+    final y = bosluguDoldur(sekil, [komsu]);
+    final xs = y.map((e) => e.$1);
+    expect(xs.reduce((a, b) => a > b ? a : b), closeTo(5, 0.05));
+    expect(xs.reduce((a, b) => a < b ? a : b), closeTo(0, 0.05));
+    // Çakışma yoksa şekil aynen kalır.
+    expect(identical(bosluguDoldur(sekil, [[(20.0, 20.0), (21.0, 20.0), (21.0, 21.0)]]), sekil), isTrue);
   });
 }
