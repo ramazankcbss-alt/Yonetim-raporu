@@ -9,7 +9,7 @@ KMZ'de her sezon (2023-2024 … 2026-2027) ayrı klasördedir. Çizimler esas ha
 parsellerle örtüşmeye göre eşleştirilir (shapely gerekir):
 - tarla_2024_2025.json, tarla_2026_2027.json: "katman" — esas parsellerin üzerine o sezonun ürünü, dekarı,
   tohumu ve (parselin bir kısmını kaplayan çizimlerden) bölgeleri.
-- tarla_2023_2024.json: "ayri" — o yılın parsel düzeni farklı olduğundan kendi çizimleriyle.
+- 2023-2024 sezonu kaldırıldı (25.11.2026).
 Ürün ve dekar KMZ'deki çizim adından okunur (ör. "3. Parsel 190da. Buğday Halis"). Uygulamadan girilen
 kayıtlar bu bilgilerin önüne geçer. 2025-2026 sezonu ayrıca düzenlenmiş olduğundan bu betikle değişmez.
 KVKK: çizim adlarında kişi adı yoktur; kişi adı içeren çizim çıkarsa alınmaz (KISI listesi).
@@ -159,25 +159,4 @@ for sezon in ['2024-2025', '2026-2027']:
         ciftlikler=[dict(ad=c, parseller=p) for c, p in k.items()]))
     print(sezon, {c: len(p) for c, p in k.items()})
 
-# 2023-2024: kendi parsel düzeni. Esas parselle iki yönlü örtüşen çizim esas adı alır.
-ESKI = {'Şekersüt': [], 'Aslım': [], 'Taşağıl': []}
-gorsel = {c['ad']: c.get('gorseller', []) for c in esas['ciftlikler']}
-for cf, y, x in sezon_cizimleri('2023-2024'):
-    if 'kiralık' in ' '.join(y) or x['ad'].strip().upper() == 'TAŞAĞIL ÇİFTLİĞİ':
-        continue
-    q = P(x['koord'])
-    ad, kap, pay = eslestir(cf, q)
-    o = oku(x['ad'])
-    if ad and kap >= 0.85 and pay >= 0.85:
-        yeni = ad
-    else:
-        m = re.match(r'\s*(\d+)\s*\.', x['ad'])
-        yeni = f'Eski {m.group(1)}. parsel' if m else (f'Eski alan ({o[0]} {o[1]:g} da)' if o and o[1] else 'Eski alan')
-        while any(e['ad'] == yeni for e in ESKI[cf]):
-            yeni += ' (2)'
-    ESKI[cf].append(dict(ad=yeni, tip='parsel' if o else 'girilmedi', urunler=[[o[0], o[1] or 0]] if o else [],
-                         cesitler=[o[2]] if o and o[2] else [], not_=f'KMZ: {x["ad"].strip()}',
-                         koord=[[round(a, 6), round(b, 6)] for a, b in sade(x['koord'], 48)]))
-yaz('tarla_2023_2024.json', dict(sezon='2023-2024', kaynak=KAYNAK, tarih='2026-11-24', tur='ayri',
-    ciftlikler=[dict(ad=c, parseller=p, tesis={}, notlar=[], gorseller=gorsel.get(c, [])) for c, p in ESKI.items() if p]))
-print('2023-2024', {c: [p['ad'] for p in l] for c, l in ESKI.items()})
+# 2023-2024 sezonu kullanıcı kararıyla kaldırıldı (25.11.2026); dosyası üretilmez.

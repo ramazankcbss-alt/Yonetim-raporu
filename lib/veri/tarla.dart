@@ -167,7 +167,6 @@ class TarlaSezonu {
 const tarlaSezonDosyalari = [
   'assets/veri/tarla_2025_2026.json',
   // Yerlerim 24.11.2026 GÜNCEL.kmz: sezon katmanları (araclar/tarla/kmz_sezonlar.py)
-  'assets/veri/tarla_2023_2024.json',
   'assets/veri/tarla_2024_2025.json',
   'assets/veri/tarla_2026_2027.json',
 ];

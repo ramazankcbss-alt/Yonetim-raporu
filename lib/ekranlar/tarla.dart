@@ -64,8 +64,7 @@ class _TarlaEkranState extends State<TarlaEkran> {
                     const BilgiKutusu(
                         yazi: 'Her sezon ayrı bir bölümdür; içinde Harita, Parseller, Karşılaştırma ve ÇKS sekmeleri yer alır. '
                             'Parsel çizimleri ve sezonların ürünleri Google Earth KMZ haritasından (Yerlerim 24.11.2026 GÜNCEL) '
-                            'alınır; 2023-2024 sezonu o yılın parsel düzeniyle gösterilir. Haritada parsele dokunularak '
-                            'yapılan girişler KMZ bilgisinin önüne geçer; KMZ\'de farklı yazan parsellerde uyarı notu görünür.'),
+                            'alınır. Haritada parsele dokunularak yapılan girişler KMZ bilgisinin önüne geçer.'),
                     const SizedBox(height: 8),
                     for (final x in hepsi) _sezonKarti(context, l, x, v),
                     if (VeriDeposu.ben.paylasim case final p?)

@@ -92,7 +92,7 @@
 <script>
 var ANAHTAR = __ANAHTAR__;
 var VERI_ADRESI = 'https://raw.githubusercontent.com/ramazankcbss-alt/Yonetim-raporu/main/assets/veri/';
-var DOSYALAR = ['tarla_2025_2026.json', 'tarla_2023_2024.json', 'tarla_2024_2025.json', 'tarla_2026_2027.json'];
+var DOSYALAR = ['tarla_2025_2026.json', 'tarla_2024_2025.json', 'tarla_2026_2027.json'];
 var SINIR = 400;
 var URUNLER = ['Buğday', 'Arpa', 'Tritikale', 'Çavdar', 'Yulaf', 'Dane mısır', 'Şeker pancarı', 'Patates', 'Soğan',
   'Yağlık ayçiçeği', 'Çerezlik ayçiçeği', 'Kanola (kolza)', 'Aspir', 'Soya', 'Nohut', 'Kuru fasulye', 'Mercimek',
@@ -403,7 +403,7 @@ function ciz() {
   kok.innerHTML = S.sekme === 'parseller' ? parselSekmesi(s) : S.sekme === 'karsi' ? karsiSekmesi(s) : cksSekmesi(s);
 }
 function anaEkran(l) {
-  var h = '<div class="bilgi">Her sezon ayrı bir bölümdür; içinde Harita, Parseller, Karşılaştırma ve ÇKS sekmeleri yer alır. Parsel çizimleri ve sezonların ürünleri Google Earth KMZ haritasından alınır; 2023-2024 sezonu o yılın parsel düzeniyle gösterilir. ' +
+  var h = '<div class="bilgi">Her sezon ayrı bir bölümdür; içinde Harita, Parseller, Karşılaştırma ve ÇKS sekmeleri yer alır. Parsel çizimleri ve sezonların ürünleri Google Earth KMZ haritasından alınır. ' +
     (S.yetki === 'duzenle' ? 'Parsele dokunarak ürün, dekar ve tohum girebilirsiniz.' : 'Yalnızca görüntüleme yetkiniz var.') + '</div>';
   l.forEach(function (x) {
     var ps = []; x.ciftlikler.forEach(function (c) { c.parseller.forEach(function (p) { if (p.tip !== 'diger') ps.push(p); }); });
