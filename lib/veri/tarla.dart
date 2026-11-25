@@ -620,8 +620,9 @@ bool ekimDisi(String urun) => ekimDisiAlanlar.contains(urunAnahtari(urun));
 
 
 /// Tarla Haritası bölümleri: 2024-2025 (haritadan giriş), KMZ sezonu (2025-2026),
-/// 2026-2027 ve 2027-2028 (haritadan giriş). Hepsi KMZ sezonunun parsel çizimlerini kullanır.
-List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l, {List<ParselSinir> sinirlar = const []}) {
+/// 2026-2027 (haritadan giriş) ve "Yeni sezon ekle" ile açılan sonraki sezonlar. Hepsi KMZ sezonunun parsel çizimlerini kullanır.
+List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l,
+    {List<ParselSinir> sinirlar = const [], List<String> ekSezonlar = const []}) {
   final esaslar = paket.where((k) => k.tur == 'kmz').toList();
   if (esaslar.isEmpty) return const [];
   // Yeniden çizilen sınırlar yalnızca esas haritaya uygulanır (katman sezonları esas çizimleri kullanır).
@@ -643,10 +644,29 @@ List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l, {
     for (final (i, k) in esaslar.indexed) kmzUzerine(i == 0 ? kmz : k, l, onceki: i == 0 ? eski : null)
   ];
   final yeni = girisSezonu(kmz, l, onceki: orta.first, katman: k3);
-  // 2027-2028: haritadan giriş için açılan sezon (önceki sezon 2026-2027).
-  final s4 = sonrakiSezon(s3);
-  final sonra = girisSezonu(kmz, l, sezon: s4, onceki: yeni, katman: bul(s4, 'katman'));
-  return [if (s0 != null) s0, eski, ...orta, yeni, sonra];
+  // "Yeni sezon ekle" ile açılan sezonlar (ör. 2027-2028) ve kaydı bulunan sonraki sezonlar.
+  final sonraki = <TarlaSezonu>[];
+  var once = yeni;
+  for (final s in sonrakiSezonlar(s3, ekSezonlar, l)) {
+    once = girisSezonu(kmz, l, sezon: s, onceki: once, katman: bul(s, 'katman'));
+    sonraki.add(once);
+  }
+  return [if (s0 != null) s0, eski, ...orta, yeni, ...sonraki];
+}
+
+/// [son] sezonundan sonra açılmış sezonlar: kullanıcının açtıkları ve kaydı bulunanlar, aradaki
+/// boş yıllar da dahil sırayla (ör. 2027-2028, 2028-2029).
+List<String> sonrakiSezonlar(String son, List<String> acilan, List<SezonParsel> l) {
+  final adaylar = {...acilan, for (final x in l) x.sezon}
+      .where((s) => RegExp(r'^\d{4}-\d{4}$').hasMatch(s) && s.compareTo(son) > 0)
+      .toList()
+    ..sort();
+  if (adaylar.isEmpty) return const [];
+  final out = <String>[];
+  for (var s = sonrakiSezon(son); s.compareTo(adaylar.last) <= 0; s = sonrakiSezon(s)) {
+    out.add(s);
+  }
+  return out;
 }
 
 /// Geçerli parsel sınırları: (çiftlik, parsel) → (boylam, enlem) noktaları. Son "Aktif" kayıt geçerlidir,

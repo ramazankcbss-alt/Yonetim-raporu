@@ -1090,6 +1090,7 @@ class RaporVerisi {
     this.resmiParsel = const [],
     this.sezonParsel = const [],
     this.sezonParselSiniri = 60,
+    this.tarlaSezonlari = const [],
     this.parselSinir = const [],
     this.paylasim,
     this.paylasimlar = const [],
@@ -1150,6 +1151,9 @@ class RaporVerisi {
 
   /// Sunucunun Sezon_Parselleri "Ürün" alanında sakladığı en çok karakter (eski sürüm: 60).
   final int sezonParselSiniri;
+
+  /// Tarla Haritası'nda "Yeni sezon ekle" ile açılan sezonlar (ör. 2027-2028).
+  final List<String> tarlaSezonlari;
   final List<BesiSatir> besi;
   final List<Is> isler;
   final List<AkisKaydi> akis;
@@ -1222,6 +1226,7 @@ class RaporVerisi {
       resmiParsel: oku('resmiParsel', ResmiParsel.oku),
       sezonParsel: oku('sezonParsel', SezonParsel.oku),
       sezonParselSiniri: sayiOku(j['sezonParselSiniri'])?.round() ?? 60,
+      tarlaSezonlari: [for (final x in _liste(j['tarlaSezonlari'])) if (x is String) x],
       parselSinir: oku('parselSinir', ParselSinir.oku),
       paylasim: Paylasim.oku(j['paylasim']),
       paylasimlar: oku('paylasimlar', PaylasimKaydi.oku),

@@ -220,6 +220,7 @@ class VeriDeposu extends ChangeNotifier {
     // Bu çekim başlamadan önce kaydedilen yerel girişler artık sunucu verisinde.
     _yerelParsel.removeWhere((e) => e.$1.isBefore(baslangic));
     _yerelSinir.removeWhere((e) => e.$1.isBefore(baslangic));
+    _yerelSezonlar = null;
     final kanca = veriGeldi;
     if (kanca != null && v.paylasim == null) unawaited(kanca(v, ham));
   }
@@ -488,6 +489,21 @@ class VeriDeposu extends ChangeNotifier {
     unawaited(yenile());
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
+
+  /// Tarla Haritası: yeni sezon açar ya da kaydı olmayan sezonu kaldırır (sunucuda TARLA_SEZONLARI).
+  Future<String> tarlaSezon(String sezon, {bool sil = false}) async {
+    final j = await _islem(sil ? 'tarlaSezonSil' : 'tarlaSezonEkle', {'sezon': sezon});
+    final l = j['tarlaSezonlari'];
+    if (l is List) _yerelSezonlar = [for (final x in l) '$x'];
+    notifyListeners();
+    unawaited(yenile());
+    return (j['mesaj'] ?? 'Kaydedildi.').toString();
+  }
+
+  List<String>? _yerelSezonlar;
+
+  /// Açılan sezonlar: son işlemin sonucu (yenileme gelene kadar) ya da sunucu verisi.
+  List<String> tarlaEkSezonlari(RaporVerisi v) => _yerelSezonlar ?? v.tarlaSezonlari;
 
   /// Ürün Takibi: elle teslimat / satış kaydı ekler ve veriyi yeniler.
   /// Miktarlar kg, fiyat TL/kg. Kişi adı gönderilmez.

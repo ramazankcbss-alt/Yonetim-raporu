@@ -304,8 +304,10 @@ function sezonlar() {
   l.push(girisSezonu(kmz, s1, bul(s1, 'katman')));
   l.push(kmzUzerine(kmz));
   l.push(girisSezonu(kmz, s3, bul(s3, 'katman')));
-  var s4 = sonrakiSezon(s3);
-  l.push(girisSezonu(kmz, s4, bul(s4, 'katman'))); // 2027-2028: haritadan giriş
+  // Uygulamada "Yeni sezon ekle" ile açılan sezonlar ve kaydı bulunan sonraki sezonlar
+  var aday = (S.tarlaSezonlari || []).concat(S.sezonParsel.map(function (r) { return String(r[0]); }))
+    .filter(function (x) { return /^\d{4}-\d{4}$/.test(x) && x > s3; }).sort();
+  if (aday.length) for (var s = sonrakiSezon(s3); s <= aday[aday.length - 1]; s = sonrakiSezon(s)) l.push(girisSezonu(kmz, s, bul(s, 'katman')));
   return l;
 }
 
@@ -1225,7 +1227,7 @@ function yukle() {
   }
   google.script.run.withSuccessHandler(function (r) {
     if (!r || !r.ok) { hata = (r && r.hata) || 'Veri alınamadı.'; if (r && r.kapali) hata = 'Bu paylaşım kapatıldı.'; return bitti(); }
-    S.sezonParsel = r.sezonParsel || []; S.parselSinir = r.parselSinir || []; S.yetki = r.yetki; S.etiket = r.etiket; SINIR = r.sezonParselSiniri || 400;
+    S.sezonParsel = r.sezonParsel || []; S.parselSinir = r.parselSinir || []; S.tarlaSezonlari = r.tarlaSezonlari || []; S.yetki = r.yetki; S.etiket = r.etiket; SINIR = r.sezonParselSiniri || 400;
     S.ekim = r.ekim || []; S.ekimPlani = r.ekimPlani || []; S.cks = r.cks || [];
     document.getElementById('ust').textContent = r.etiket + ' · ' + (r.yetki === 'duzenle' ? 'düzenleme yetkisi' : 'yalnızca görüntüleme');
     bitti();

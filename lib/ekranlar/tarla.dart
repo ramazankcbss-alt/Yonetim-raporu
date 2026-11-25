@@ -55,7 +55,7 @@ class _TarlaEkranState extends State<TarlaEkran> {
             listenable: VeriDeposu.ben,
             builder: (context, _) {
               final v = VeriDeposu.ben.veri ?? widget.veri;
-              final hepsi = tarlaSezonlari(l, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v));
+              final hepsi = tarlaSezonlari(l, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v), ekSezonlar: VeriDeposu.ben.tarlaEkSezonlari(v));
               return Scaffold(
                 appBar: AppBar(title: const Text('Tarla Haritası')),
                 body: GonderAlani(
@@ -67,6 +67,14 @@ class _TarlaEkranState extends State<TarlaEkran> {
                             'alınır. Haritada parsele dokunularak yapılan girişler KMZ bilgisinin önüne geçer.'),
                     const SizedBox(height: 8),
                     for (final x in hepsi) _sezonKarti(context, l, x, v),
+                    if (!_yalnizGor && VeriDeposu.ben.paylasim == null && hepsi.isNotEmpty)
+                      _MenuKarti(
+                        baslik: 'Yeni sezon ekle',
+                        alt: '${sonrakiSezon(hepsi.last.sezon)} sezonunu açın; parseller güncel harita çizimleriyle gelir, '
+                            'ürünleri haritaya dokunarak girersiniz',
+                        ikon: Icons.add_circle_outline,
+                        dokun: () => _yeniSezon(context, hepsi, v),
+                      ),
                     if (VeriDeposu.ben.paylasim case final p?)
                       BilgiKutusu(
                           yazi: 'Paylaşılan harita (${p.etiket}) · '
@@ -92,6 +100,36 @@ class _TarlaEkranState extends State<TarlaEkran> {
           );
         },
       );
+
+  /// Yeni sezon açma (ve kaydı olmayan son açılan sezonu kaldırma) penceresi.
+  Future<void> _yeniSezon(BuildContext context, List<TarlaSezonu> hepsi, RaporVerisi v) async {
+    final yeni = sonrakiSezon(hepsi.last.sezon);
+    final son = hepsi.last.sezon;
+    final acilan = VeriDeposu.ben.tarlaEkSezonlari(v);
+    final kayitsiz = acilan.contains(son) && !VeriDeposu.ben.sezonParselleri(v).any((x) => x.sezon == son);
+    final secim = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('$yeni sezonu açılsın mı?'),
+        content: Text('Yeni sezon $son sezonunun ardından eklenir. Parseller güncel harita çizimleriyle açılır; ürün ve dekarları '
+            'haritada parsele dokunarak girersiniz. Sezon, paylaştığınız web panelinde de görünür.'
+            '${kayitsiz ? '\n\n$son sezonunda henüz kayıt yok; isterseniz onu kaldırabilirsiniz.' : ''}'),
+        actions: [
+          if (kayitsiz) TextButton(onPressed: () => Navigator.pop(ctx, 'sil'), child: Text('$son sezonunu kaldır')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Vazgeç')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, 'ekle'), child: const Text('Sezonu aç')),
+        ],
+      ),
+    );
+    if (secim == null || !context.mounted) return;
+    final m = ScaffoldMessenger.of(context);
+    try {
+      final mesaj = await VeriDeposu.ben.tarlaSezon(secim == 'sil' ? son : yeni, sil: secim == 'sil');
+      m.showSnackBar(SnackBar(content: Text(mesaj)));
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text('Sezon kaydedilemedi: $e')));
+    }
+  }
 
   Widget _sezonKarti(BuildContext context, List<TarlaSezonu> l, TarlaSezonu x, RaporVerisi v) {
     final parseller = [for (final c in x.ciftlikler) ...c.parseller.where((p) => p.tip != 'diger')];
@@ -130,7 +168,7 @@ class _YilKarsilastirma extends StatelessWidget {
         listenable: VeriDeposu.ben,
         builder: (context, _) {
           final v = VeriDeposu.ben.veri ?? ilk;
-          final sezonlar = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v));
+          final sezonlar = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v), ekSezonlar: VeriDeposu.ben.tarlaEkSezonlari(v));
           final ciftlikler = <String>{for (final s in sezonlar) for (final c in s.ciftlikler) c.ad}.toList();
           // (sezon, çiftlik) → ürün → (dekar, haritadan mı)
           Map<String, (double, bool)> alanlar(TarlaSezonu s, String c) {
@@ -246,7 +284,7 @@ class _SezonEkrani extends StatelessWidget {
   final RaporVerisi ilk;
 
   TarlaSezonu _bul(RaporVerisi v) {
-    final l = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v));
+    final l = tarlaSezonlari(paket, VeriDeposu.ben.sezonParselleri(v), sinirlar: VeriDeposu.ben.parselSinirleri(v), ekSezonlar: VeriDeposu.ben.tarlaEkSezonlari(v));
     return l.firstWhere((x) => x.sezon == sezon, orElse: () => l.first);
   }
 

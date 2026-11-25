@@ -61,7 +61,7 @@ void main() {
     });
     final l = [const SezonParsel(sezon: '2026-2027', ciftlik: 'Örnek', parsel: 'B', urun: 'Arpa', alan: 30, durum: 'Aktif')];
     final ss = tarlaSezonlari([kmz, katman], l);
-    expect([for (final x in ss) x.sezon], ['2024-2025', '2025-2026', '2026-2027', '2027-2028']);
+    expect([for (final x in ss) x.sezon], ['2024-2025', '2025-2026', '2026-2027']);
     final p = ss[2].ciftlikler.single.parseller;
     expect(p.first.urunler, [('Buğday', 10.0), ('Arpa', 20.0)]);
     expect(p.first.cesit(0), 'Halis');
