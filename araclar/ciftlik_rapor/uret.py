@@ -216,16 +216,47 @@ def _tl(v):
     return f'{v:,.0f}'.replace(',', '.')
 
 
+def sutun(i):
+    """0 tabanlı sütun numarası → Excel harfi (0 → A)."""
+    h = ''
+    i += 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        h = chr(65 + r) + h
+    return h
+
+
+def ay_sutunu(yil, ay_no):
+    """Gelir tablosu sayfalarında ayın sütunu: A etiket, 2026 Ocak B, Şubat D…; 2025 Ocak AC…"""
+    return sutun((1 if yil == 2026 else 28) + 2 * (ay_no - 1))
+
+
+def konum(sayfa, satir, yil, aylar):
+    """Bulgunun dosyadaki yeri: sayfa · satır · sütun(lar)."""
+    if len(aylar) == 1:
+        s = f'{ay_sutunu(yil, aylar[0])} sütunu ({M[aylar[0] - 1]} {yil % 100})'
+    else:
+        s = f'{ay_sutunu(yil, aylar[0])}–{ay_sutunu(yil, aylar[-1])} sütunları ({M[aylar[0] - 1]}–{M[aylar[-1] - 1]} {yil % 100})'
+    return f'“{sayfa}” sayfası · “{satir}” satırı · {s}'
+
+
 def senaryo_karsilastirma(g, ay_sayisi=9):
     K = dict(KALEMLER)
 
-    def seri(sayfa, kalem):
+    def seri(sayfa, kalem, y='26'):
         t = g[sayfa]
         if kalem == 'Faaliyet dışı net':
-            a = [t[K[k]]['26'] for k in ('Diğer olağan gelirler (649)', 'Olağandışı gelirler (679)', 'Diğer olağan giderler',
-                                         'Olağandışı giderler')]
+            a = [t[K[k]][y] for k in ('Diğer olağan gelirler (649)', 'Olağandışı gelirler (679)', 'Diğer olağan giderler',
+                                      'Olağandışı giderler')]
             return [(a[0][i] or 0) + (a[1][i] or 0) - (a[2][i] or 0) - (a[3][i] or 0) for i in range(12)]
-        return [x or 0 for x in t[K[kalem]]['26']]
+        return [x or 0 for x in t[K[kalem]][y]]
+
+    def donem(sayfa, y, n):
+        s2 = sayfa + ' 2'
+        return dict(
+            ay_sayisi=n,
+            aylik=[dict(ay_no=i + 1, **{f'{k}|{j}': round(seri(sf, k, y)[i]) for k in SENARYO_KALEM for j, sf in ((1, sayfa), (2, s2))})
+                   for i in range(n)])
 
     ciftlikler, kontrol = [], []
     top1 = {k: [0.0] * 12 for k in SENARYO_KALEM}
@@ -245,19 +276,27 @@ def senaryo_karsilastirma(g, ay_sayisi=9):
         ns1, ns2 = seri(sayfa, 'Net satışlar'), seri(s2, 'Net satışlar')
         for i in range(ay_sayisi):
             aylik.append(dict(ay_no=i + 1, s1=round(n1[i]), s2=round(n2[i]), satis1=round(ns1[i]), satis2=round(ns2[i])))
-        ciftlikler.append(dict(ciftlik=ad, kalemler=kal, aylik=aylik))
+        ciftlikler.append(dict(ciftlik=ad, sayfa=sayfa, kalemler=kal, aylik=aylik,
+                               donemler={'2026': donem(sayfa, '26', ay_sayisi), '2025': donem(sayfa, '25', 12)}))
         # kontrol: maliyet senaryosunda negatif satış maliyeti
         smm1 = seri(sayfa, 'Satışların maliyeti')
         neg = [M[i] for i in range(ay_sayisi) if smm1[i] < -1]
         if neg:
             kontrol.append(dict(tur='tutarsizlik', baslik=f'{ad} – negatif satış maliyeti',
                                 aciklama=f'Maliyet senaryosunda (“{sayfa}”) {", ".join(neg)} ayında satışların maliyeti eksi '
-                                         f'({_tl(min(smm1[:ay_sayisi]))} ₺) görünüyor; iade/düzeltme kaydı muhasebeden teyit edilmeli.', ciftlik=ad))
+                                         f'({_tl(min(smm1[:ay_sayisi]))} ₺) görünüyor; iade/düzeltme kaydı muhasebeden teyit edilmeli.', ciftlik=ad,
+                                kaynak=konum(sayfa, K['Satışların maliyeti'], 2026, [M.index(a) + 1 for a in neg])))
     if ciftlikler:
         kal = [dict(kalem=k, s1=round(sum(top1[k][:ay_sayisi])), s2=round(sum(top2[k][:ay_sayisi]))) for k in SENARYO_KALEM]
         aylik = [dict(ay_no=i + 1, s1=round(top1['Dönem net kârı/zararı'][i]), s2=round(top2['Dönem net kârı/zararı'][i]),
                       satis1=round(top1['Net satışlar'][i]), satis2=round(top2['Net satışlar'][i])) for i in range(ay_sayisi)]
-        ciftlikler.insert(0, dict(ciftlik='Çiftliklerimiz (ESK hariç)', kalemler=kal, aylik=aylik))
+        def topla(y):
+            l = [c['donemler'][y] for c in ciftlikler]
+            n = l[0]['ay_sayisi']
+            return dict(ay_sayisi=n, aylik=[dict(ay_no=i + 1, **{k: sum(x['aylik'][i][k] for x in l) for k in l[0]['aylik'][i] if k != 'ay_no'})
+                                            for i in range(n)])
+        ciftlikler.insert(0, dict(ciftlik='Çiftliklerimiz (ESK hariç)', sayfa='', kalemler=kal, aylik=aylik,
+                                  donemler={'2026': topla('2026'), '2025': topla('2025')}))
         # kontrol: Konsolide (2) sayfası
         k2 = g.get('Çiftlikler Konsolide (2)')
         if k2 and NET in k2 and DONEM_KARI in k2:
@@ -268,13 +307,16 @@ def senaryo_karsilastirma(g, ay_sayisi=9):
                 kontrol.append(dict(tur='tutarsizlik', baslik='Konsolide (2) – dönem net kârı satırı hatalı',
                                     aciklama=f'“Çiftlikler Konsolide (2)” sayfasında dönem kârı {_mn(dk2)} mn ₺, vergi karşılığı sıfır '
                                              f'olduğu hâlde dönem net kârı {_mn(net2)} mn ₺ yazıyor. Çiftlik sayfalarının toplamı '
-                                             f'{_mn(top)} mn ₺ olduğundan analizde toplam kullanılmıştır; satırdaki formül düzeltilmeli.', ciftlik='Çiftliklerimiz (ESK hariç)'))
+                                             f'{_mn(top)} mn ₺ olduğundan analizde toplam kullanılmıştır; satırdaki formül düzeltilmeli.', ciftlik='Çiftliklerimiz (ESK hariç)',
+                                    kaynak=konum('Çiftlikler Konsolide (2)', NET, 2026, list(range(1, ay_sayisi + 1))) +
+                                    f'; karşılaştırılan satır “{DONEM_KARI}”'))
             ns = sum((x or 0) for x in k2['NET SATIŞLAR']['26'][:ay_sayisi]) if 'NET SATIŞLAR' in k2 else None
             if ns is not None and abs(ns - sum(top2['Net satışlar'][:ay_sayisi])) > 1000:
                 kontrol.append(dict(tur='tutarsizlik', baslik='Konsolide (2) – net satış toplamı çiftliklerle uyuşmuyor',
                                     aciklama=f'Konsolide (2) net satış {_mn(ns)} mn ₺, çiftlik sayfaları toplamı '
                                              f'{_mn(sum(top2["Net satışlar"][:ay_sayisi]))} mn ₺.',
-                                    ciftlik='Çiftliklerimiz (ESK hariç)'))
+                                    ciftlik='Çiftliklerimiz (ESK hariç)',
+                                    kaynak=konum('Çiftlikler Konsolide (2)', 'NET SATIŞLAR', 2026, list(range(1, ay_sayisi + 1)))))
         # kontrol: iki senaryonun aynı olduğu aylar (iç transfer yeniden değerlenmemiş olabilir)
         for c in ciftlikler[1:]:
             ayni = [M[a['ay_no'] - 1] for a in c['aylik'] if a['satis1'] == a['satis2'] and abs(a['s1'] - a['s2']) < 1]

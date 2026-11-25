@@ -13,3 +13,4 @@ android/
 
 # İmza anahtarı depoda tutulmaz (GitHub gizli ayarı: YONETIM_KEYSTORE_B64)
 ci/yonetim-raporu.p12
+__pycache__/

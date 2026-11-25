@@ -33,9 +33,34 @@ class SenaryoAy {
   String get ay => raporAylari[ayNo - 1];
 }
 
+/// Bir yılın aylık iki senaryo verisi (2025: 12 ay, 2026: rapor dönemi).
+class SenaryoDonem {
+  const SenaryoDonem(this.yil, this.aylar);
+  final int yil;
+
+  /// Her ay: 'kalem|1' (maliyet bedeliyle) / 'kalem|2' (piyasa fiyatıyla) → ₺.
+  final List<Map<String, double>> aylar;
+
+  int get aySayisi => aylar.length;
+  double ay(int ayNo, String kalem, int senaryo) => aylar[ayNo - 1]['$kalem|$senaryo'] ?? 0;
+  double toplam(String kalem, int senaryo, {int? ayaKadar}) =>
+      aylar.take(ayaKadar ?? aylar.length).fold(0.0, (t, a) => t + (a['$kalem|$senaryo'] ?? 0));
+
+  /// Verisi olan aylar (iki senaryoda da net satış ve sonuç sıfır olmayan).
+  List<int> get doluAylar => [
+        for (var i = 1; i <= aySayisi; i++)
+          if (senaryoKalemleri.any((k) => ay(i, k, 1) != 0 || ay(i, k, 2) != 0)) i,
+      ];
+  String get etiket => aySayisi == 0 ? '$yil' : '${raporAylari[0]}–${raporAylari[aySayisi - 1]} $yil';
+}
+
 class SenaryoCiftlik {
-  const SenaryoCiftlik(this.ciftlik, this.kalemler, this.aylik);
+  const SenaryoCiftlik(this.ciftlik, this.kalemler, this.aylik, {this.sayfa = '', this.donemler = const {}});
   final String ciftlik;
+
+  /// Maliyet senaryosu sayfası (ör. "1605 - Aslım"); piyasa senaryosu aynı adın " 2" uzantılısı.
+  final String sayfa;
+  final Map<int, SenaryoDonem> donemler;
 
   /// kalem → (maliyet senaryosu, piyasa senaryosu)
   final Map<String, (double, double)> kalemler;
@@ -50,10 +75,41 @@ class SenaryoCiftlik {
 }
 
 class SenaryoKontrol {
-  const SenaryoKontrol(this.tur, this.baslik, this.aciklama, this.ciftlik);
+  const SenaryoKontrol(this.tur, this.baslik, this.aciklama, this.ciftlik, {this.kaynak = ''});
 
   /// 'tutarsizlik' | 'bilgi'
   final String tur, baslik, aciklama, ciftlik;
+
+  /// Dosyadaki yeri: sayfa · satır · sütun.
+  final String kaynak;
+}
+
+/// Gelir tablosu satır başlıkları (dosyadaki yazımıyla).
+const kSatirNet = 'DÖNEM NET KÂRI VEYA ZARARI ( DÖNEM KARI VEYA ZARARI-J)';
+const kSatirBrut = 'BRÜT SATIŞ KÂRI VEYA ZARARI';
+
+String _sutun(int i) {
+  var h = '';
+  i += 1;
+  while (i > 0) {
+    final r = (i - 1) % 26;
+    h = String.fromCharCode(65 + r) + h;
+    i = (i - 1) ~/ 26;
+  }
+  return h;
+}
+
+/// Gelir tablosu sayfalarında ayın sütunu: A etiket; 2026 Ocak B, Şubat D…; 2025 Ocak AC…
+String aySutunu(int yil, int ayNo) => _sutun((yil == 2026 ? 1 : 28) + 2 * (ayNo - 1));
+
+/// "“1605 - Aslım 2” sayfası · “…” satırı · B–R sütunları (Ocak–Eylül 26)"
+String senaryoKonum(String sayfa, String satir, int yil, List<int> aylar) {
+  if (aylar.isEmpty) return '“$sayfa” sayfası · “$satir” satırı';
+  final y = yil % 100;
+  final s = aylar.length == 1
+      ? '${aySutunu(yil, aylar.first)} sütunu (${raporAylari[aylar.first - 1]} $y)'
+      : '${aySutunu(yil, aylar.first)}–${aySutunu(yil, aylar.last)} sütunları (${raporAylari[aylar.first - 1]}–${raporAylari[aylar.last - 1]} $y)';
+  return '“$sayfa” sayfası · “$satir” satırı · $s';
 }
 
 class Senaryo {
@@ -63,6 +119,9 @@ class Senaryo {
   final List<SenaryoKontrol> kontrol;
 
   SenaryoCiftlik? ciftlik(String c) => ciftlikler.where((x) => x.ciftlik == c).firstOrNull;
+
+  /// Verisi bulunan yıllar (yeniden eskiye).
+  List<int> get yillar => ({for (final c in ciftlikler) ...c.donemler.keys}.toList()..sort()).reversed.toList();
 
   static Senaryo? json(Map<String, dynamic>? j) {
     if (j == null) return null;
@@ -77,11 +136,20 @@ class Senaryo {
             c['ciftlik'] as String,
             {for (final k in l(c, 'kalemler')) k['kalem'] as String: (d(k['s1']), d(k['s2']))},
             [for (final a in l(c, 'aylik')) SenaryoAy(a['ay_no'] as int, d(a['s1']), d(a['s2']), d(a['satis1']), d(a['satis2']))],
+            sayfa: c['sayfa'] as String? ?? '',
+            donemler: {
+              for (final e in ((c['donemler'] as Map<String, dynamic>?) ?? const {}).entries)
+                int.parse(e.key): SenaryoDonem(int.parse(e.key), [
+                  for (final a in l(e.value as Map<String, dynamic>, 'aylik'))
+                    {for (final x in a.entries) if (x.key != 'ay_no') x.key: d(x.value)},
+                ]),
+            },
           ),
       ],
       kontrol: [
         for (final k in l(j, 'kontrol'))
-          SenaryoKontrol(k['tur'] as String, k['baslik'] as String, k['aciklama'] as String, k['ciftlik'] as String? ?? ''),
+          SenaryoKontrol(k['tur'] as String, k['baslik'] as String, k['aciklama'] as String, k['ciftlik'] as String? ?? '',
+              kaynak: k['kaynak'] as String? ?? ''),
       ],
     );
   }

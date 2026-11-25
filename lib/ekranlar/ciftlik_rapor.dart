@@ -835,6 +835,8 @@ class _BulguListesi extends StatelessWidget {
                 TextSpan(children: [
                   TextSpan(text: '${b.baslik}: ', style: const TextStyle(fontWeight: FontWeight.w700)),
                   TextSpan(text: b.aciklama),
+                  if (b.kaynak.isNotEmpty)
+                    TextSpan(text: '\nKaynak: ${b.kaynak}', style: const TextStyle(fontSize: 12, color: Renk.soluk, fontStyle: FontStyle.italic)),
                 ]),
                 style: const TextStyle(fontSize: 13, color: Renk.yazi, height: 1.4),
               ),
@@ -1073,6 +1075,8 @@ class _PiyasaSenaryosu extends StatefulWidget {
 
 class _PiyasaSenaryosuState extends State<_PiyasaSenaryosu> {
   String? _secili;
+  String _gorunum = 'Aylık';
+  int? _yil;
 
   @override
   Widget build(BuildContext context) {
@@ -1081,69 +1085,158 @@ class _PiyasaSenaryosuState extends State<_PiyasaSenaryosu> {
       return const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(uyari: true, yazi: 'Dosyada piyasa fiyatlı senaryo sayfası bulunamadı.'));
     }
     final c = s.ciftlik(_secili ?? '') ?? s.ciftlikler.first;
-    final bulgular = senaryoBulgulari(widget.r);
+    final yillar = s.yillar.isEmpty ? const [2026] : s.yillar;
+    final yil = yillar.contains(_yil) ? _yil! : yillar.first;
+    final aylik = _gorunum == 'Aylık';
+    final bulgular = senaryoBulgulari(widget.r, yil: aylik ? yil : null);
     final olumsuz = [for (final b in bulgular) if (b.tur == BulguTuru.olumsuz) b];
     final tutarsiz = [for (final b in bulgular) if (b.tur == BulguTuru.tutarsizlik) b];
     final bilgi = [for (final k in s.kontrol) if (k.tur == 'bilgi' && (c.ciftlik == kSenaryoToplam || k.ciftlik == c.ciftlik)) k];
     String m1(double v) => sayi(v / 1e6, ondalik: 1);
     String f1(double v) => '${v > 0 ? '+' : v < 0 ? '−' : ''}${sayi(v.abs() / 1e6, ondalik: 1)}';
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        BilgiKutusu(yazi: '${s.aciklama} Dönem: ${s.donem}. Tutarlar mn ₺.'),
+    const net = 'Dönem net kârı/zararı';
+    SenaryoDonem? dn(SenaryoCiftlik x, int y) => x.donemler[y];
+    final sirali = [...s.ciftlikler.skip(1), s.ciftlikler.first];
+    final toplamSon = s.ciftlikler.first.ciftlik == kSenaryoToplam;
+    String etiket(int y) => dn(s.ciftlikler.first, y)?.etiket ?? '$y';
+    const kaynakStil = TextStyle(fontSize: 12, color: Renk.soluk, fontStyle: FontStyle.italic);
+
+    Widget ciftlikSecici() => Wrap(spacing: 8, runSpacing: 4, children: [
+          for (final x in s.ciftlikler)
+            ChoiceChip(label: Text(x.ciftlik), selected: x.ciftlik == c.ciftlik, onSelected: (_) => setState(() => _secili = x.ciftlik)),
+        ]);
+    Widget bulguPaneli() => Panel(
+          baslik: 'Olumsuz sonuçlar ve tutarsızlıklar',
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (olumsuz.isNotEmpty) _BulguListesi(baslik: 'Olumsuz sonuçlar', bulgular: olumsuz),
+            if (tutarsiz.isNotEmpty) _BulguListesi(baslik: 'Veri tutarsızlıkları', bulgular: tutarsiz),
+          ]),
+        );
+
+    final govde = <Widget>[];
+    if (aylik) {
+      final d = dn(c, yil);
+      govde.addAll([
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, children: [
+          for (final y in yillar) ChoiceChip(label: Text('$y'), selected: y == yil, onSelected: (_) => setState(() => _yil = y)),
+        ]),
         Panel(
-          baslik: 'Dönem net sonucu – iki senaryo (mn ₺)',
+          baslik: 'Dönem net sonucu – ${etiket(yil)} (mn ₺)',
           child: VeriTablosu(
             ilkSutunGenislik: 150,
             basliklar: const ['Çiftlik', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
             satirlar: [
-              for (final x in [...s.ciftlikler.skip(1), s.ciftlikler.first]) [x.ciftlik, m1(x.net1), m1(x.net2), f1(x.netFark)],
+              for (final x in sirali)
+                if (dn(x, yil) case final e?) [x.ciftlik, m1(e.toplam(net, 1)), m1(e.toplam(net, 2)), f1(e.toplam(net, 2) - e.toplam(net, 1))],
             ],
-            vurguluSonSatir: s.ciftlikler.first.ciftlik == kSenaryoToplam,
+            vurguluSonSatir: toplamSon,
           ),
         ),
-        if (olumsuz.isNotEmpty || tutarsiz.isNotEmpty)
-          Panel(
-            baslik: 'Olumsuz sonuçlar ve tutarsızlıklar',
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              if (olumsuz.isNotEmpty) _BulguListesi(baslik: 'Olumsuz sonuçlar', bulgular: olumsuz),
-              if (tutarsiz.isNotEmpty) _BulguListesi(baslik: 'Veri tutarsızlıkları', bulgular: tutarsiz),
-            ]),
-          ),
+        if (olumsuz.isNotEmpty || tutarsiz.isNotEmpty) bulguPaneli(),
         const SizedBox(height: 4),
-        Wrap(spacing: 8, runSpacing: 4, children: [
-          for (final x in s.ciftlikler)
-            ChoiceChip(
-              label: Text(x.ciftlik),
-              selected: x.ciftlik == c.ciftlik,
-              onSelected: (_) => setState(() => _secili = x.ciftlik),
+        ciftlikSecici(),
+        if (d != null) ...[
+          Panel(
+            baslik: '${c.ciftlik} – kalem karşılaştırması, ${d.etiket} (mn ₺)',
+            child: VeriTablosu(
+              ilkSutunGenislik: 150,
+              basliklar: const ['Kalem', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
+              satirlar: [
+                for (final k in senaryoKalemleri) [k, m1(d.toplam(k, 1)), m1(d.toplam(k, 2)), f1(d.toplam(k, 2) - d.toplam(k, 1))],
+              ],
+              vurguluSonSatir: true,
             ),
-        ]),
+          ),
+          Panel(
+            baslik: '${c.ciftlik} – aylık net sonuç, $yil (mn ₺)',
+            child: VeriTablosu(
+              ilkSutunGenislik: 80,
+              basliklar: const ['Ay', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
+              satirlar: [
+                for (var i = 1; i <= d.aySayisi; i++)
+                  [raporAylari[i - 1], m1(d.ay(i, net, 1)), m1(d.ay(i, net, 2)), f1(d.ay(i, net, 2) - d.ay(i, net, 1))],
+                ['Toplam', m1(d.toplam(net, 1)), m1(d.toplam(net, 2)), f1(d.toplam(net, 2) - d.toplam(net, 1))],
+              ],
+              vurguluSonSatir: true,
+            ),
+          ),
+          if (c.sayfa.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                  'Kaynak: “${c.sayfa}” (maliyet bedeliyle) ve “${c.sayfa} 2” (piyasa fiyatıyla) sayfaları · '
+                  '“$kSatirNet” satırı · ${aySutunu(yil, 1)}–${aySutunu(yil, d.aySayisi)} sütunları.',
+                  style: kaynakStil),
+            ),
+        ],
+        if (yil == 2026) _Nedenler(senaryoNedenleri(s, c), baslik: 'Farkın nedenleri'),
+        if (yil == 2026 && bilgi.isNotEmpty) _Nedenler([for (final k in bilgi) (k.baslik, k.aciklama)], baslik: 'Notlar'),
+      ]);
+    } else {
+      final ys = yillar.reversed.toList();
+      govde.addAll([
         Panel(
-          baslik: '${c.ciftlik} – kalem karşılaştırması (mn ₺)',
+          baslik: 'Yıllara göre dönem net sonucu (mn ₺)',
           child: VeriTablosu(
             ilkSutunGenislik: 150,
-            basliklar: const ['Kalem', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
+            basliklar: ['Çiftlik', for (final y in ys) ...['$y maliyet', '$y piyasa']],
             satirlar: [
-              for (final k in senaryoKalemleri) [k, m1(c.s1(k)), m1(c.s2(k)), f1(c.fark(k))],
+              for (final x in sirali)
+                [
+                  x.ciftlik,
+                  for (final y in ys) ...[
+                    dn(x, y) == null ? '—' : m1(dn(x, y)!.toplam(net, 1)),
+                    dn(x, y) == null ? '—' : m1(dn(x, y)!.toplam(net, 2)),
+                  ],
+                ],
             ],
-            vurguluSonSatir: true,
+            vurguluSonSatir: toplamSon,
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+              'Dönemler: ${[for (final y in ys) etiket(y)].join(', ')}. Şekersüt ve Pan-Gev 2025 verisi Ağustos 2025’ten başlar. '
+              'Kaynak: çiftlik sayfaları ve “2” uzantılı sayfalar · “$kSatirNet” satırı · '
+              '${[for (final y in ys) '$y: ${aySutunu(y, 1)}–${aySutunu(y, dn(s.ciftlikler.first, y)?.aySayisi ?? 12)}'].join(', ')} sütunları.',
+              style: kaynakStil),
+        ),
+        if (olumsuz.isNotEmpty || tutarsiz.isNotEmpty) bulguPaneli(),
+        const SizedBox(height: 4),
+        ciftlikSecici(),
         Panel(
-          baslik: '${c.ciftlik} – aylık net sonuç (mn ₺)',
+          baslik: '${c.ciftlik} – yıllara göre kalemler (mn ₺)',
           child: VeriTablosu(
-            ilkSutunGenislik: 80,
-            basliklar: const ['Ay', 'Maliyet bedeliyle', 'Piyasa fiyatıyla', 'Fark'],
+            ilkSutunGenislik: 150,
+            basliklar: ['Kalem', for (final y in ys) ...['$y maliyet', '$y piyasa']],
             satirlar: [
-              for (final a in c.aylik) [a.ay, m1(a.s1), m1(a.s2), f1(a.fark)],
-              ['Toplam', m1(c.net1), m1(c.net2), f1(c.netFark)],
+              for (final k in senaryoKalemleri)
+                [
+                  k,
+                  for (final y in ys) ...[
+                    dn(c, y) == null ? '—' : m1(dn(c, y)!.toplam(k, 1)),
+                    dn(c, y) == null ? '—' : m1(dn(c, y)!.toplam(k, 2)),
+                  ],
+                ],
             ],
             vurguluSonSatir: true,
           ),
         ),
-        _Nedenler(senaryoNedenleri(s, c), baslik: 'Farkın nedenleri'),
-        if (bilgi.isNotEmpty) _Nedenler([for (final k in bilgi) (k.baslik, k.aciklama)], baslik: 'Notlar'),
+      ]);
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        BilgiKutusu(yazi: '${s.aciklama} Tutarlar mn ₺. Gelir tabloları aylık tutulduğundan günlük ve haftalık kırılım bulunmaz.'),
+        const SizedBox(height: 8),
+        SegmentedButton<String>(
+          segments: const [ButtonSegment(value: 'Aylık', label: Text('Aylık')), ButtonSegment(value: 'Yıllık', label: Text('Yıllık'))],
+          selected: {_gorunum},
+          onSelectionChanged: (x) => setState(() => _gorunum = x.first),
+        ),
+        ...govde,
       ],
     );
   }

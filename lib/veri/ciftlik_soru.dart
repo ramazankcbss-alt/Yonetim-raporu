@@ -12,9 +12,12 @@ enum BulguTuru { olumsuz, tutarsizlik }
 
 /// Olumsuz sonuç (zarar, maliyetin fiyatı aşması) ya da veri tutarsızlığı.
 class Bulgu {
-  const Bulgu(this.tur, this.baslik, this.aciklama, this.konular);
+  const Bulgu(this.tur, this.baslik, this.aciklama, this.konular, {this.kaynak = ''});
   final BulguTuru tur;
   final String baslik, aciklama;
+
+  /// Dosyadaki yeri (sayfa · satır · sütun); boşsa gösterilmez.
+  final String kaynak;
 
   /// Eşleştirme etiketleri: çiftlik adları, 'süt', 'et', 'tarım', ürün adları, 'finans'.
   final Set<String> konular;
@@ -134,28 +137,44 @@ List<Bulgu> tumBulgular(CiftlikRaporu r) {
 }
 
 /// Piyasa senaryosu ("2" uzantılı sayfalar) olumsuz sonuçları ve tutarsızlıkları.
-List<Bulgu> senaryoBulgulari(CiftlikRaporu r) {
+List<Bulgu> senaryoBulgulari(CiftlikRaporu r, {int? yil}) {
   final s = r.senaryo;
   if (s == null) return const [];
   final l = <Bulgu>[];
-  for (final c in s.ciftlikler) {
-    if (c.ciftlik == kSenaryoToplam) continue;
-    if (c.net2 < 0) {
-      l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa fiyatlarıyla zarar',
-          'Grup içi ürünler piyasa fiyatıyla değerlendiğinde ${s.donem} sonucu ${kz(c.net2)} (maliyet bedeliyle ${kz(c.net1)}; fark ${mnFark(c.netFark)}).',
-          {c.ciftlik, 'senaryo', 'finans', if (c.ciftlik == 'Aslım') 'et'}));
-    } else if (c.netFark < -1e6) {
-      l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa fiyatlarıyla kâr düşüyor',
-          'Piyasa senaryosunda sonuç ${kz(c.net2)}, maliyet senaryosunda ${kz(c.net1)}.', {c.ciftlik, 'senaryo', 'finans'}));
-    }
-    if (c.s2('Brüt satış kârı/zararı') < 0) {
-      l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa senaryosunda brüt zarar',
-          'Piyasa fiyatlarıyla brüt satış sonucu ${mn(c.s2('Brüt satış kârı/zararı'))}.', {c.ciftlik, 'senaryo', 'finans'}));
+  for (final y in s.yillar) {
+    if (yil != null && y != yil) continue;
+    for (final c in s.ciftlikler) {
+      if (c.ciftlik == kSenaryoToplam || c.sayfa.isEmpty) continue;
+      final d = c.donemler[y];
+      if (d == null) continue;
+      final aylar = d.doluAylar;
+      if (aylar.isEmpty) continue;
+      final s2 = '${c.sayfa} 2';
+      final n1 = d.toplam('Dönem net kârı/zararı', 1), n2 = d.toplam('Dönem net kârı/zararı', 2);
+      final b2 = d.toplam('Brüt satış kârı/zararı', 2);
+      final donem = '${raporAylari[aylar.first - 1]}–${raporAylari[aylar.last - 1]} $y';
+      if (n2 < 0) {
+        l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa fiyatlarıyla zarar ($y)',
+            'Grup içi ürünler piyasa fiyatıyla değerlendiğinde $donem sonucu ${kz(n2)} (maliyet bedeliyle ${kz(n1)}; fark ${mnFark(n2 - n1)}).',
+            {c.ciftlik, 'senaryo', 'finans', '$y', if (c.ciftlik == 'Aslım') 'et'},
+            kaynak: senaryoKonum(s2, kSatirNet, y, aylar)));
+      } else if (n2 - n1 < -1e6) {
+        l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa fiyatlarıyla kâr düşüyor ($y)',
+            '$donem piyasa senaryosunda sonuç ${kz(n2)}, maliyet senaryosunda ${kz(n1)}.', {c.ciftlik, 'senaryo', 'finans', '$y'},
+            kaynak: senaryoKonum(s2, kSatirNet, y, aylar)));
+      }
+      if (b2 < 0) {
+        l.add(Bulgu(BulguTuru.olumsuz, '${c.ciftlik} – piyasa senaryosunda brüt zarar ($y)',
+            '$donem piyasa fiyatlarıyla brüt satış sonucu ${mn(b2)}.', {c.ciftlik, 'senaryo', 'finans', '$y'},
+            kaynak: senaryoKonum(s2, kSatirBrut, y, aylar)));
+      }
     }
   }
-  for (final k in s.kontrol) {
-    if (k.tur != 'tutarsizlik') continue;
-    l.add(Bulgu(BulguTuru.tutarsizlik, k.baslik, k.aciklama, {k.ciftlik, 'senaryo', 'finans'}));
+  if (yil == null || yil == 2026) {
+    for (final k in s.kontrol) {
+      if (k.tur != 'tutarsizlik') continue;
+      l.add(Bulgu(BulguTuru.tutarsizlik, k.baslik, k.aciklama, {k.ciftlik, 'senaryo', 'finans', '2026'}, kaynak: k.kaynak));
+    }
   }
   return l;
 }

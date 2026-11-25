@@ -62,4 +62,20 @@ void main() {
     expect(n.any((x) => x.$1 == 'Yorum'), isTrue);
     expect(senaryoNedenleri(s, s.ciftlikler.first).any((x) => x.$1 == 'Grup toplamındaki fark'), isTrue);
   });
+
+  test('senaryo: sütun harfleri ve yıllık dönemler', () {
+    expect(aySutunu(2026, 1), 'B');
+    expect(aySutunu(2026, 9), 'R');
+    expect(aySutunu(2025, 1), 'AC');
+    final s = r.senaryo!;
+    expect(s.yillar, containsAll([2025, 2026]));
+    for (final c in s.ciftlikler) {
+      final d = c.donemler[2026]!;
+      for (final k in senaryoKalemleri) {
+        expect(d.toplam(k, 1), closeTo(c.s1(k), 2));
+        expect(d.toplam(k, 2), closeTo(c.s2(k), 2));
+      }
+      expect(c.donemler[2025]!.aySayisi, 12);
+    }
+  });
 }

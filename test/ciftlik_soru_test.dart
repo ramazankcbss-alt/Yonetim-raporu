@@ -54,4 +54,11 @@ void main() {
     expect(y.paragraflar.join(' '), contains('piyasa'));
     expect(y.bulgular.any((b) => b.baslik.contains('Aslım – piyasa')), isTrue);
   });
+
+  test('senaryo bulgularında dosyadaki yer belirtilir', () {
+    final b = senaryoBulgulari(r);
+    expect(b, isNotEmpty);
+    expect(b.every((x) => x.kaynak.contains('sayfası')), isTrue);
+    expect(senaryoBulgulari(r, yil: 2025).every((x) => x.baslik.contains('2025')), isTrue);
+  });
 }
