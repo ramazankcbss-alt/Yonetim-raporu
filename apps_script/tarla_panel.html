@@ -304,6 +304,8 @@ function sezonlar() {
   l.push(girisSezonu(kmz, s1, bul(s1, 'katman')));
   l.push(kmzUzerine(kmz));
   l.push(girisSezonu(kmz, s3, bul(s3, 'katman')));
+  var s4 = sonrakiSezon(s3);
+  l.push(girisSezonu(kmz, s4, bul(s4, 'katman'))); // 2027-2028: haritadan giriş
   return l;
 }
 

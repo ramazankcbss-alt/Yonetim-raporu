@@ -85,13 +85,15 @@ void main() {
     expect(yilPlani(v.ekimPlani, '2027', 'Şekersüt')['Buğday'], 900);
     expect(parselGirisi(v.sezonParsel, '2026-2027', 'Şekersüt', '4. pivot')?.alan, 300);
     final ss = tarlaSezonlari([s], v.sezonParsel);
-    expect([for (final x in ss) x.sezon], ['2024-2025', '2025-2026', '2026-2027']);
+    expect([for (final x in ss) x.sezon], ['2024-2025', '2025-2026', '2026-2027', '2027-2028']);
     expect(ss.first.giris, isTrue);
     expect(ss.first.onceki, isNull);
     expect(ss.first.sonraki?.sezon, '2025-2026');
     expect(sezonExcel(v.ekim, v.ekimPlani, ss.first, 'Şekersüt')['Buğday'], 1700);
     expect(sezonExcel(v.ekim, v.ekimPlani, ss.first, 'Taşağıl')['Şeker pancarı'], 230);
-    expect(sezonExcel(v.ekim, v.ekimPlani, ss.last, 'Şekersüt')['Buğday'], 900);
+    expect(sezonExcel(v.ekim, v.ekimPlani, ss[2], 'Şekersüt')['Buğday'], 900);
+    expect(ss.last.onceki?.sezon, '2026-2027');
+    expect(ss.last.giris, isTrue);
   });
 
   testWidgets('Tarla Haritası ekranı', (t) async {

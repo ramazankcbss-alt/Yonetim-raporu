@@ -620,7 +620,7 @@ bool ekimDisi(String urun) => ekimDisiAlanlar.contains(urunAnahtari(urun));
 
 
 /// Tarla Haritası bölümleri: 2024-2025 (haritadan giriş), KMZ sezonu (2025-2026),
-/// 2026-2027 (haritadan giriş). Hepsi KMZ sezonunun parsel çizimlerini kullanır.
+/// 2026-2027 ve 2027-2028 (haritadan giriş). Hepsi KMZ sezonunun parsel çizimlerini kullanır.
 List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l, {List<ParselSinir> sinirlar = const []}) {
   final esaslar = paket.where((k) => k.tur == 'kmz').toList();
   if (esaslar.isEmpty) return const [];
@@ -642,7 +642,11 @@ List<TarlaSezonu> tarlaSezonlari(List<TarlaSezonu> paket, List<SezonParsel> l, {
   final orta = [
     for (final (i, k) in esaslar.indexed) kmzUzerine(i == 0 ? kmz : k, l, onceki: i == 0 ? eski : null)
   ];
-  return [if (s0 != null) s0, eski, ...orta, girisSezonu(kmz, l, onceki: orta.first, katman: k3)];
+  final yeni = girisSezonu(kmz, l, onceki: orta.first, katman: k3);
+  // 2027-2028: haritadan giriş için açılan sezon (önceki sezon 2026-2027).
+  final s4 = sonrakiSezon(s3);
+  final sonra = girisSezonu(kmz, l, sezon: s4, onceki: yeni, katman: bul(s4, 'katman'));
+  return [if (s0 != null) s0, eski, ...orta, yeni, sonra];
 }
 
 /// Geçerli parsel sınırları: (çiftlik, parsel) → (boylam, enlem) noktaları. Son "Aktif" kayıt geçerlidir,
