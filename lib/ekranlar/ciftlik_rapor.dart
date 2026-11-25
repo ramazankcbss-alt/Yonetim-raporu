@@ -262,7 +262,7 @@ class _Sut2025 extends StatelessWidget {
                 if (r.donemOrt(u, 2025).aylar.isNotEmpty)
                   () {
                     final d = r.donemOrt(u, 2025);
-                    return ['Ort.', sayi(d.aylar.fold(0.0, (t, a) => t + a.miktar)), s2(d.birimMaliyet), '', s2(d.fiyat),
+                    return ['Ort.', sayi(d.aylar.fold<double>(0, (t, a) => t + a.miktar)), s2(d.birimMaliyet), '', s2(d.fiyat),
                       d.fiyat == null ? '—' : tl2f(d.fiyat! - d.birimMaliyet)];
                   }(),
               ],
