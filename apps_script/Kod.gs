@@ -1739,26 +1739,20 @@ function paylasimLinki_(p) {
   return paylasimAdresi_() + '?panel=tarla&anahtar=' + p.anahtar;
 }
 
-/** Web sürümü: depodaki "web-yayin" dalı (yalnızca program kodu, veri içermez), jsDelivr üzerinden yüklenir.
- * Dalın son sürümü (commit) 10 dakikada bir sorgulanır; adres o sürüme sabitlenir. */
+/** Web sürümü: depodaki "1.0.N" etiketleri (yalnızca program kodu, veri içermez), jsDelivr üzerinden yüklenir.
+ * En son sürüm 10 dakikada bir sorgulanır; adres o değişmez sürüme sabitlenir. */
 var WEB_DEPO_ = 'ramazankcbss-alt/Yonetim-raporu';
 function webSurumAdresi_() {
   var c = CacheService.getScriptCache(), k = 'web_surum_adresi';
   var x = c.get(k);
   if (x) return x;
-  var sha = '';
+  var surum = '';
   try {
-    var r = UrlFetchApp.fetch('https://data.jsdelivr.com/v1/packages/gh/' + WEB_DEPO_ + '/resolved?specifier=web-yayin', { muteHttpExceptions: true });
-    if (r.getResponseCode() === 200) sha = String(JSON.parse(r.getContentText()).version || '');
-  } catch (e) { sha = ''; }
-  if (!/^[0-9a-f]{7,40}$/.test(sha)) {
-    try {
-      var g = UrlFetchApp.fetch('https://api.github.com/repos/' + WEB_DEPO_ + '/branches/web-yayin', { muteHttpExceptions: true });
-      if (g.getResponseCode() === 200) sha = String(JSON.parse(g.getContentText()).commit.sha || '');
-    } catch (e) { sha = ''; }
-  }
-  if (!/^[0-9a-f]{7,40}$/.test(sha)) return '';
-  x = 'https://cdn.jsdelivr.net/gh/' + WEB_DEPO_ + '@' + sha + '/';
+    var r = UrlFetchApp.fetch('https://data.jsdelivr.com/v1/packages/gh/' + WEB_DEPO_ + '/resolved?specifier=latest', { muteHttpExceptions: true });
+    if (r.getResponseCode() === 200) surum = String(JSON.parse(r.getContentText()).version || '');
+  } catch (e) { surum = ''; }
+  if (!/^1\.0\.\d+$/.test(surum)) return '';
+  x = 'https://cdn.jsdelivr.net/gh/' + WEB_DEPO_ + '@' + surum + '/';
   c.put(k, x, 600);
   return x;
 }

@@ -45,3 +45,6 @@ jobs:
           git add -A
           git commit -q -m "Web sürümü ${GITHUB_SHA::7} (yalnızca program kodu, veri içermez)"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" web-yayin
+          # Değişmez sürüm etiketi: şirket paneli en son "1.0.N" etiketini jsDelivr'dan yükler
+          git tag "1.0.${GITHUB_RUN_NUMBER}"
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" "1.0.${GITHUB_RUN_NUMBER}"
