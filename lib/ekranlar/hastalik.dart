@@ -43,11 +43,11 @@ class _HastalikEkranState extends State<HastalikEkran> {
   Widget build(BuildContext context) {
     final h = _hepsi;
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Hastalık Dağılımı'),
-          bottom: const TabBar(tabs: [Tab(text: 'Aylık'), Tab(text: 'Hastalıklar'), Tab(text: 'Tedbirler')]),
+          bottom: const TabBar(tabs: [Tab(text: 'Yıllık'), Tab(text: 'Aylık'), Tab(text: 'Hastalıklar'), Tab(text: 'Tedbirler')]),
         ),
         body: h == null
             ? const Center(child: CircularProgressIndicator())
@@ -55,6 +55,7 @@ class _HastalikEkranState extends State<HastalikEkran> {
                 _filtreler(h),
                 Expanded(
                   child: TabBarView(children: [
+                    GonderAlani(konu: 'Hastalık Dağılımı – Yıllık', child: _Yillik(k: _suz(h))),
                     GonderAlani(konu: 'Hastalık Dağılımı – Aylık', child: _Aylik(k: _suz(h))),
                     GonderAlani(konu: 'Hastalık Dağılımı – Hastalıklar', child: _Hastaliklar(k: _suz(h))),
                     GonderAlani(konu: 'Hastalık Dağılımı – Tedbirler', child: _Tedbirler(k: _suz(h))),
@@ -231,6 +232,78 @@ class _Aylik extends StatelessWidget {
           ),
         ),
       );
+}
+
+/// Yıllık özet: her yılın vaka sayısı, sonuç dağılımı, önceki yıla göre değişim ve en sık hastalıklar.
+/// İçinde bulunulan yıl ve eksik aylı yıllar kapsadığı aylarla gösterilir; karşılaştırma aynı aylar üzerinden yapılır.
+class _Yillik extends StatelessWidget {
+  const _Yillik({required this.k});
+  final List<HastalikKaydi> k;
+
+  @override
+  Widget build(BuildContext context) {
+    if (k.isEmpty) return const Center(child: Text('Bu seçimde kayıt yok'));
+    final yil = <int, List<HastalikKaydi>>{};
+    for (final x in k) {
+      yil.putIfAbsent(x.yil, () => []).add(x);
+    }
+    final yillar = yil.keys.toList()..sort((a, b) => b.compareTo(a));
+    int top(Iterable<HastalikKaydi> l) => l.fold(0, (s, x) => s + x.adet);
+    final enCok = yillar.map((y) => top(yil[y]!)).reduce((a, b) => a > b ? a : b);
+    String aralik(Set<int> ay) {
+      if (ay.isEmpty) return '';
+      final l = ay.toList()..sort();
+      if (l.length == 12) return 'Ocak–Aralık';
+      return l.length == 1 ? aylar[l.first - 1] : '${aylar[l.first - 1]}–${aylar[l.last - 1]} (${l.length} ay)';
+    }
+
+    return ListView(padding: const EdgeInsets.all(12), children: [
+      const _Lejant(),
+      const SizedBox(height: 4),
+      const Text('Yıl içinde kaydı olan aylar başlıkta yazılıdır. Önceki yılla karşılaştırma yalnızca iki yılda da kaydı olan aylar üzerinden yapılır.',
+          style: TextStyle(fontSize: 12, color: Renk.soluk)),
+      const SizedBox(height: 8),
+      for (final y in yillar)
+        Builder(builder: (_) {
+          final l = yil[y]!;
+          final aylarY = l.map((x) => x.ay).toSet();
+          final t = top(l);
+          final olum = top(l.where((x) => x.sonuc == 'Ölüm'));
+          String? degisim;
+          final onceki = yil[y - 1];
+          if (onceki != null) {
+            final ortak = aylarY.intersection(onceki.map((x) => x.ay).toSet());
+            final a = top(l.where((x) => ortak.contains(x.ay)));
+            final b = top(onceki.where((x) => ortak.contains(x.ay)));
+            if (ortak.isNotEmpty && b > 0) {
+              final f = (a - b) / b * 100;
+              degisim = '${y - 1} aynı aylara göre ${f >= 0 ? '+' : ''}${f.toStringAsFixed(0)}% ($a / $b vaka)';
+            }
+          }
+          final enSik = _topla(l, (x) => x.hastalik).entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: ExpansionTile(
+              title: Row(children: [
+                SizedBox(width: 56, child: Text('$y', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+                Expanded(child: _YiginCubuk(dagilim: _topla(l, (x) => x.sonuc), enCok: enCok)),
+                SizedBox(width: 56, child: Text('$t', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700))),
+              ]),
+              subtitle: Text(
+                  [
+                    aralik(aylarY),
+                    '$olum ölüm (%${t == 0 ? 0 : (olum / t * 100).toStringAsFixed(1)})',
+                    if (degisim != null) degisim,
+                    if (enSik.isNotEmpty) 'En sık: ${enSik.take(3).map((e) => '${e.key} ${e.value}').join(', ')}',
+                  ].join(' · '),
+                  style: const TextStyle(fontSize: 12.5)),
+              childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              children: [_HastalikListesi(k: l, sinir: 12)],
+            ),
+          );
+        }),
+    ]);
+  }
 }
 
 class _Lejant extends StatelessWidget {
