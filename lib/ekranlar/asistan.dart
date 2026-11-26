@@ -14,6 +14,7 @@ import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
 import 'mali.dart';
+import 'paylasim.dart';
 import 'sureme.dart';
 import 'tarla.dart';
 import 'toplanti.dart';
@@ -49,6 +50,16 @@ class AsistanEkran extends StatelessWidget {
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => GenelSoruEkran(veri: veri))),
         ),
+        // Paylaşımla açılan uygulamada paylaşım yönetimi gösterilmez.
+        if (VeriDeposu.ben.paylasim == null)
+          _Bolum(
+            ikon: Icons.share_outlined,
+            baslik: 'Tarım ve Hayvancılık Paylaşımı',
+            aciklama: 'İş arkadaşınızla paylaşın: kişiye göre menü seçimi (Ziraat, Hayvancılık, Tarla Haritaları), '
+                'görüntüleme / düzenleme yetkisi, istediğiniz zaman kapatma',
+            renk: Renk.ana,
+            ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PaylasimEkrani())),
+          ),
         _Bolum(
           ikon: Icons.agriculture_outlined,
           baslik: 'ESK – Et ve Süt Kurumu',

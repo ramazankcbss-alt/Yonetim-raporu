@@ -13,7 +13,6 @@ import '../veri/model.dart';
 import '../veri/tarla.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
-import 'paylasim.dart';
 
 /// Tarla Haritası: Google Earth (KMZ) ekiliş haritası; parseller,
 /// alanlar ve tarım icmaliyle (ekim alanları, hasat, günlük faaliyet)
@@ -75,17 +74,11 @@ class _TarlaEkranState extends State<TarlaEkran> {
                         ikon: Icons.add_circle_outline,
                         dokun: () => _yeniSezon(context, hepsi, v),
                       ),
+                    // Paylaşım yönetimi Asistan › Tarım ve Hayvancılık Paylaşımı'na taşındı.
                     if (VeriDeposu.ben.paylasim case final p?)
                       BilgiKutusu(
                           yazi: 'Paylaşılan harita (${p.etiket}) · '
-                              '${p.duzenler ? 'düzenleme yetkisi' : 'yalnızca görüntüleme'}')
-                    else
-                      _MenuKarti(
-                        baslik: 'Paylaşım',
-                        alt: 'İş arkadaşınızla paylaşın: kişiye göre menü seçimi (Ziraat, Hayvancılık, Tarla Haritaları), görüntüleme / düzenleme yetkisi, istediğiniz zaman kapatma',
-                        ikon: Icons.share_outlined,
-                        dokun: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PaylasimEkrani())),
-                      ),
+                              '${p.duzenler ? 'düzenleme yetkisi' : 'yalnızca görüntüleme'}'),
                     _MenuKarti(
                       baslik: 'Yıllara göre ekim karşılaştırması',
                       alt: '${hepsi.map((x) => x.sezon).join(' · ')} — çiftlik ve ürün alanları, parsel geçmişi',
