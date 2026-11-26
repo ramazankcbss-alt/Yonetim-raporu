@@ -119,11 +119,18 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                         onSelectionChanged: _mesgul ? null : (x) => _yap('paylasimYetki', id: p.id, yetki: x.first),
                       ),
                       const SizedBox(height: 6),
-                      const Text('Görebileceği menüler', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+                      const Text('Görebileceği menüler (dokunarak açın / kapatın; yeşil ✓ = görüyor)',
+                          style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
                       Wrap(spacing: 6, children: [
                         for (final m in paylasimMenuAdlari.entries)
                           FilterChip(
                             label: Text(m.value),
+                            showCheckmark: true,
+                            checkmarkColor: Colors.white,
+                            selectedColor: Renk.ana,
+                            labelStyle: TextStyle(
+                                color: p.menuler.contains(m.key) ? Colors.white : Renk.soluk,
+                                fontWeight: p.menuler.contains(m.key) ? FontWeight.w700 : FontWeight.w500),
                             selected: p.menuler.contains(m.key),
                             onSelected: _mesgul
                                 ? null
@@ -247,11 +254,18 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
             onSelectionChanged: (x) => setState(() => _yetki = x.first),
           ),
           const SizedBox(height: 10),
-          const Text('Görebileceği menüler', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+          const Text('Görebileceği menüler (dokunarak açın / kapatın; yeşil ✓ = görüyor)',
+                          style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
           Wrap(spacing: 6, children: [
             for (final m in paylasimMenuAdlari.entries)
               FilterChip(
                 label: Text(m.value),
+                showCheckmark: true,
+                checkmarkColor: Colors.white,
+                selectedColor: Renk.ana,
+                labelStyle: TextStyle(
+                    color: _menuler.contains(m.key) ? Colors.white : Renk.soluk,
+                    fontWeight: _menuler.contains(m.key) ? FontWeight.w700 : FontWeight.w500),
                 selected: _menuler.contains(m.key),
                 onSelected: (x) => setState(() => x ? _menuler.add(m.key) : _menuler.remove(m.key)),
               ),
