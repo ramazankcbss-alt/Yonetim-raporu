@@ -73,17 +73,59 @@ var UYGULAMA_DOSYALARI_ = {
 };
 var TARLA_DOSYALARI_ = ['tarla_2025_2026', 'tarla_2024_2025', 'tarla_2026_2027'];
 
+/** Önbellek değeri 100 KB ile sınırlı: büyük metinler 90.000 karakterlik parçalar hâlinde tutulur. */
+function parcaliYaz_(cache, k, m) {
+  try {
+    var o = {}, n = Math.ceil(m.length / 90000);
+    if (n > 20) return;
+    for (var i = 0; i < n; i++) o[k + '_' + i] = m.substr(i * 90000, 90000);
+    o[k + '_n'] = String(n);
+    cache.putAll(o, 21600);
+  } catch (e) {}
+}
+function parcaliOku_(cache, k) {
+  try {
+    var n = +cache.get(k + '_n');
+    if (!n) return null;
+    var ad = [];
+    for (var i = 0; i < n; i++) ad.push(k + '_' + i);
+    var o = cache.getAll(ad), l = [];
+    for (var j = 0; j < n; j++) { if (o[ad[j]] == null) return null; l.push(o[ad[j]]); }
+    return l.join('');
+  } catch (e) { return null; }
+}
+
+/** Hastalık arşivinin güncel dosyası: bu adla kayıtlı en yeni dosya (yeni sürüm yüklenince
+ *  Kod.gs değiştirilmeden kullanılır); bulunamazsa VET_ARSIV_ID. Kimlik 10 dakika önbellekte. */
+var VET_ARSIV_ADI_ = 'Veteriner Paneli – hastalık arşivi (Yönetim Raporu, silmeyin).json';
+function vetArsivId_() {
+  var cache = CacheService.getScriptCache(), id = null;
+  try { id = cache.get('vet_arsiv_id'); } catch (e) {}
+  if (id) return id;
+  id = VET_ARSIV_ID;
+  try {
+    var it = DriveApp.getFilesByName(VET_ARSIV_ADI_), en = null;
+    while (it.hasNext()) {
+      var f = it.next();
+      if (f.isTrashed() || f.getOwner() && f.getOwner().getEmail() !== Session.getEffectiveUser().getEmail()) continue;
+      if (!en || f.getDateCreated() > en.getDateCreated()) en = f;
+    }
+    if (en) id = en.getId();
+  } catch (e) {}
+  try { cache.put('vet_arsiv_id', id, 600); } catch (e) {}
+  return id;
+}
+
 /** {ad: JSON metni}. Dosyalar 6 saat önbellekte tutulur (değişince en geç 6 saatte yenilenir). */
 function uygulamaDosyalari_(adlar) {
   var o = {}, cache = CacheService.getScriptCache();
   adlar.forEach(function (ad) {
-    var id = ad === 'hastalik' ? VET_ARSIV_ID : UYGULAMA_DOSYALARI_[ad];
+    var id = ad === 'hastalik' ? vetArsivId_() : UYGULAMA_DOSYALARI_[ad];
     if (!id) return;
-    var k = 'dosya_' + ad + '_' + id, m = null;
-    try { m = cache.get(k); } catch (e) { m = null; }
+    var k = 'dosya_' + ad + '_' + id, m = parcaliOku_(cache, k);
     if (!m) {
       try { m = DriveApp.getFileById(id).getBlob().getDataAsString('UTF-8'); } catch (e) { m = null; }
-      if (m && m.length < 95000) { try { cache.put(k, m, 21600); } catch (e) {} }
+      if (m) parcaliYaz_(cache, k, m);
     }
     if (m) o[ad] = m;
   });
@@ -2402,7 +2444,7 @@ function detayGecmisiAl() {
 // "Veteriner Paneli – sayfa (…).html" ve "Veteriner Paneli – hastalık arşivi (…).json".
 // Kaynakları depoda: apps_script/Veteriner.html ve assets/veri/hastalik.json.
 var VET_HTML_ID = '14izW3rxYQvhXV668iD_McdEcds4VvTs8';
-var VET_ARSIV_ID = '13m3kHW6whr56GRcgSZiMsyB00bCaXJRT'; // 23.11.2026: yalnızca Drive Sağlık Raporları (araclar/hastalik/olustur.py)
+var VET_ARSIV_ID = '1pqRQEViMwHcoGC_X0MizSsB6kfd6_BAz'; // 26.11.2026: Drive Sağlık Raporları, günlük kırılımlı (araclar/hastalik/olustur.py)
 
 // Panel durumu (20.11.2026): Komut dosyası özelliği VET_PANEL = 'acik' ise
 // açıktır; tanımlı değilse kapalı kabul edilir. Uygulamadaki anahtarla
@@ -2567,12 +2609,14 @@ function vetVeri(kod) {
 /** Hastalık arşivi (Drive'daki JSON; 6 saat önbellek). */
 function vetArsiv_() {
   var cache = CacheService.getScriptCache();
-  var m = cache.get('vet_arsiv_v2');
+  var k = 'dosya_hastalik_' + vetArsivId_(), m = parcaliOku_(cache, k);
   if (!m) {
-    m = DriveApp.getFileById(VET_ARSIV_ID).getBlob().getDataAsString('UTF-8');
-    try { cache.put('vet_arsiv_v2', m, 21600); } catch (err) { /* büyükse önbelleğe alınmaz */ }
+    m = DriveApp.getFileById(vetArsivId_()).getBlob().getDataAsString('UTF-8');
+    parcaliYaz_(cache, k, m);
   }
-  return JSON.parse(m);
+  var j = JSON.parse(m);
+  delete j.gunluk; // Veteriner Paneli aylık kaydı kullanır
+  return j;
 }
 
 function vetBildirimleri_(kod) {

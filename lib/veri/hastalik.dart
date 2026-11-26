@@ -5,11 +5,16 @@ import 'dosyalar.dart';
 import 'model.dart';
 
 /// Hastalık dağılımı: ay × çiftlik × cins × hastalık × sonuç (adet).
+/// [gun]: vakanın kaynakta ilk görüldüğü gün; 0 = kaynakta tarih yok (tarihi belirsiz),
+/// null = yalnızca aylık sayı bulunan kayıt (ör. Bilgi Bankası girişi).
 class HastalikKaydi {
-  const HastalikKaydi(this.yil, this.ay, this.ciftlik, this.cins, this.hastalik, this.sonuc, this.adet);
+  const HastalikKaydi(this.yil, this.ay, this.ciftlik, this.cins, this.hastalik, this.sonuc, this.adet, {this.gun});
   final int yil, ay;
   final String ciftlik, cins, hastalik, sonuc;
   final int adet;
+  final int? gun;
+
+  DateTime? get tarih => gun == null || gun == 0 ? null : DateTime(yil, ay, gun!);
 }
 
 const sonuclar = ['Ölüm', 'Tedavi (kalım)', 'Kuru', 'Kesim', 'İmha'];
@@ -20,6 +25,15 @@ List<HastalikKaydi> hastalikJsonCoz(String metin) {
   final j = jsonDecode(metin) as Map<String, dynamic>;
   List<String> l(String k) => (j[k] as List).cast<String>();
   final cf = l('ciftlik'), cins = l('cins'), h = l('hastalik'), s = l('sonuc');
+  // Günlük kırılım varsa o kullanılır; her ayın günlük toplamı aylık kayda eşittir.
+  final g = j['gunluk'];
+  if (g is List && g.isNotEmpty) {
+    return [
+      for (final r in g.cast<List>())
+        HastalikKaydi(r[0] as int, r[1] as int, cf[r[3] as int], cins[r[4] as int], h[r[5] as int], s[r[6] as int], r[7] as int,
+            gun: r[2] as int),
+    ];
+  }
   return [
     for (final r in (j['kayit'] as List).cast<List>())
       HastalikKaydi(r[0] as int, r[1] as int, cf[r[2] as int], cins[r[3] as int], h[r[4] as int], s[r[5] as int], r[6] as int),

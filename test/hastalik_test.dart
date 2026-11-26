@@ -26,4 +26,12 @@ void main() {
     expect(l.any((k) => k.ciftlik == 'Aslım'), isTrue);
     expect(l.any((k) => k.ay == 10), isTrue);
   });
+  test('Günlük kırılımlı arşiv çözülür, gün toplamı aylık sayıya eşittir', () {
+    const j = '{"ciftlik":["A"],"cins":["İnek"],"hastalik":["Mastit"],"sonuc":["Kuru"],'
+        '"kayit":[[2026,3,0,0,0,0,5]],"gunluk":[[2026,3,0,0,0,0,0,1],[2026,3,4,0,0,0,0,4]]}';
+    final l = hastalikJsonCoz(j);
+    expect(l.fold(0, (s, k) => s + k.adet), 5);
+    expect(l.where((k) => k.tarih == null).single.adet, 1);
+    expect(l.where((k) => k.tarih != null).single.tarih, DateTime(2026, 3, 4));
+  });
 }

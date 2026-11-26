@@ -43,11 +43,18 @@ class _HastalikEkranState extends State<HastalikEkran> {
   Widget build(BuildContext context) {
     final h = _hepsi;
     return DefaultTabController(
-      length: 4,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Hastalık Dağılımı'),
-          bottom: const TabBar(tabs: [Tab(text: 'Yıllık'), Tab(text: 'Aylık'), Tab(text: 'Hastalıklar'), Tab(text: 'Tedbirler')]),
+          bottom: const TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
+            Tab(text: 'Günlük'),
+            Tab(text: 'Haftalık'),
+            Tab(text: 'Aylık'),
+            Tab(text: 'Yıllık'),
+            Tab(text: 'Hastalıklar'),
+            Tab(text: 'Tedbirler'),
+          ]),
         ),
         body: h == null
             ? const Center(child: CircularProgressIndicator())
@@ -55,8 +62,10 @@ class _HastalikEkranState extends State<HastalikEkran> {
                 _filtreler(h),
                 Expanded(
                   child: TabBarView(children: [
-                    GonderAlani(konu: 'Hastalık Dağılımı – Yıllık', child: _Yillik(k: _suz(h))),
+                    GonderAlani(konu: 'Hastalık Dağılımı – Günlük', child: _Donemsel(k: _suz(h), haftalik: false)),
+                    GonderAlani(konu: 'Hastalık Dağılımı – Haftalık', child: _Donemsel(k: _suz(h), haftalik: true)),
                     GonderAlani(konu: 'Hastalık Dağılımı – Aylık', child: _Aylik(k: _suz(h))),
+                    GonderAlani(konu: 'Hastalık Dağılımı – Yıllık', child: _Yillik(k: _suz(h))),
                     GonderAlani(konu: 'Hastalık Dağılımı – Hastalıklar', child: _Hastaliklar(k: _suz(h))),
                     GonderAlani(konu: 'Hastalık Dağılımı – Tedbirler', child: _Tedbirler(k: _suz(h))),
                   ]),
@@ -208,6 +217,152 @@ class _YilAy extends StatelessWidget {
       satirlar.add(ay(y, a % 100, donem[a]!, enCok));
     }
     return ListView(padding: const EdgeInsets.all(12), children: satirlar);
+  }
+}
+
+/// Günlük / haftalık dağılım. Tarih, vakanın kaynak listede ilk görüldüğü gündür.
+/// Kaynağında gün bulunmayan vakalar ("tarihi belirsiz") ve yalnızca aylık sayısı
+/// girilmiş dönemler bu görünümde yer almaz; sayıları üstte ayrıca belirtilir.
+class _Donemsel extends StatelessWidget {
+  const _Donemsel({required this.k, required this.haftalik});
+  final List<HastalikKaydi> k;
+  final bool haftalik;
+
+  static DateTime _haftaBasi(DateTime t) => t.subtract(Duration(days: t.weekday - 1));
+
+  String _etiket(DateTime t) {
+    if (!haftalik) {
+      const gunler = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+      return '${t.day} ${aylar[t.month - 1]} ${t.year}, ${gunler[t.weekday - 1]}';
+    }
+    final b = t.add(const Duration(days: 6));
+    final bas = b.month == t.month ? '${t.day}' : b.year == t.year ? '${t.day} ${aylar[t.month - 1]}' : '${t.day} ${aylar[t.month - 1]} ${t.year}';
+    return '$bas – ${b.day} ${aylar[b.month - 1]} ${b.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final donem = <DateTime, List<HastalikKaydi>>{};
+    var belirsiz = 0, aylik = 0;
+    final aylikDonem = <String>{};
+    for (final x in k) {
+      final t = x.tarih;
+      if (t == null) {
+        if (x.gun == 0) {
+          belirsiz += x.adet;
+        } else {
+          aylik += x.adet;
+          aylikDonem.add('${aylar[x.ay - 1]} ${x.yil}');
+        }
+        continue;
+      }
+      donem.putIfAbsent(haftalik ? _haftaBasi(t) : t, () => []).add(x);
+    }
+    final anahtar = donem.keys.toList()..sort((a, b) => b.compareTo(a));
+    int top(Iterable<HastalikKaydi> l) => l.fold(0, (s, x) => s + x.adet);
+    final toplam = {for (final a in anahtar) a: top(donem[a]!)};
+    final enCok = toplam.isEmpty ? 0 : toplam.values.reduce((a, b) => a > b ? a : b);
+
+    final ust = <Widget>[
+      const _Lejant(),
+      const SizedBox(height: 4),
+      Text(
+          haftalik
+              ? 'Haftalar pazartesi–pazar olarak gruplanır. Tarih, vakanın kaynak listede ilk görüldüğü gündür; '
+                  'aynı hayvanın aynı ay içindeki aynı hastalığı tek vaka sayılır.'
+              : 'Tarih, vakanın kaynak listede ilk görüldüğü gündür; aynı hayvanın aynı ay içindeki aynı hastalığı tek vaka sayılır.',
+          style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+      if (belirsiz > 0 || aylik > 0)
+        Container(
+          margin: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: Renk.amberAcik, borderRadius: BorderRadius.circular(8)),
+          child: Text(
+              [
+                if (belirsiz > 0) 'Tarihi belirsiz: $belirsiz vaka (kaynakta gün bilgisi yok; aylık ve yıllık toplamlarda yer alır).',
+                if (aylik > 0)
+                  'Yalnızca aylık veri: $aylik vaka (${aylikDonem.take(4).join(', ')}${aylikDonem.length > 4 ? ' …' : ''}; Bilgi Bankası girişi).',
+              ].join('\n'),
+              style: const TextStyle(fontSize: 12)),
+        ),
+      const SizedBox(height: 8),
+    ];
+    if (anahtar.isEmpty) {
+      return ListView(padding: const EdgeInsets.all(12), children: [
+        ...ust,
+        const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Bu seçimde tarihli kayıt yok'))),
+      ]);
+    }
+    // Başlık: günlükte ay, haftalıkta yıl.
+    final ogeler = <Object>[];
+    int? onceki;
+    for (final a in anahtar) {
+      final g = haftalik ? a.year : a.year * 100 + a.month;
+      if (g != onceki) {
+        ogeler.add(g);
+        onceki = g;
+      }
+      ogeler.add(a);
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: ust.length + ogeler.length,
+      itemBuilder: (context, i) {
+        if (i < ust.length) return ust[i];
+        final o = ogeler[i - ust.length];
+        if (o is int) {
+          final grup = anahtar.where((a) => haftalik ? a.year == o : a.year * 100 + a.month == o);
+          final t = grup.fold(0, (s, a) => s + toplam[a]!);
+          final ol = grup.fold(0, (s, a) => s + top(donem[a]!.where((x) => x.sonuc == 'Ölüm')));
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+            child: Row(children: [
+              Text(haftalik ? '$o' : '${aylar[o % 100 - 1]} ${o ~/ 100}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text('$t tarihli vaka · $ol ölüm · ${grup.length} ${haftalik ? 'hafta' : 'gün'}',
+                    style: const TextStyle(color: Renk.soluk, fontSize: 13)),
+              ),
+            ]),
+          );
+        }
+        final a = o as DateTime;
+        final l = donem[a]!;
+        final t = toplam[a]!;
+        final cf = _topla(l, (x) => x.ciftlik).entries.toList()..sort((x, y) => y.value.compareTo(x.value));
+        final hs = _topla(l, (x) => x.hastalik).entries.toList()..sort((x, y) => y.value.compareTo(x.value));
+        String? degisim;
+        if (haftalik) {
+          final onc = toplam[a.subtract(const Duration(days: 7))] ?? 0;
+          if (onc > 0) {
+            final f = (t - onc) / onc * 100;
+            degisim = 'Önceki hafta $onc (${f >= 0 ? '+' : ''}${f.toStringAsFixed(0)}%)';
+          }
+        }
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: ExpansionTile(
+            title: Row(children: [
+              Expanded(flex: 5, child: Text(_etiket(a), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+              Expanded(flex: 3, child: _YiginCubuk(dagilim: _topla(l, (x) => x.sonuc), enCok: enCok)),
+              SizedBox(width: 40, child: Text('$t', textAlign: TextAlign.right, style: const TextStyle(fontWeight: FontWeight.w700))),
+            ]),
+            subtitle: Text(
+                [
+                  cf.map((e) => '${e.key} ${e.value}').join(', '),
+                  if (degisim != null) degisim,
+                  'En sık: ${hs.take(3).map((e) => '${e.key} ${e.value}').join(', ')}',
+                ].join(' · '),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12)),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            children: [_HastalikListesi(k: l)],
+          ),
+        );
+      },
+    );
   }
 }
 

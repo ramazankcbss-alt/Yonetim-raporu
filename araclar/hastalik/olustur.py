@@ -8,8 +8,13 @@ Klasördeki dosyalar şu adlarla beklenir (Drive'dan .xlsx olarak indirilir):
   aslim_<yıl>, pangev_<yıl>
 Eksik dosya atlanır.
 
-KVKK: Çıktıda yalnızca yıl, ay, çiftlik, hayvan cinsi, hastalık grubu, sonuç ve
-adet bulunur. Küpe/tasma numaraları yalnızca aynı vakayı tekrar saymamak için
+KVKK: Çıktıda yalnızca yıl, ay, (gün,) çiftlik, hayvan cinsi, hastalık grubu, sonuç ve
+adet bulunur.
+
+Çıktı: "kayit" aylık sayımdır; "gunluk" aynı sayımın vakanın kaynakta ilk görüldüğü
+güne göre kırılımıdır (gün 0 = kaynakta tarih yok). Her ayın günlük toplamı aylık
+sayıya eşittir. Revir listelerinde gün, "GG.AA.YYYY REVİR …" gün başlığından; buzağılık
+listelerinde ilk sütundaki tarihten; diğer listelerde satır tarihinden alınır. Küpe/tasma numaraları yalnızca aynı vakayı tekrar saymamak için
 bellekte kullanılır; personel, veteriner ve eksper adları hiç okunmaz.
 
 Sayım birimi "vaka"dır:
@@ -166,9 +171,10 @@ def sutun(h, *adlar):
 class Arsiv:
     def __init__(self):
         self.say = {}
+        self.gun = {}
         self.vaka = set()
 
-    def ekle(self, yil, ay, ciftlik, cins, hastalik, sonuc, adet=1, anahtar=None):
+    def ekle(self, yil, ay, ciftlik, cins, hastalik, sonuc, adet=1, anahtar=None, gun=None):
         if not yil or not ay or adet <= 0 or yil < 2015:
             return
         if anahtar is not None:
@@ -178,6 +184,11 @@ class Arsiv:
             self.vaka.add(k)
         k = (yil, ay, ciftlik, cins, hastalik, sonuc)
         self.say[k] = self.say.get(k, 0) + adet
+        # Günlük kırılım: vakanın ilk görüldüğü gün. Gün, kaynağın ayıyla uyuşmuyorsa
+        # "tarihi belirsiz" (0) yazılır; aylık sayım hiçbir durumda değişmez.
+        g = gun.day if gun is not None and (gun.year, gun.month) == (yil, ay) else 0
+        kg = k + (g,)
+        self.gun[kg] = self.gun.get(kg, 0) + adet
 
 
 def hucre(r, i):
@@ -196,7 +207,12 @@ def sek_revir(a, yol, yil):
         if bi is None:
             continue
         ct, ck, cte = sutun(h, 'TASMA'), sutun(h, 'KÜPE'), sutun(h, 'TEŞH')
+        gun = tarih(hucre(rows[bi - 1], 0)) if bi > 0 else None
         for r in rows[bi + 1:]:
+            gb = tarih(hucre(r, 0))
+            if gb and hucre(r, ct) in (None, ''):
+                gun = gb
+                continue
             t = hucre(r, cte)
             kim = hucre(r, ct) or hucre(r, ck)
             if t in (None, '') or kim in (None, '') or buyuk(t) == 'TEŞHİS':
@@ -206,7 +222,7 @@ def sek_revir(a, yol, yil):
                 continue
             m = buyuk(t)
             sonuc = 'Kuru' if re.search(r'KÖR|KURUYA|KURU ÇIK|KURUT', m) else 'Tedavi (kalım)'
-            a.ekle(yil, ay, 'Şekersüt', 'İnek', g, sonuc, anahtar=('revir', buyuk(kim)))
+            a.ekle(yil, ay, 'Şekersüt', 'İnek', g, sonuc, anahtar=('revir', buyuk(kim)), gun=gun)
 
 
 # ---- Şekersüt buzağılık tedavi ----
@@ -221,7 +237,11 @@ def sek_buz(a, yol, yil):
         if bi is None:
             continue
         ck, cku, ch = sutun(h, 'KÜPE'), sutun(h, 'KULUBE'), sutun(h, 'HASTALIK')
+        gun = None
         for r in rows[bi + 1:]:
+            gb = tarih(hucre(r, 0))
+            if gb:
+                gun = gb
             t = hucre(r, ch)
             kim = hucre(r, ck) or hucre(r, cku)
             if t in (None, '') or kim in (None, ''):
@@ -229,7 +249,7 @@ def sek_buz(a, yol, yil):
             g = grup(t)
             if g == 'Belirtilmemiş':
                 continue
-            a.ekle(yil, ay, 'Şekersüt', 'Buzağı', g, 'Tedavi (kalım)', anahtar=('buz', buyuk(kim)))
+            a.ekle(yil, ay, 'Şekersüt', 'Buzağı', g, 'Tedavi (kalım)', anahtar=('buz', buyuk(kim)), gun=gun)
 
 
 # ---- Şekersüt doğan ve ölen buzağılar (ölüm bölümü) ----
@@ -249,7 +269,7 @@ def sek_dogol(a, yol, yil):
             if not t or hucre(r, ck) in (None, ''):
                 continue
             a.ekle(t.year, t.month, 'Şekersüt', 'Buzağı', grup(hucre(r, cos)), 'Ölüm',
-                   anahtar=('olum', buyuk(hucre(r, ck))))
+                   anahtar=('olum', buyuk(hucre(r, ck))), gun=t)
 
 
 def cins_grubu(metin, varsayilan='İnek'):
@@ -288,7 +308,7 @@ def fethiye(a, yol):
                 if not t:
                     continue
                 a.ekle(t.year, t.month, 'Şekersüt', cins_grubu(hucre(r, cg), 'Belirtilmemiş'),
-                       grup(hucre(r, cs)), 'Ölüm', anahtar=('olum', buyuk(hucre(r, ck))))
+                       grup(hucre(r, cs)), 'Ölüm', anahtar=('olum', buyuk(hucre(r, ck))), gun=t)
         elif ad.startswith('KESİM'):
             bi, h = baslik_bul(rows, 'KESİM ŞEK', 'HASTALIK')
             if bi is None:
@@ -301,7 +321,7 @@ def fethiye(a, yol):
                     continue
                 sonuc = 'İmha' if 'İMHA' in neden else 'Kesim'
                 a.ekle(t.year, t.month, 'Şekersüt', cins_grubu(hucre(r, cg)), grup(neden), sonuc,
-                       anahtar=('kesim', buyuk(hucre(r, ck))))
+                       anahtar=('kesim', buyuk(hucre(r, ck))), gun=t)
 
 
 # ---- Şekersüt Panagro kesim listeleri (2022-11 … 2023-03): hastalık nedenli kesimler ----
@@ -325,7 +345,7 @@ def sek_kesim(a, yol, yil, ay):
                     continue
                 y, m = (t.year, t.month) if t else (yil, ay)
                 a.ekle(y, m, 'Şekersüt', cins_grubu(hucre(r, cd)), grup(neden), 'Kesim',
-                       anahtar=('kesim', buyuk(hucre(r, ck)) or str(id(r))))
+                       anahtar=('kesim', buyuk(hucre(r, ck)) or str(id(r))), gun=t)
             bi += 1
 
 
@@ -351,7 +371,7 @@ def aslim(a, yol, yil_dosya):
                 if not t:
                     continue
                 neden = hucre(r, co) or hucre(r, ca)
-                a.ekle(t.year, t.month, ciftlik, 'Besi danası', grup(neden), 'Ölüm')
+                a.ekle(t.year, t.month, ciftlik, 'Besi danası', grup(neden), 'Ölüm', gun=t)
         elif ad.startswith('KESİM'):
             bi, h = baslik_bul(rows, 'KESİM TAR')
             if bi is None:
@@ -364,7 +384,7 @@ def aslim(a, yol, yil_dosya):
                 if not t or not re.search(r'ZOR|ACİL|ACIL|SİGORTA|SIGORTA|HASTA', tur):
                     continue
                 a.ekle(t.year, t.month, ciftlik, 'Besi danası', grup(hucre(r, ca)), 'Kesim',
-                       adet_oku(hucre(r, ch)))
+                       adet_oku(hucre(r, ch)), gun=t)
         elif ad.startswith('TEDAVİ'):
             bi, h = baslik_bul(rows, 'TEŞH')
             if bi is None:
@@ -380,7 +400,7 @@ def aslim(a, yol, yil_dosya):
                     if g == 'Belirtilmemiş':
                         continue
                     a.ekle(t.year, t.month, ciftlik, 'Besi danası', g, 'Tedavi (kalım)',
-                           adet_oku(hucre(r, ck)))
+                           adet_oku(hucre(r, ck)), gun=t)
 
 
 # ---- Pangev (Erentepe) ----
@@ -408,7 +428,7 @@ def pangev(a, yol):
                 cins = cins_grubu(str(hucre(r, cg)) + ' ' + buyuk(te))
                 toplu = 'TOPLU' in buyuk(te)
                 a.ekle(t.year, t.month, 'Pangev', cins, g, 'Tedavi (kalım)',
-                       anahtar=('ted', kim + ('|' + str(t) if toplu else '')))
+                       anahtar=('ted', kim + ('|' + str(t) if toplu else '')), gun=t)
         elif ad.startswith('ÖLÜM'):
             bi, h = baslik_bul(rows, 'TARİH', 'AÇIKLAMA')
             if bi is None:
@@ -419,7 +439,7 @@ def pangev(a, yol):
                 if not t:
                     continue
                 cins = cins_grubu(str(hucre(r, ck)) + ' ' + str(hucre(r, cc)))
-                a.ekle(t.year, t.month, 'Pangev', cins, grup(hucre(r, ca)), 'Ölüm')
+                a.ekle(t.year, t.month, 'Pangev', cins, grup(hucre(r, ca)), 'Ölüm', gun=t)
         elif ad.startswith('KESİM'):
             bi, h = baslik_bul(rows, 'TARİH', 'AÇIKLAMA')
             if bi is None:
@@ -430,7 +450,7 @@ def pangev(a, yol):
                 neden = buyuk(hucre(r, ca))
                 if not t or (neden and NORMAL_KESIM.search(neden)):
                     continue
-                a.ekle(t.year, t.month, 'Pangev', cins_grubu(hucre(r, ck)), grup(neden), 'Kesim')
+                a.ekle(t.year, t.month, 'Pangev', cins_grubu(hucre(r, ck)), grup(neden), 'Kesim', gun=t)
 
 
 def main(klasor, cikti):
@@ -460,7 +480,11 @@ def main(klasor, cikti):
     idx = {alan: {v: n for n, v in enumerate(l)} for alan, l in listeler.items()}
     kayit = [[k[0], k[1], idx['ciftlik'][k[2]], idx['cins'][k[3]], idx['hastalik'][k[4]],
               idx['sonuc'][k[5]], v] for k, v in sorted(say.items())]
-    j = dict(listeler, kayit=kayit,
+    # gunluk: [yıl, ay, gün (0 = tarihi belirsiz), çiftlik, cins, hastalık, sonuç, adet];
+    # her ayın günlük toplamı "kayit"taki aylık sayıya eşittir.
+    gunluk = [[k[0], k[1], k[6], idx['ciftlik'][k[2]], idx['cins'][k[3]], idx['hastalik'][k[4]],
+               idx['sonuc'][k[5]], v] for k, v in sorted(a.gun.items()) if k[:6] in say]
+    j = dict(listeler, kayit=kayit, gunluk=gunluk,
              kaynak='Drive › SAĞLIK RAPORLARI: Şekersüt revir-fresh, buzağılık tedavi, doğan ve ölen '
                     'buzağılar, Panagro kesim listeleri (Kas 2022–Mar 2023), 2026 Fethiye ölüm/kesim listeleri; Aslım ve Pangev veteriner '
                     'uygulamaları. Mesaj/sohbet kaynağı yok.',
