@@ -71,6 +71,8 @@ void main() {
       await t.tap(find.text('Hayvancılık'));
       await t.pumpAndSettle();
 
+      // İşletme Raporları paneli eklendiği için besi tablosu aşağıda kalır.
+      await t.scrollUntilVisible(find.text('Besi Planı ve Kesim'), 300, scrollable: find.byType(Scrollable).first);
       expect(find.text('Besi Planı ve Kesim'), findsOneWidget);
       expect(find.text('Ekim Alanları (dekar)'), findsNothing);
     });
