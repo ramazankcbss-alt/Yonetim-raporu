@@ -1327,7 +1327,9 @@ function tarimVerisiOku(r) {
       kesilenDana: tn(x, 10), inekOlum: tn(x, 11), gencOlum: tn(x, 13), yavruAtma: tn(x, 14), olenDana: tn(x, 15), alinan: tn(x, 16) }; }).filter(Boolean)
     .sort(function (a, b) { return a.t < b.t ? -1 : a.t > b.t ? 1 : 0; });
   T.gunluk = (r.gunluk || []).map(function (x) { var t = tg(x[0]); if (!t) return null;
-    return { t: t, toplamHayvan: tn(x, 1) + tn(x, 7), sagmal: tn(x, 2) + tn(x, 8), sut: tn(x, 5) + tn(x, 11), satilan: tn(x, 6) + tn(x, 12) }; }).filter(Boolean)
+    function suru(i) { return { toplam: tn(x, i), sagmal: tn(x, i + 1), kuruGebe: tn(x, i + 2), erkek: tn(x, i + 3), sut: tn(x, i + 4), satilan: tn(x, i + 5) }; }
+    var f = suru(1), e = suru(7);
+    return { t: t, f: f, e: e, toplamHayvan: f.toplam + e.toplam, sagmal: f.sagmal + e.sagmal, sut: f.sut + e.sut, satilan: f.satilan + e.satilan }; }).filter(Boolean)
     .sort(function (a, b) { return a.t < b.t ? -1 : a.t > b.t ? 1 : 0; });
   T.detay = (r.detay || []).map(function (x) { var t = tg(x[0]), d = tSayiOku(x[4]);
     if (!t || d == null || !String(x[1] || '').trim() || !String(x[3] || '').trim() || /\/\s*(topl|hay)/i.test(String(x[3]))) return null;
@@ -1421,11 +1423,13 @@ function gostergeler(bas, gunlukMu) {
     r.sut = ozVar ? oz.toplam.sut : g && g.sut; r.ortVerim = (r.sagilan || 0) > 0 && r.sut != null ? r.sut / r.sagilan : null;
     r.eskBesiHayvan = eskGunSonuHayvan(bas); if (r.eskBesiHayvan == null && ozVar && esk) r.eskBesiHayvan = esk.hayvan;
     r.eskGelen = ozVar || eskGunSonuHayvan(bas) != null ? eskGelenToplam(bas, bas) : null;
+    r.satilan = g ? g.satilan : null;
   } else {
     var sut = gunler.length ? gunler.reduce(function (a, x) { return a + x.sut; }, 0) : null, sagGun = gunler.reduce(function (a, x) { return a + x.sagmal; }, 0);
     r.toplamHayvan = sonG ? sonG.toplamHayvan : ozVar ? oz.toplam.hayvan : null; r.sagilan = sonG ? sonG.sagmal : ozVar ? oz.toplam.sagilan : null;
     r.sut = sut; r.ortVerim = sagGun > 0 && sut != null ? sut / sagGun : null;
     r.eskBesiHayvan = ozVar && esk ? esk.hayvan : null; r.eskGelen = ozVar ? eskGelenToplam(bas, son) : null;
+    r.satilan = gunler.length ? gunler.reduce(function (a, x) { return a + x.satilan; }, 0) : null;
   }
   ['dogan', 'kesilenDana', 'kesimSatis', 'yavruAtma', 'inekOlum', 'gencOlum', 'olenDana'].forEach(function (k) { r[k] = ozVar ? oz.toplam[k] : null; });
   r.olenBuzagi = ozVar ? oz.toplam.buzagiOlum : null;
@@ -1439,8 +1443,91 @@ function gostergeler(bas, gunlukMu) {
     r.kayipAyrinti = p.length ? p.join(' · ') : 'Kayıp yok';
   }
   r.eskVar = r.eskBesiHayvan != null || r.eskKesilen != null || r.eskGelen != null;
-  r.oz = oz; r.son = son;
+  r.oz = oz; r.son = son; r.gunler = gunler;
   return r;
+}
+
+// ---- işletme raporları (uygulamadaki "İşletme Raporları" paneli) ----
+var BOLUM_ADLARI = { 'hayvan sayisi': 'Hayvan Sayıları', 'hayvan sayısı': 'Hayvan Sayıları', 'sut (lt)': 'Süt Üretimi (lt)', 'sut (kg)': 'Süt Üretimi (kg)',
+  'ort.sut verimi': 'Ortalama Süt Verimi', 'lt': 'Süt Dağılımı (lt)', 'kg': 'Süt Dağılımı (kg)', 'suruden cikanlar': 'Sürüden Çıkanlar', 'sürüden çıkanlar': 'Sürüden Çıkanlar',
+  'disiler': 'Dişi Hayvanlar', 'dişiler': 'Dişi Hayvanlar', 'erkekler': 'Erkek Hayvanlar', 'aslım çiftliği': 'Sürü Yapısı', 'taşağıl çiftliği': 'Sürü Yapısı' };
+(function () {
+  var e = { 'toplam hayv.say.': 'Toplam hayvan', 'sagılan hay.say.': 'Sağılan hayvan', 'sagilan hay.say.': 'Sağılan hayvan', 'sagilan hayvan sayisi': 'Sağılan hayvan',
+    'buzag.ver.mama': 'Buzağıya verilen mama', 'buzag.ver.süt': 'Buzağıya verilen süt', 'buzag.ver.sut': 'Buzağıya verilen süt', 'buzag.ver.kolostrum': 'Buzağıya verilen kolostrum',
+    'dokulen kolostrum': 'Dökülen kolostrum', 'antibiyot.sut': 'Antibiyotikli süt', 'ant tank': 'Antibiyotik tankı', 'satilan sut': 'Satılan süt', 'satilan sut (kg)': 'Satılan süt (kg)',
+    'sagilan sut': 'Sağılan süt', 'sagilan': 'Sağılan' };
+  for (var k in e) ETIKETLER[k] = e[k];
+  var w = { yuksek: 'yüksek', dusuk: 'düşük', bugun: 'bugün', bos: 'boş', 'dısardan': 'dışarıdan', 'dışardan': 'dışarıdan', sutten: 'sütten', cikan: 'çıkan', satilan: 'satılan' };
+  for (var k2 in w) KELIMELER[k2] = w[k2];
+})();
+function buyukIlk(n) { return n ? (n[0] === 'i' ? 'İ' : n[0].toUpperCase()) + n.slice(1) : n; }
+function bolumAdi(b) { var n = tKucuk(b); return BOLUM_ADLARI[n] || buyukIlk(n.split(' ').map(function (x) { return KELIMELER[x] || x; }).join(' ')); }
+function detayTuru(b0, g0) {
+  var b = tKucuk(b0), g = tKucuk(g0);
+  if (b.indexOf('ort') >= 0 || g.indexOf('ort.') >= 0 || g.indexOf('süt ort') === 0) return 'ortalama';
+  if (cikisMi(b0) || b.indexOf('sut (') === 0 || b.indexOf('süt (') === 0 || b === 'lt' || b === 'kg' || girisMi(g0) ||
+    tIcerir(g, ['kesilen', 'ölen', 'olen', 'giden', 'satılan', 'satilan'])) return 'toplam';
+  return 'sonGun';
+}
+function detayGunleri(isl, bas, son) { return tUniq(T.detay.filter(function (d) { return d.isletme === isl && arada(d.t, bas, son); }).map(function (d) { return d.t; })).reverse(); }
+function isletmeDetayi(isl, bas, son) {
+  var gunler = detayGunleri(isl, bas, son); if (!gunler.length) return [];
+  var sonGun = gunler[gunler.length - 1], sira = [], bilgi = {}, toplam = {}, adet = {}, sonD = {};
+  T.detay.forEach(function (d) {
+    if (d.isletme !== isl || !arada(d.t, bas, son)) return;
+    var k = tKucuk(d.bolum) + '|' + tKucuk(d.gosterge);
+    if (!bilgi[k]) { bilgi[k] = [d.bolum, d.gosterge]; sira.push(k); }
+    toplam[k] = (toplam[k] || 0) + d.deger; adet[k] = (adet[k] || 0) + 1; if (d.t === sonGun) sonD[k] = d.deger;
+  });
+  var bolumler = {}, bsira = [];
+  sira.forEach(function (k) {
+    var b = bilgi[k][0], g = bilgi[k][1], tur = detayTuru(b, g);
+    var deger = tur === 'toplam' ? toplam[k] : tur === 'sonGun' ? (sonD[k] || 0) : toplam[k] / adet[k];
+    if (deger === 0) return;
+    var ad = bolumAdi(b), key = ad + '|' + tur;
+    if (!bolumler[key]) { bolumler[key] = { ad: ad, tur: tur, satirlar: [] }; bsira.push(key); }
+    bolumler[key].satirlar.push([gostergeAdi(g), deger]);
+  });
+  return { gunler: gunler, bolumler: bsira.map(function (k) { return bolumler[k]; }) };
+}
+var TS_ISL = DETAY_ISLETMELERI[0];
+function isletmeRaporlari(bas, son) {
+  var tekGun = bas === son, x = isletmeDetayi(TS_ISL, bas, son);
+  var h = '<h3>İşletme Raporları</h3><div class="kart"><div class="cipler">' + DETAY_ISLETMELERI.map(function (i) {
+    return '<span class="cip' + (i === TS_ISL ? ' secili' : '') + '" onclick="TS_ISL=' + js(i) + ';ciz()">' + esc(i.replace(' Çiftliği', '').replace(' Şube', '')) + '</span>'; }).join('') + '</div>';
+  if (!x.bolumler || !x.bolumler.length) return h + '<div style="color:var(--soluk);padding:8px 2px">Bu dönem için işletme raporu verisi yok.</div></div>';
+  var g = x.gunler, kis = function (t) { return tarihKisa(t).slice(0, 5); };
+  h += '<div class="ipucu">' + (tekGun ? 'Kaynak: işletme günlük raporu, ' + tarihKisa(g[g.length - 1]) :
+    'Kaynak: işletme günlük raporları, ' + g.length + ' gün (' + kis(g[0]) + ' – ' + kis(g[g.length - 1]) + '). Hareketler dönem toplamı, hayvan sayıları ' + kis(g[g.length - 1]) + ' itibarıyla.') + '</div>';
+  x.bolumler.forEach(function (b) {
+    var ack = { toplam: 'dönem toplamı', sonGun: 'son veri günü', ortalama: 'günlük ortalama' }[b.tur];
+    h += '<div style="font-weight:700;font-size:13.5px;margin:12px 0 4px;color:' + (b.ad === 'Sürüden Çıkanlar' ? '#ea580c' : '#0f172a') + '">' +
+      esc(tekGun || b.tur === 'sonGun' ? b.ad : b.ad + ' (' + ack + ')') + '</div><table>' +
+      b.satirlar.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td class="sag">' + ts(r[1], r[1] === Math.round(r[1]) ? 0 : 1) + '</td></tr>'; }).join('') + '</table>';
+  });
+  return h + '</div>';
+}
+function fark(v, ond) { var y = ond ? v : Math.round(v); if (Math.abs(y) < (ond ? 0.005 : 0.5)) return '—'; return (y > 0 ? '+' : '-') + ts(Math.abs(y), ond); }
+function suruTablosu(ilk, son, e1, e2) {
+  var bos = { toplam: 0, sagmal: 0, kuruGebe: 0, erkek: 0, sut: 0, satilan: 0 };
+  var fi = ilk ? ilk.f : bos, fs = son ? son.f : bos, ei = ilk ? ilk.e : bos, es = son ? son.e : bos;
+  function ort(s) { return s.sagmal > 0 ? s.sut / s.sagmal : 0; }
+  function satir(ad, f, ond) {
+    function d(x, g) { return g ? ts(f(x), ond) : '—'; } function fk(a, b) { return ilk && son ? fark(f(b) - f(a), ond) : '—'; }
+    return [ad, d(fi, ilk), d(fs, son), fk(fi, fs), d(ei, ilk), d(es, son), fk(ei, es)];
+  }
+  return tablo(['Gösterge', 'Fethiye ' + e1, 'Fethiye ' + e2, 'Fark', 'Erentepe ' + e1, 'Erentepe ' + e2, 'Fark'], [
+    satir('Toplam hayvan', function (s) { return s.toplam; }), satir('Sağmal', function (s) { return s.sagmal; }), satir('Kuru gebe', function (s) { return s.kuruGebe; }),
+    satir('Erkek', function (s) { return s.erkek; }), satir('Sağılan süt (kg)', function (s) { return s.sut; }), satir('Süt ortalaması (kg)', ort, 2),
+    satir('Satılan süt (kg)', function (s) { return s.satilan; })]);
+}
+function gunlukSutTablosu(gunler) {
+  var GK = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+  var r = gunler.map(function (g) { return [tarihKisa(g.t) + ' ' + GK[tDate(g.t).getDay()], ts(g.f.sut), ts(g.e.sut), ts(g.sut), ts(g.sagmal), g.sagmal > 0 ? ts(g.sut / g.sagmal, 1) : '—', ts(g.satilan)]; });
+  var t = function (f) { return gunler.reduce(function (a, g) { return a + f(g); }, 0); }, sag = t(function (g) { return g.sagmal; });
+  r.push(['Hafta Toplamı', ts(t(function (g) { return g.f.sut; })), ts(t(function (g) { return g.e.sut; })), ts(t(function (g) { return g.sut; })), ts(sag),
+    sag > 0 ? ts(t(function (g) { return g.sut; }) / sag, 1) : '—', ts(t(function (g) { return g.satilan; }))]);
+  return tablo(['Tarih', 'Fethiye Süt', 'Erentepe Süt', 'Toplam Süt', 'Sağmal', 'Ort. Verim', 'Satılan'], r, true);
 }
 
 // ---- görünüm ----
@@ -1497,6 +1584,7 @@ function hayvancilikEkrani() {
   if (oz.ozetGunu == null) h += '<div class="bilgi" style="background:#fffbeb;border-color:#fde68a">Bu ' + (TS.gunluk ? 'gün' : 'hafta') + ' için işletme özeti yok; kartlarda yalnızca günlük süt verisi bulunan değerler gösterilir.</div>';
   h += '<h3>Çiftliklerimiz</h3><div class="gizgara">' + gKart('Toplam Hayvan', ts(g.toplamHayvan)) + gKart('Sağılan Hayvan', ts(g.sagilan), '', '#1d4ed8') +
     gKart(TS.gunluk ? 'Günlük Süt' : 'Haftalık Süt', g.sut == null ? '—' : ts(g.sut) + ' kg', g.ortVerim == null ? '' : 'Ort. ' + ts(g.ortVerim, 1) + ' kg/baş/gün', '#1d4ed8') +
+    gKart('Satılan Süt', g.satilan == null ? '—' : ts(g.satilan) + ' kg', 'Fethiye + Erentepe', '#1d4ed8') +
     gKart('Doğan Buzağı', ts(g.dogan), g.olenBuzagi == null ? '' : 'Ölen buzağı: ' + ts(g.olenBuzagi), '#15803D') +
     gKart('Hayvan Kayıpları', ts(ko ? ko.toplam : g.kayip), ko ? ko.aciklama : g.kayipAyrinti, '#ea580c') +
     gKart('Kesilen Dana', ts(g.kesilenDana), '', '#ea580c') + gKart('İnek/Düve Kesim-Satış', ts(g.kesimSatis), '', '#ea580c') + '</div>';
@@ -1508,11 +1596,25 @@ function hayvancilikEkrani() {
       (g.eskSonGelen && !(g.eskGelen > 0) ? gKart('Son Gelen Hayvan', ts(g.eskSonGelen.adet), tarihKisa(g.eskSonGelen.t), '#15803D') : '') +
       (g.eskOlenDana > 0 ? gKart('Ölen Dana', ts(g.eskOlenDana), '', '#ea580c') : '') + '</div>';
   }
-  h += '<h3>İşletme Bazlı Canlı Hayvan</h3>';
+  if (!TS.gunluk) h += '<h3>Günlük Süt Üretimi (kg)</h3>' + (g.gunler.length ? gunlukSutTablosu(g.gunler) : '<div class="kart">Bu hafta için günlük süt verisi yok.</div>');
+  h += isletmeRaporlari(bas, son);
+  h += '<h3>İşletme Bazlı Canlı Hayvan</h3>' + (oz.ozetGunu == null ? '' : '<div class="ipucu" style="margin:-4px 2px 6px">' +
+    (TS.gunluk ? 'Kaynak: ' + tarihKisa(oz.ozetGunu) + ' işletme özeti.' : 'Hayvan ve sağılan: ' + tarihKisa(oz.ozetGunu) + '. Süt ve olaylar: hafta toplamı.') + '</div>');
   if (oz.ozetGunu == null) h += '<div class="kart">İşletme özeti verisi yok.</div>';
   else h += tablo(['İşletme', 'Hayvan', 'Sağılan', 'Süt (kg)', 'Ort. Verim', 'İnek/Düve Kesim-Satış', 'Buzağı Ölümü', 'Yavru Atma/Ölü Doğum', 'İnek/Genç Ölüm', 'Kesilen Dana'],
     oz.satirlar.concat([oz.toplam]).map(function (s) { var v = ortVerim(s);
       return [s.ad, tsT(s.hayvan), tsT(s.sagilan), tsT(s.sut), v > 0 ? ts(v, 1) : '—', tsT(s.kesimSatis), tsT(s.buzagiOlum), tsT(s.yavruAtma), tsT(s.inekOlum + s.gencOlum), tsT(s.kesilenDana)]; }), true);
+  if (TS.gunluk) {
+    var bugun = T.gunluk.filter(function (x) { return x.t === bas; })[0] || null, onceki = null;
+    T.gunluk.forEach(function (x) { if (x.t < bas) onceki = x; });
+    h += '<h3>Süt Sığırı — Fethiye / Erentepe</h3>' + (!bugun ? '<div class="kart">Bu gün için Fethiye / Erentepe günlük verisi yok.</div>' :
+      '<div class="ipucu" style="margin:-4px 2px 6px">' + (onceki ? 'Önceki veri günü (' + tarihKisa(onceki.t) + ') ile karşılaştırma' : 'Önceki gün verisi yok.') + '</div>' +
+      suruTablosu(onceki, bugun, onceki ? tarihKisa(onceki.t).slice(0, 5) : 'Önceki', tarihKisa(bas).slice(0, 5)));
+  } else {
+    var gl = g.gunler;
+    h += '<h3>Sürü Değişimi — Fethiye / Erentepe</h3>' + (!gl.length ? '<div class="kart">Bu hafta için günlük veri yok.</div>' :
+      suruTablosu(gl[0], gl[gl.length - 1], tarihKisa(gl[0].t).slice(0, 5), tarihKisa(gl[gl.length - 1].t).slice(0, 5)));
+  }
   h += '<h3>Besi Planı ve Kesim</h3>';
   if (!T.besi.length) h += '<div class="kart">Besi planı verisi yok.</div>';
   else { var t = function (k) { return T.besi.reduce(function (a, b) { return a + b[k]; }, 0); };
