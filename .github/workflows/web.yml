@@ -39,13 +39,13 @@ jobs:
       - name: web-yayin dalına koy
         run: |
           cd build/web
+          # Sürüm adı: panel sayfası en son sürümü bu dosyadan öğrenir ve değişmez etiketten yükler
+          echo "w${GITHUB_RUN_NUMBER}" > surum.txt
           git init -q -b web-yayin
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add -A
           git commit -q -m "Web sürümü ${GITHUB_SHA::7} (yalnızca program kodu, veri içermez)"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" web-yayin
-          # jsDelivr önbelleğini yenile: şirket paneli dosyaları @web-yayin adresinden yükler
-          for f in $(find . -type f -not -path './.git/*' | sed 's#^\./##'); do
-            curl -s -o /dev/null "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@web-yayin/$f" || true
-          done
+          git tag "w${GITHUB_RUN_NUMBER}"
+          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" "w${GITHUB_RUN_NUMBER}"

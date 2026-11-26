@@ -1767,21 +1767,25 @@ function tarlaPanel_(anahtar, eski) {
       .setTitle('Tarım ve Hayvancılık').addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
   }
-  var WEB_ADRES = webSurumAdresi_();
-  var html = '<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><base href="' + WEB_ADRES + '" target="_top">' +
+  // Web sürümünün en son sürüm adı (wN) depodaki küçük bir dosyadan tarayıcıda okunur; dosyalar o değişmez
+  // sürümden jsDelivr üzerinden yüklenir. Böylece web sürümü güncellenince Apps Script'i yeniden dağıtmak gerekmez.
+  var yedekLink = paylasimAdresi_() + '?panel=tarla&anahtar=' + encodeURIComponent(pay.anahtar) + '&eski=1';
+  var html = '<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><base target="_top">' +
     '<meta name="robots" content="noindex, nofollow"><title>Tarım ve Hayvancılık</title>' +
     '<style>html,body{margin:0;height:100%;background:#f8fafc;font-family:sans-serif}#yukl{padding:40px;text-align:center;color:#64748b}</style>' +
-    '<script>window.YR_WEB=' + JSON.stringify(WEB_ADRES) + ';var YR_ANAHTAR=' + JSON.stringify(pay.anahtar) + ';' +
+    '<script>var YR_ANAHTAR=' + JSON.stringify(pay.anahtar) + ';' +
     'window.yrSunucu=function(islem,govde){return new Promise(function(ok,hata){google.script.run' +
     '.withSuccessHandler(function(r){ok(String(r));}).withFailureHandler(function(e){hata(e&&e.message?e.message:String(e));})' +
-    '.paylasimSunucu(YR_ANAHTAR,String(islem),String(govde||""));});};</script>' +
-    '<script src="' + WEB_ADRES + 'flutter_bootstrap.js" async onerror="yrYedek()"></script>' +
-    // Web sürümü yüklenemezse (bağlantı, tarayıcı) klasik görünüm bağlantısı gösterilir.
-    '<script>function yrYedek(){var y=document.getElementById("yukl");if(y)y.innerHTML=' +
-    JSON.stringify('Görünüm yüklenemedi. <a target="_top" href="' + paylasimAdresi_() + '?panel=tarla&anahtar=' +
-      encodeURIComponent(pay.anahtar) + '&eski=1">Klasik görünümle açın</a>') + ';}' +
-    'setTimeout(function(){if(document.getElementById("yukl"))yrYedek();},30000);</script></head>' +
-    '<body><div id="yukl">Yükleniyor…</div></body></html>';
+    '.paylasimSunucu(YR_ANAHTAR,String(islem),String(govde||""));});};' +
+    'function yrYedek(){var y=document.getElementById("yukl");if(y)y.innerHTML=' +
+    JSON.stringify('Görünüm yüklenemedi. <a target="_top" href="' + yedekLink + '">Klasik görünümle açın</a>') + ';}' +
+    'setTimeout(function(){if(document.getElementById("yukl"))yrYedek();},40000);' +
+    'fetch("https://raw.githubusercontent.com/' + WEB_DEPO_ + '/web-yayin/surum.txt",{cache:"no-store"})' +
+    '.then(function(r){return r.ok?r.text():"";}).catch(function(){return "";}).then(function(t){' +
+    't=String(t||"").trim();var w="https://cdn.jsdelivr.net/gh/' + WEB_DEPO_ + '@"+(/^w\\d+$/.test(t)?t:"web-yayin")+"/";' +
+    'window.YR_WEB=w;var b=document.querySelector("base");if(b)b.href=w;' +
+    'var s=document.createElement("script");s.src=w+"flutter_bootstrap.js";s.onerror=yrYedek;document.head.appendChild(s);});' +
+    '</script></head><body><div id="yukl">Yükleniyor…</div></body></html>';
   return HtmlService.createHtmlOutput(html)
     .setTitle('Tarım ve Hayvancılık')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
