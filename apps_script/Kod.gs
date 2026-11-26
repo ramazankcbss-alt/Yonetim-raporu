@@ -1762,7 +1762,7 @@ function tarlaPanel_(anahtar, eski) {
         adres + '?panel=tarla&anahtar=' + encodeURIComponent(anahtar) + '">Şirket hesabıyla aç</a></p>' : '';
     return sayfa('<b>Tarım ve Hayvancılık</b><p>Bu panel yalnızca şirket Google hesabıyla (@' + SIRKET_ALANI_ + ') açılır.</p>' + git);
   }
-  if (eski || !webSurumHazir_()) {
+  if (eski) {
     return HtmlService.createHtmlOutput(TARLA_PANEL_HTML_.replace('__ANAHTAR__', JSON.stringify(pay.anahtar)))
       .setTitle('Tarım ve Hayvancılık').addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
@@ -1775,7 +1775,12 @@ function tarlaPanel_(anahtar, eski) {
     'window.yrSunucu=function(islem,govde){return new Promise(function(ok,hata){google.script.run' +
     '.withSuccessHandler(function(r){ok(String(r));}).withFailureHandler(function(e){hata(e&&e.message?e.message:String(e));})' +
     '.paylasimSunucu(YR_ANAHTAR,String(islem),String(govde||""));});};</script>' +
-    '<script src="' + WEB_ADRES + 'flutter_bootstrap.js" async></script></head>' +
+    '<script src="' + WEB_ADRES + 'flutter_bootstrap.js" async onerror="yrYedek()"></script>' +
+    // Web sürümü yüklenemezse (bağlantı, tarayıcı) klasik görünüm bağlantısı gösterilir.
+    '<script>function yrYedek(){var y=document.getElementById("yukl");if(y)y.innerHTML=' +
+    JSON.stringify('Görünüm yüklenemedi. <a target="_top" href="' + paylasimAdresi_() + '?panel=tarla&anahtar=' +
+      encodeURIComponent(pay.anahtar) + '&eski=1">Klasik görünümle açın</a>') + ';}' +
+    'setTimeout(function(){if(document.getElementById("yukl"))yrYedek();},30000);</script></head>' +
     '<body><div id="yukl">Yükleniyor…</div></body></html>';
   return HtmlService.createHtmlOutput(html)
     .setTitle('Tarım ve Hayvancılık')
@@ -1785,19 +1790,12 @@ function tarlaPanel_(anahtar, eski) {
 
 /** Kurulum sonrası bir kez düzenleyicide çalıştırın: web sürümü kontrolü için gereken izni (harici istek) verir. */
 function yetkiVer() {
-  CacheService.getScriptCache().remove('web_surum_hazir');
-  Logger.log('Web sürümü yayında: ' + webSurumHazir_() + ' · Paylaşım adresi: ' + paylasimAdresi_());
-}
-
-/** Web sürümü yayında mı (web-yayin dalı, jsDelivr). Değilse eski panel açılır. Sonuç 10 dakika önbellekte. */
-function webSurumHazir_() {
-  var c = CacheService.getScriptCache(), k = 'web_surum_hazir';
-  var x = c.get(k);
-  if (x) return x === '1';
-  var ok = false, WEB_ADRES = webSurumAdresi_();
-  try { ok = !!WEB_ADRES && UrlFetchApp.fetch(WEB_ADRES + 'flutter_bootstrap.js', { muteHttpExceptions: true }).getResponseCode() === 200; } catch (e) { ok = false; }
-  c.put(k, ok ? '1' : '0', 600);
-  return ok;
+  var durum;
+  try {
+    var r = UrlFetchApp.fetch(webSurumAdresi_() + 'flutter_bootstrap.js', { muteHttpExceptions: true });
+    durum = 'HTTP ' + r.getResponseCode();
+  } catch (e) { durum = 'hata: ' + e; }
+  Logger.log('Web sürümü (' + webSurumAdresi_() + '): ' + durum + ' · Paylaşım adresi: ' + paylasimAdresi_());
 }
 
 /** google.script.run (web sürümü): veri ('veri') ya da paylaşım işlemi. Şirket hesabı ve açık paylaşım zorunlu.
