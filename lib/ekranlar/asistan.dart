@@ -14,6 +14,7 @@ import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
 import 'mali.dart';
+import 'sureme.dart';
 import 'tarla.dart';
 import 'toplanti.dart';
 import 'uretim_karlilik.dart';
@@ -130,6 +131,14 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.kirmizi,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => HastalikEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.child_friendly_outlined,
+          baslik: 'Sürü Sağlığı ve Üreme',
+          aciklama: 'Doğum, tohumlama, gebelik muayenesi, senkronizasyon, sürü durumu, aşı, gelen hayvan, satış ve süt analizi',
+          renk: Renk.yesil,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SuremeEkran())),
         ),
         _Bolum(
           ikon: Icons.medical_services_outlined,

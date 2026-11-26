@@ -309,6 +309,37 @@ def fethiye(a, yol):
                     continue
                 a.ekle(t.year, t.month, 'Şekersüt', cins_grubu(hucre(r, cg), 'Belirtilmemiş'),
                        grup(hucre(r, cs)), 'Ölüm', anahtar=('olum', buyuk(hucre(r, ck))), gun=t)
+        elif ad.startswith('REVİR'):
+            # Şekersüt revir dosyasıyla aynı işletme: aynı hayvanın aynı ay/hastalık vakası
+            # ('revir', tasma) anahtarıyla bir kez sayılır (revir dosyası önce işlenir).
+            bi, h = baslik_bul(rows, 'TEŞH', 'BAŞLANGI')
+            if bi is None:
+                continue
+            cte, cb = sutun(h, 'TEŞH'), sutun(h, 'BAŞLANGI')
+            for r in rows[bi + 1:]:
+                t, kim, te = tarih(hucre(r, cb)), hucre(r, 0), hucre(r, cte)
+                if not t or kim in (None, '') or te in (None, ''):
+                    continue
+                g = grup(te)
+                if g == 'Belirtilmemiş':
+                    continue
+                m = buyuk(te)
+                sonuc = 'Kuru' if re.search(r'KÖR|KURUYA|KURU ÇIK|KURUT', m) else 'Tedavi (kalım)'
+                a.ekle(t.year, t.month, 'Şekersüt', 'İnek', g, sonuc, anahtar=('revir', buyuk(kim)), gun=t)
+        elif ad.startswith('BUZA'):
+            bi, h = baslik_bul(rows, 'KÜPE', 'HASTALIK')
+            if bi is None:
+                continue
+            ck, cku, ch, cb = sutun(h, 'KÜPE'), sutun(h, 'KULUBE'), sutun(h, 'HASTALIK'), sutun(h, 'BAŞLANGI')
+            for r in rows[bi + 1:]:
+                t, te = tarih(hucre(r, cb)), hucre(r, ch)
+                kim = hucre(r, ck) or hucre(r, cku)
+                if not t or te in (None, '') or kim in (None, ''):
+                    continue
+                g = grup(te)
+                if g == 'Belirtilmemiş':
+                    continue
+                a.ekle(t.year, t.month, 'Şekersüt', 'Buzağı', g, 'Tedavi (kalım)', anahtar=('buz', buyuk(kim)), gun=t)
         elif ad.startswith('KESİM'):
             bi, h = baslik_bul(rows, 'KESİM ŞEK', 'HASTALIK')
             if bi is None:
@@ -429,6 +460,24 @@ def pangev(a, yol):
                 toplu = 'TOPLU' in buyuk(te)
                 a.ekle(t.year, t.month, 'Pangev', cins, g, 'Tedavi (kalım)',
                        anahtar=('ted', kim + ('|' + str(t) if toplu else '')), gun=t)
+        elif 'ABORT' in ad or ad.startswith('ÖLÜ DOĞUM'):
+            # Abort: annenin kaydı (sonuç kalım); ölü doğum: buzağı ölümü.
+            bi, h = baslik_bul(rows, 'TARİH', 'AÇIKLAMA')
+            if bi is None:
+                continue
+            ct, cg, ck, ca = sutun(h, 'TARİH'), sutun(h, 'GRUP'), sutun(h, 'KÜPE'), sutun(h, 'AÇIKLAMA')
+            for r in rows[bi + 1:]:
+                t = tarih(hucre(r, ct))
+                if not t:
+                    continue
+                aciklama = buyuk(hucre(r, ca))
+                if 'ÖLÜ DOĞ' in aciklama or (ad.startswith('ÖLÜ DOĞUM') and 'ABORT' not in aciklama):
+                    a.ekle(t.year, t.month, 'Pangev', 'Buzağı', 'Ölü doğum', 'Ölüm',
+                           anahtar=('oludogum', buyuk(hucre(r, ck)), str(t)), gun=t)
+                else:
+                    cins = 'Düve' if 'DÜVE' in buyuk(hucre(r, cg)) else 'İnek'
+                    a.ekle(t.year, t.month, 'Pangev', cins, 'Abort', 'Tedavi (kalım)',
+                           anahtar=('abort', buyuk(hucre(r, ck)), str(t)), gun=t)
         elif ad.startswith('ÖLÜM'):
             bi, h = baslik_bul(rows, 'TARİH', 'AÇIKLAMA')
             if bi is None:
@@ -455,7 +504,8 @@ def pangev(a, yol):
 
 def main(klasor, cikti):
     a = Arsiv()
-    for yol in sorted(glob.glob(os.path.join(klasor, '*.xlsx'))):
+    # Fethiye en son işlenir: aynı vakalar Şekersüt revir/buzağılık listelerinde varsa oradan sayılır.
+    for yol in sorted(glob.glob(os.path.join(klasor, '*.xlsx')), key=lambda y: (os.path.basename(y).startswith('fethiye'), y)):
         ad = os.path.basename(yol)[:-5]
         yil = int(ad[-4:]) if ad[-4:].isdigit() else None
         if ad.startswith('sek_revir'):
@@ -486,8 +536,9 @@ def main(klasor, cikti):
                idx['sonuc'][k[5]], v] for k, v in sorted(a.gun.items()) if k[:6] in say]
     j = dict(listeler, kayit=kayit, gunluk=gunluk,
              kaynak='Drive › SAĞLIK RAPORLARI: Şekersüt revir-fresh, buzağılık tedavi, doğan ve ölen '
-                    'buzağılar, Panagro kesim listeleri (Kas 2022–Mar 2023), 2026 Fethiye ölüm/kesim listeleri; Aslım ve Pangev veteriner '
-                    'uygulamaları. Mesaj/sohbet kaynağı yok.',
+                    'buzağılar, Panagro kesim listeleri (Kas 2022–Mar 2023), 2026 Fethiye revir/buzağılık tedavi ve ölüm/kesim listeleri; '
+                    'Aslım ve Pangev veteriner uygulamaları (Pangev abort/ölü doğum dahil). Fethiye = Şekersüt, Erentepe = Pangev. '
+                    'Mesaj/sohbet kaynağı yok.',
              olusturma=bugun.isoformat())
     with open(cikti, 'w', encoding='utf-8') as f:
         json.dump(j, f, ensure_ascii=False, separators=(',', ':'))

@@ -98,13 +98,20 @@ function parcaliOku_(cache, k) {
 /** Hastalık arşivinin güncel dosyası: bu adla kayıtlı en yeni dosya (yeni sürüm yüklenince
  *  Kod.gs değiştirilmeden kullanılır); bulunamazsa VET_ARSIV_ID. Kimlik 10 dakika önbellekte. */
 var VET_ARSIV_ADI_ = 'Veteriner Paneli – hastalık arşivi (Yönetim Raporu, silmeyin).json';
-function vetArsivId_() {
+function vetArsivId_() { return adlaDosyaId_(VET_ARSIV_ADI_, VET_ARSIV_ID, 'vet_arsiv_id'); }
+
+/** Sürü Sağlığı ve Üreme arşivi (araclar/hastalik/uygulamalar.py; doğum, tohumlama, gebelik, aşı vb.). */
+var UYGULAMALAR_ADI_ = 'Yönetim Raporu – sürü sağlığı ve üreme arşivi (silmeyin).json';
+var UYGULAMALAR_ID_ = '1myA4JE2_9dr-ENnlZQC7vPV2-Ek4KMjM';
+function uygulamalarId_() { return adlaDosyaId_(UYGULAMALAR_ADI_, UYGULAMALAR_ID_, 'uygulamalar_id'); }
+
+function adlaDosyaId_(dosyaAdi, varsayilan, onbellek) {
   var cache = CacheService.getScriptCache(), id = null;
-  try { id = cache.get('vet_arsiv_id'); } catch (e) {}
+  try { id = cache.get(onbellek); } catch (e) {}
   if (id) return id;
-  id = VET_ARSIV_ID;
+  id = varsayilan;
   try {
-    var it = DriveApp.getFilesByName(VET_ARSIV_ADI_), en = null;
+    var it = DriveApp.getFilesByName(dosyaAdi), en = null;
     while (it.hasNext()) {
       var f = it.next();
       if (f.isTrashed() || f.getOwner() && f.getOwner().getEmail() !== Session.getEffectiveUser().getEmail()) continue;
@@ -112,7 +119,7 @@ function vetArsivId_() {
     }
     if (en) id = en.getId();
   } catch (e) {}
-  try { cache.put('vet_arsiv_id', id, 600); } catch (e) {}
+  try { cache.put(onbellek, id, 600); } catch (e) {}
   return id;
 }
 
@@ -120,7 +127,7 @@ function vetArsivId_() {
 function uygulamaDosyalari_(adlar) {
   var o = {}, cache = CacheService.getScriptCache();
   adlar.forEach(function (ad) {
-    var id = ad === 'hastalik' ? vetArsivId_() : UYGULAMA_DOSYALARI_[ad];
+    var id = ad === 'hastalik' ? vetArsivId_() : ad === 'uygulamalar' ? uygulamalarId_() : UYGULAMA_DOSYALARI_[ad];
     if (!id) return;
     var k = 'dosya_' + ad + '_' + id, m = parcaliOku_(cache, k);
     if (!m) {
@@ -212,7 +219,7 @@ function veriTopla_(gun) {
     surum: 1,
     olusturma: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ss"),
     // Uygulama veri dosyaları (çiftlik raporu, maliyet takip, hastalık arşivi, tarla haritası)
-    dosyalar: uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'hastalik'].concat(TARLA_DOSYALARI_)),
+    dosyalar: uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'hastalik', 'uygulamalar'].concat(TARLA_DOSYALARI_)),
     // Tarih, İşletme, Personel, Taşeron, Hayvan, Sağılan, Süt, Doğan Buzağı,
     // İnek/Düve Kesim-Satış, Buzağı Ölümü, Kesilen Dana, İnek Ölüm,
     // Genç Kesim/Satış, Genç Ölüm, Yavru Atma/Ölü Doğum, Ölen Dana,
@@ -1762,7 +1769,7 @@ function bitisGunu_(sure) {
 }
 
 /** Paylaşımda görünen menüler. Eski paylaşımlarda (seçim yapılmamış) üç menü de açıktır. */
-var PAYLASIM_MENULERI_ = ['gunluk', 'haftalik', 'ziraat', 'hayvan', 'tarla', 'esk', 'mali', 'ciftlikRapor', 'urun', 'gecmis', 'hastalik', 'arac', 'bakim'];
+var PAYLASIM_MENULERI_ = ['gunluk', 'haftalik', 'ziraat', 'hayvan', 'tarla', 'esk', 'mali', 'ciftlikRapor', 'urun', 'gecmis', 'hastalik', 'sureme', 'arac', 'bakim'];
 function paylasimMenuleri_(p) {
   return Array.isArray(p.menuler) ? p.menuler.filter(function (m) { return PAYLASIM_MENULERI_.indexOf(m) >= 0; }) : ['ziraat', 'hayvan', 'tarla'];
 }
@@ -2053,6 +2060,7 @@ function tarlaVeri_(pay) {
   if (acik('tarla')) dos = dos.concat(TARLA_DOSYALARI_);
   if (acik('ciftlikRapor')) dos = dos.concat(['ciftlik_rapor_2026', 'maliyet_takip_2026']);
   if (acik('hastalik')) dos.push('hastalik');
+  if (acik('sureme')) dos.push('uygulamalar');
   o.dosyalar = uygulamaDosyalari_(dos);
   if (acik('bakim')) o.bakimOnarim = (v.bakimOnarim || []).map(function (r) { r = r.slice(); r[3] = ''; return r; }); // bildiren
   return o;

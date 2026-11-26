@@ -15,6 +15,7 @@ import 'gecmis.dart';
 import 'gunluk.dart';
 import 'haftalik.dart';
 import 'hastalik.dart';
+import 'sureme.dart';
 import 'mali.dart';
 import 'tarim.dart';
 import 'tarla.dart';
@@ -309,6 +310,7 @@ const paylasimMenuAdlari = {
   'urun': 'Ürün Takibi',
   'gecmis': 'Geçmiş Yıllar',
   'hastalik': 'Hastalık Dağılımı',
+  'sureme': 'Sürü Sağlığı ve Üreme',
   'arac': 'Araçlar',
   'bakim': 'Bakım Onarım',
 };
@@ -326,6 +328,7 @@ const _menuBilgi = <String, (String, IconData)>{
   'urun': ('Teslimat, satış, maliyet ve net kazanç', Icons.auto_graph),
   'gecmis': ('Geçmiş yılların kayıtları ve çıkarılan dersler', Icons.history_edu_outlined),
   'hastalik': ('Aylara göre hastalıklar ve önleme tedbirleri', Icons.vaccines_outlined),
+  'sureme': ('Doğum, tohumlama, gebelik, aşı, satış ve süt analizi', Icons.child_friendly_outlined),
   'arac': ('Araç kullanımı, bakım ve arıza', Icons.agriculture),
   'bakim': ('Bakım onarım kayıtları', Icons.build_outlined),
 };
@@ -496,6 +499,7 @@ class _PaylasimAna extends StatelessWidget {
       'urun' => UretimKarlilikEkran(veri: v),
       'gecmis' => GecmisEkran(veri: v),
       'hastalik' => HastalikEkran(veri: v),
+      'sureme' => const SuremeEkran(),
       'arac' => AraclarEkran(veri: v),
       'bakim' => BakimOnarimEkran(veri: v),
       _ => TarlaEkran(veri: v),
