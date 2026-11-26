@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../bicim.dart';
 import '../tema.dart';
 import '../veri/detay.dart';
+import '../servis/veri_servisi.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
@@ -56,7 +57,7 @@ class _GunlukEkranState extends State<GunlukEkran> {
           etiket: tarihUzun,
           degisti: (d) => setState(() => _gun = d),
         ),
-        const EsitleButonu(),
+        if (VeriDeposu.ben.paylasim == null) const EsitleButonu(),
         if (oz.ozetGunu == null)
           const BilgiKutusu(
             uyari: true,
@@ -92,7 +93,7 @@ class _GunlukEkranState extends State<GunlukEkran> {
             renk: Renk.mavi,
             alt: 'Fethiye + Erentepe',
           ),
-          GostergeKarti(
+          if (VeriDeposu.ben.paylasim == null) GostergeKarti(
             baslik: 'Personel / Taşeron',
             deger: '${sayi(g.ciftlikPersonel)} / ${sayi(g.ciftlikTaseron)}',
             ikon: Icons.groups_outlined,
@@ -124,7 +125,7 @@ class _GunlukEkranState extends State<GunlukEkran> {
         EskBolumu(g: g, olenDana: eskKo?.toplam),
         const SizedBox(height: 12),
         IsletmeDetayPaneli(veri: v, bas: gun, son: gun),
-        DriveBulgulariPaneli(veri: v, bas: gun, son: gun),
+        if (VeriDeposu.ben.paylasim == null) DriveBulgulariPaneli(veri: v, bas: gun, son: gun),
         Panel(
           baslik: 'İşletme Bazlı Canlı Hayvan',
           child: oz.ozetGunu == null

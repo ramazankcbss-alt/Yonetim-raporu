@@ -6,13 +6,20 @@ import '../veri/detay.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
+import 'isletme_detay.dart';
 import 'tarla.dart';
 
 /// Tarım panosu: ekim alanları, hasat/verim, besi planı ve faaliyet akışı.
 class TarimEkran extends StatefulWidget {
-  const TarimEkran({super.key, required this.veri});
+  const TarimEkran({super.key, required this.veri, this.sabitTur, this.tarlaGoster = true});
 
   final RaporVerisi veri;
+
+  /// Paylaşımda menü ayrı açıldığında: false = yalnızca Ziraat, true = yalnızca Hayvancılık (geçiş gizlenir).
+  final bool? sabitTur;
+
+  /// Ziraat bölümündeki Tarla Haritası kartı (paylaşımda menü kapalıysa gizlenir).
+  final bool tarlaGoster;
 
   @override
   State<TarimEkran> createState() => _TarimEkranState();
@@ -20,7 +27,7 @@ class TarimEkran extends StatefulWidget {
 
 class _TarimEkranState extends State<TarimEkran> {
   String? _ciftlik; // null: tümü
-  bool _hayvancilik = false; // false: Ziraat, true: Hayvancılık
+  late bool _hayvancilik = widget.sabitTur ?? false; // false: Ziraat, true: Hayvancılık
   bool _gunluk = false; // false: haftalık, true: günlük
   DateTime? _gun, _hafta;
 
@@ -62,14 +69,16 @@ class _TarimEkranState extends State<TarimEkran> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
-        _TurGecis(
-          hayvancilik: _hayvancilik,
-          sec: (h) => setState(() {
-            _hayvancilik = h;
-            _ciftlik = null;
-          }),
-        ),
-        const SizedBox(height: 12),
+        if (widget.sabitTur == null) ...[
+          _TurGecis(
+            hayvancilik: _hayvancilik,
+            sec: (h) => setState(() {
+              _hayvancilik = h;
+              _ciftlik = null;
+            }),
+          ),
+          const SizedBox(height: 12),
+        ],
         SegmentedButton<bool>(
           segments: const [
             ButtonSegment(value: true, label: Text('Günlük'), icon: Icon(Icons.today_outlined)),
@@ -100,7 +109,7 @@ class _TarimEkranState extends State<TarimEkran> {
             ),
           ]),
           const SizedBox(height: 12),
-          Card(
+          if (widget.tarlaGoster) Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ListTile(
               leading: const Icon(Icons.map_outlined, color: Renk.ana),
@@ -191,6 +200,7 @@ class _TarimEkranState extends State<TarimEkran> {
             ]),
             EskBolumu(g: hg, kesilenAlt: _gunluk ? 'Gün toplamı' : 'Hafta toplamı'),
             const SizedBox(height: 12),
+            IsletmeDetayPaneli(veri: v, bas: bas!, son: son!),
           ],
           Panel(
             baslik: 'İşletme Bazlı Canlı Hayvan',

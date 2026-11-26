@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -12,7 +13,12 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('tr_TR');
   await VeriDeposu.ben.baslat();
-  VeriDeposu.ben.veriGeldi = RaporArsivi.guncelle;
+  if (kIsWeb) {
+    // Web sürümü yalnızca paylaşım linkiyle açılır: ?baglanti=<Apps Script linki + paylaşım anahtarı>
+    VeriDeposu.ben.webBaglantisi(Uri.base.queryParameters['baglanti']);
+  } else {
+    VeriDeposu.ben.veriGeldi = RaporArsivi.guncelle;
+  }
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,

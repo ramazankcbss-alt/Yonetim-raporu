@@ -6,8 +6,19 @@ import '../servis/guncelleme.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
+import 'araclar.dart';
+import 'bakim_onarim.dart';
 import 'bilesenler.dart';
+import 'ciftlik_rapor.dart';
+import 'esk.dart';
+import 'gecmis.dart';
+import 'gunluk.dart';
+import 'haftalik.dart';
+import 'hastalik.dart';
+import 'mali.dart';
+import 'tarim.dart';
 import 'tarla.dart';
+import 'uretim_karlilik.dart';
 
 /// Tarla Haritası paylaşımları (uygulama sahibi için): görüntüleme / düzenleme yetkisi, aç-kapat, sil.
 /// Her paylaşımın kendi linki vardır; ana bağlantı linki paylaşılmaz.
@@ -20,10 +31,12 @@ class PaylasimEkrani extends StatefulWidget {
 class _PaylasimEkraniState extends State<PaylasimEkrani> {
   bool _mesgul = false;
 
-  Future<void> _yap(String tur, {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler}) async {
+  Future<void> _yap(String tur,
+      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler, bool? maliDetay}) async {
     setState(() => _mesgul = true);
     try {
-      final m = await VeriDeposu.ben.paylasimYonet(tur, id: id, etiket: etiket, yetki: yetki, menuler: menuler);
+      final m = await VeriDeposu.ben
+          .paylasimYonet(tur, id: id, etiket: etiket, yetki: yetki, menuler: menuler, maliDetay: maliDetay);
       if (mounted) bildir(context, m);
     } catch (e) {
       if (mounted) bildir(context, '$e');
@@ -82,9 +95,10 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
             body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 90), children: [
               const BilgiKutusu(
                   yazi: 'Paylaşım linki tarayıcıda "Tarım ve Hayvancılık" web panelini açar (uygulama kurmak gerekmez). '
-                      'Her paylaşımda hangi menülerin (Ziraat, Hayvancılık, Tarla Haritaları) görüneceğini işaretleyin; işareti '
-                      'kaldırdığınız menü ve verisi o kişiye hemen kapanır. Ziraat ve Hayvancılık yalnızca görüntülenir; personel/taşeron '
-                      'sayıları gönderilmez. Rapor, mali ve araç verileri gitmez. "Düzenleme" yetkisinde Tarla Haritası\'nda sizin yapabildiğiniz her işlem '
+                      'Her paylaşımda hangi menülerin görüneceğini işaretleyin; işareti kaldırdığınız menü ve verisi o kişiye hemen '
+                      'kapanır. Tarla Haritaları dışındaki menüler yalnızca görüntülenir. KVKK: personel/taşeron sayıları, araç ve bakım '
+                      'kayıtlarındaki kişi adları gönderilmez; Mali Raporlar "Özet"te tedarikçi bilgisi olmadan yalnızca toplamlar gider. '
+                      'Günlük, Toplantı Notları, Veteriner Paneli ve Soru Sor paylaşılmaz. "Düzenleme" yetkisinde Tarla Haritası\'nda sizin yapabildiğiniz her işlem '
                       '(ürün/dekar/tohum, bölme, birleştirme, çizgi ve şekille bölge, sınır düzenleme, yeni parsel) yapılabilir; '
                       '"Görüntüleme" yetkisinde hiçbir şey değiştirilemez. Girişler tabloda paylaşım adıyla '
                       'işaretlenir. Paylaşımı kapattığınızda link hemen çalışmaz olur. KVKK: paylaşım adına kişi adı değil '
@@ -140,6 +154,18 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                                     ]),
                           ),
                       ]),
+                      if (p.menuler.contains('mali')) ...[
+                        const SizedBox(height: 6),
+                        const Text('Mali Raporlar görünümü', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+                        SegmentedButton<bool>(
+                          segments: const [
+                            ButtonSegment(value: false, label: Text('Özet (toplamlar)')),
+                            ButtonSegment(value: true, label: Text('Detaylı (fatura bazında)')),
+                          ],
+                          selected: {p.maliDetay},
+                          onSelectionChanged: _mesgul ? null : (x) => _yap('paylasimMali', id: p.id, maliDetay: x.first),
+                        ),
+                      ],
                       Wrap(spacing: 4, children: [
                         TextButton.icon(
                             onPressed: !p.acik || p.link.isEmpty
@@ -184,20 +210,21 @@ class _GorunumOzeti extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String kim(PaylasimKaydi p) => '${p.etiket} (${p.duzenler && p.menuler.contains('tarla') ? 'düzenleme' : 'görüntüleme'})';
+    String kim(PaylasimKaydi p, String m) => '${p.etiket} (${m == 'tarla' && p.duzenler ? 'düzenleme' : m == 'mali' ? (p.maliDetay ? 'detaylı' : 'özet') : 'görüntüleme'})';
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const Text('Kim hangi bölümü görüyor', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
-          const Text('Yalnızca açık paylaşımlar sayılır. Düzenleme yetkisi yalnızca Tarla Haritaları\'nda geçerlidir.',
+          const Text('Yalnızca açık paylaşımlar sayılır. Düzenleme yetkisi yalnızca Tarla Haritaları\'nda geçerlidir; '
+              'diğer menüler yalnızca görüntülenir.',
               style: TextStyle(fontSize: 12, color: Renk.soluk)),
           for (final m in paylasimMenuAdlari.entries) ...[
             const SizedBox(height: 10),
             Text(m.value, style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.ana)),
             Builder(builder: (_) {
-              final x = [for (final p in l) if (p.acik && p.menuler.contains(m.key)) kim(p)];
+              final x = [for (final p in l) if (p.acik && p.menuler.contains(m.key)) kim(p, m.key)];
               return Text(x.isEmpty ? 'Kimse görmüyor' : x.join(' · '),
                   style: TextStyle(fontSize: 13.5, color: x.isEmpty ? Renk.soluk : Renk.yazi));
             }),
@@ -214,7 +241,38 @@ class _GorunumOzeti extends StatelessWidget {
 }
 
 /// Paylaşımda seçilebilen menüler (web panelindeki adlarıyla).
-const paylasimMenuAdlari = {'ziraat': 'Ziraat', 'hayvan': 'Hayvancılık', 'tarla': 'Tarla Haritaları'};
+const paylasimMenuAdlari = {
+  'gunluk': 'Günlük Pano',
+  'haftalik': 'Haftalık Pano',
+  'ziraat': 'Ziraat',
+  'hayvan': 'Hayvancılık',
+  'tarla': 'Tarla Haritaları',
+  'esk': 'ESK – Et ve Süt Kurumu',
+  'mali': 'Mali Raporlar',
+  'ciftlikRapor': 'Çiftlikler Rapor',
+  'urun': 'Ürün Takibi',
+  'gecmis': 'Geçmiş Yıllar',
+  'hastalik': 'Hastalık Dağılımı',
+  'arac': 'Araçlar',
+  'bakim': 'Bakım Onarım',
+};
+
+/// Paylaşılan kişinin ana ekranındaki menü kartları: başlık, açıklama, simge.
+const _menuBilgi = <String, (String, IconData)>{
+  'gunluk': ('Günün canlı hayvan, süt ve faaliyet özeti', Icons.today_outlined),
+  'haftalik': ('Haftalık canlı hayvan, süt ve faaliyet özeti', Icons.date_range_outlined),
+  'ziraat': ('Ekim alanları, hasat ve verim, ziraat faaliyetleri', Icons.grass),
+  'hayvan': ('Hayvan sayıları, süt, doğum ve kayıplar, işletme raporları', Icons.pets),
+  'tarla': ('Sezonlar, parseller, karşılaştırma ve ÇKS', Icons.map_outlined),
+  'esk': ('ESK–Taşağıl besi: hafta, ay ve yıl sonuçları', Icons.agriculture_outlined),
+  'mali': ('Gelen faturalar, açık bakiyeler', Icons.account_balance_outlined),
+  'ciftlikRapor': ('Kâr/zarar ile süt, et ve tarım birim maliyetleri', Icons.query_stats),
+  'urun': ('Teslimat, satış, maliyet ve net kazanç', Icons.auto_graph),
+  'gecmis': ('Geçmiş yılların kayıtları ve çıkarılan dersler', Icons.history_edu_outlined),
+  'hastalik': ('Aylara göre hastalıklar ve önleme tedbirleri', Icons.vaccines_outlined),
+  'arac': ('Araç kullanımı, bakım ve arıza', Icons.agriculture),
+  'bakim': ('Bakım onarım kayıtları', Icons.build_outlined),
+};
 
 class _PaylasimEkle extends StatefulWidget {
   const _PaylasimEkle();
@@ -283,7 +341,7 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
       );
 }
 
-/// Paylaşım linkiyle kurulan uygulama: yalnızca Tarla Haritası.
+/// Paylaşım linkiyle açılan uygulama (telefonda ya da web sürümünde): yalnızca paylaşımda açık menüler.
 class PaylasimKabugu extends StatefulWidget {
   const PaylasimKabugu({super.key, this.guncellemeKontrolu = true});
   final bool guncellemeKontrolu;
@@ -322,11 +380,11 @@ class _PaylasimKabuguState extends State<PaylasimKabugu> with WidgetsBindingObse
         builder: (context, _) {
           if (d.paylasimKapali) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Tarla Haritası')),
+              appBar: AppBar(title: const Text('Tarım ve Hayvancılık')),
               body: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const BilgiKutusu(yazi: 'Bu paylaşım kapatıldı. Harita verisi bu telefondan silindi.'),
+                  const BilgiKutusu(yazi: 'Bu paylaşım kapatıldı. Paylaşılan veriler bu cihazdan silindi.'),
                   const SizedBox(height: 12),
                   FilledButton(onPressed: () => d.yenile(), child: const Text('Tekrar dene')),
                   TextButton(onPressed: d.linkSil, child: const Text('Bağlantıyı kaldır')),
@@ -337,7 +395,7 @@ class _PaylasimKabuguState extends State<PaylasimKabugu> with WidgetsBindingObse
           final v = d.veri;
           if (v == null) {
             return Scaffold(
-              appBar: AppBar(title: const Text('Tarla Haritası')),
+              appBar: AppBar(title: const Text('Tarım ve Hayvancılık')),
               body: Center(
                   child: d.hata == null
                       ? const CircularProgressIndicator()
@@ -350,7 +408,61 @@ class _PaylasimKabuguState extends State<PaylasimKabugu> with WidgetsBindingObse
                           ]))),
             );
           }
-          return TarlaEkran(veri: v);
+          return _PaylasimAna(v: v, p: v.paylasim);
         },
       );
+}
+
+/// Paylaşılan kişinin ana ekranı: yalnızca açık menüler.
+class _PaylasimAna extends StatelessWidget {
+  const _PaylasimAna({required this.v, required this.p});
+  final RaporVerisi v;
+  final Paylasim? p;
+
+  Widget _ekran(String m) {
+    final tarla = p?.acik('tarla') ?? false;
+    Widget sarili(String baslik, Widget govde) => Scaffold(appBar: AppBar(title: Text(baslik)), body: govde);
+    return switch (m) {
+      'gunluk' => sarili('Günlük Pano', GunlukEkran(veri: v)),
+      'haftalik' => sarili('Haftalık Pano', HaftalikEkran(veri: v)),
+      'ziraat' => sarili('Ziraat', TarimEkran(veri: v, sabitTur: false, tarlaGoster: tarla)),
+      'hayvan' => sarili('Hayvancılık', TarimEkran(veri: v, sabitTur: true, tarlaGoster: false)),
+      'esk' => EskEkran(veri: v),
+      'mali' => MaliEkran(veri: v),
+      'ciftlikRapor' => const CiftlikRaporEkran(),
+      'urun' => UretimKarlilikEkran(veri: v),
+      'gecmis' => GecmisEkran(veri: v),
+      'hastalik' => HastalikEkran(veri: v),
+      'arac' => AraclarEkran(veri: v),
+      'bakim' => BakimOnarimEkran(veri: v),
+      _ => TarlaEkran(veri: v),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = [for (final k in paylasimMenuAdlari.keys) if (p?.acik(k) ?? k == 'tarla') k];
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Tarım ve Hayvancılık'),
+        actions: [IconButton(onPressed: () => VeriDeposu.ben.yenile(), icon: const Icon(Icons.refresh))],
+      ),
+      body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
+        BilgiKutusu(
+            yazi: '${p?.etiket ?? ''} · ${p?.duzenler == true && l.contains('tarla') ? 'Tarla Haritaları\'nda düzenleme yetkisi; diğer menüler yalnızca görüntülenir' : 'yalnızca görüntüleme'}'),
+        if (l.isEmpty) const Text('Bu paylaşımda görüntülenebilecek bölüm bulunmuyor.', style: TextStyle(color: Renk.soluk)),
+        for (final m in l)
+          Card(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              leading: Icon(_menuBilgi[m]!.$2, color: Renk.ana),
+              title: Text(paylasimMenuAdlari[m]!, style: const TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(_menuBilgi[m]!.$1),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _ekran(m))),
+            ),
+          ),
+      ]),
+    );
+  }
 }

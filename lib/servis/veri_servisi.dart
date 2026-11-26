@@ -115,6 +115,21 @@ class VeriDeposu extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Web sürümü: bağlantı sayfa adresinden gelir; yalnızca paylaşım anahtarı ("p…") kabul edilir, kalıcı kaydedilmez.
+  void webBaglantisi(String? l) {
+    final u = Uri.tryParse((l ?? '').trim());
+    final a = u?.queryParameters['anahtar'] ?? '';
+    if (u == null || !a.startsWith('p') || a.length < 16) {
+      link = null;
+      veri = null;
+      hata = 'Bu sayfa yalnızca paylaşım linkiyle açılır. Size gönderilen linki kullanın.';
+    } else if (link != l!.trim()) {
+      link = l.trim();
+      veri = null; // başka paylaşımın önbelleği gösterilmez
+    }
+    notifyListeners();
+  }
+
   Future<void> ayarKaydet(RaporAyari a) async {
     final p = await SharedPreferences.getInstance();
     await p.setString(_kBaslik, a.baslik);
@@ -246,8 +261,12 @@ class VeriDeposu extends ChangeNotifier {
 
   /// Tarla Haritası paylaşımı (yalnızca sahibin uygulamasından): ekle, yetki, kapat, aç, sil.
   Future<String> paylasimYonet(String tur,
-      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler}) async {
-    final j = await _islem(tur, {'id': id, 'etiket': etiket, 'yetki': yetki, if (menuler != null) 'menuler': menuler.join(',')});
+      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler, bool? maliDetay}) async {
+    final j = await _islem(tur, {
+      'id': id, 'etiket': etiket, 'yetki': yetki,
+      if (menuler != null) 'menuler': menuler.join(','),
+      if (maliDetay != null) 'maliDetay': '$maliDetay',
+    });
     await yenile();
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }

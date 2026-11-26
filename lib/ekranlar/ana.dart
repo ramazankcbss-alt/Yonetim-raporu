@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../bicim.dart';
@@ -23,10 +24,16 @@ class Kapi extends StatelessWidget {
     return ListenableBuilder(
       listenable: VeriDeposu.ben,
       builder: (context, _) => VeriDeposu.ben.link == null
-          ? const KurulumEkrani(ilk: true)
-          // Paylaşım linkiyle kurulduysa yalnızca Tarla Haritası açılır.
+          ? (kIsWeb
+              ? Scaffold(
+                  appBar: AppBar(title: const Text('Tarım ve Hayvancılık')),
+                  body: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: BilgiKutusu(yazi: VeriDeposu.ben.hata ?? 'Bu sayfa yalnızca paylaşım linkiyle açılır.')))
+              : const KurulumEkrani(ilk: true))
+          // Paylaşım linkiyle açıldıysa yalnızca paylaşımda açık menüler görünür.
           : VeriDeposu.ben.paylasimLinki
-              ? const PaylasimKabugu()
+              ? const PaylasimKabugu(guncellemeKontrolu: !kIsWeb)
               : const AnaEkran(),
     );
   }

@@ -4,6 +4,7 @@ import '../bicim.dart';
 import '../tema.dart';
 import '../veri/faaliyet_ozet.dart';
 import '../veri/detay.dart';
+import '../servis/veri_servisi.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import 'bilesenler.dart';
@@ -53,7 +54,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
           etiket: haftaEtiketi,
           degisti: (d) => setState(() => _hafta = d),
         ),
-        const EsitleButonu(),
+        if (VeriDeposu.ben.paylasim == null) const EsitleButonu(),
         Padding(
           padding: const EdgeInsets.only(bottom: 10, left: 2),
           child: Text(
@@ -96,7 +97,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
             renk: Renk.mavi,
             alt: 'Fethiye + Erentepe',
           ),
-          GostergeKarti(
+          if (VeriDeposu.ben.paylasim == null) GostergeKarti(
             baslik: 'Personel / Taşeron',
             deger: '${sayi(g.ciftlikPersonel)} / ${sayi(g.ciftlikTaseron)}',
             ikon: Icons.groups_outlined,
@@ -152,7 +153,7 @@ class _HaftalikEkranState extends State<HaftalikEkran> {
           ),
         ),
         IsletmeDetayPaneli(veri: v, bas: hafta, son: haftaSonu),
-        DriveBulgulariPaneli(veri: v, bas: hafta, son: haftaSonu),
+        if (VeriDeposu.ben.paylasim == null) DriveBulgulariPaneli(veri: v, bas: hafta, son: haftaSonu),
         Panel(
           baslik: 'İşletme Bazlı Canlı Hayvan',
           child: oz.ozetGunu == null

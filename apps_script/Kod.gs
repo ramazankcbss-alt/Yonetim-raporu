@@ -1659,9 +1659,9 @@ function paylasimBul_(anahtar) {
 }
 
 /** Paylaşımda görünen menüler. Eski paylaşımlarda (seçim yapılmamış) üç menü de açıktır. */
-var PAYLASIM_MENULERI_ = ['ziraat', 'hayvan', 'tarla'];
+var PAYLASIM_MENULERI_ = ['gunluk', 'haftalik', 'ziraat', 'hayvan', 'tarla', 'esk', 'mali', 'ciftlikRapor', 'urun', 'gecmis', 'hastalik', 'arac', 'bakim'];
 function paylasimMenuleri_(p) {
-  return Array.isArray(p.menuler) ? p.menuler.filter(function (m) { return PAYLASIM_MENULERI_.indexOf(m) >= 0; }) : PAYLASIM_MENULERI_.slice();
+  return Array.isArray(p.menuler) ? p.menuler.filter(function (m) { return PAYLASIM_MENULERI_.indexOf(m) >= 0; }) : ['ziraat', 'hayvan', 'tarla'];
 }
 function menuAcik_(p, m) { return paylasimMenuleri_(p).indexOf(m) >= 0; }
 function menuSecimi_(g) {
@@ -1795,7 +1795,7 @@ function tarlaPanelKaydet(anahtar, g) {
 function paylasimListesi_() {
   return paylasimlar_().map(function (p) {
     return { id: p.id, etiket: p.etiket, yetki: p.yetki, acik: p.acik, olusturma: p.olusturma,
-      degisiklik: p.degisiklik || '', menuler: paylasimMenuleri_(p), link: paylasimLinki_(p) };
+      degisiklik: p.degisiklik || '', menuler: paylasimMenuleri_(p), maliDetay: p.maliDetay === true, link: paylasimLinki_(p) };
   });
 }
 
@@ -1818,6 +1818,7 @@ function paylasimYonet_(g) {
   if (!x) return { ok: false, hata: 'Paylaşım bulunamadı.' };
   if (g.tur === 'paylasimYetki') { x.yetki = yetki; }
   else if (g.tur === 'paylasimMenu') { x.menuler = menuSecimi_(g); }
+  else if (g.tur === 'paylasimMali') { x.maliDetay = String(g.maliDetay) === 'true'; }
   else if (g.tur === 'paylasimAd') {
     var ad = String(g.etiket || '').trim().slice(0, 40);
     if (!ad) return { ok: false, hata: 'Paylaşım adı boş olamaz.' };
@@ -1834,13 +1835,90 @@ function paylasimYonet_(g) {
 
 /** Paylaşım linkine giden veri: yalnızca Tarla Haritası'nın kullandığı alanlar. */
 function tarlaVeri_(pay) {
-  var v = veriTopla_(400);
+  var v = veriTopla_(400), m = paylasimMenuleri_(pay);
+  function acik() { for (var i = 0; i < arguments.length; i++) if (m.indexOf(arguments[i]) >= 0) return true; return false; }
   var o = { ok: true, surum: v.surum, olusturma: v.olusturma,
-    paylasim: { kapsam: 'tarla', yetki: pay.yetki, etiket: pay.etiket } };
-  if (menuAcik_(pay, 'tarla')) {
-    ['ekim', 'hasat', 'cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel', 'tarlaSezonlari']
-      .forEach(function (k) { o[k] = v[k]; });
+    paylasim: { kapsam: 'tarla', yetki: pay.yetki, etiket: pay.etiket, menuler: m, maliDetay: pay.maliDetay === true } };
+  function al(l) { l.forEach(function (k) { o[k] = v[k]; }); }
+  // KVKK: paylaşımda personel/taşeron sayıları, personel satırları ve kişi adları gönderilmez.
+  if (acik('gunluk', 'haftalik', 'hayvan', 'esk')) {
+    o.hayvanOzet = (v.hayvanOzet || []).map(function (r) { r = r.slice(); r[2] = 0; r[3] = 0; return r; });
+    o.hayvanGunluk = v.hayvanGunluk;
+    o.hayvanDetay = (v.hayvanDetay || []).filter(function (r) { return !paylasimPersonelMi_(r[3]); });
   }
+  if (acik('gunluk', 'haftalik', 'hayvan')) al(['besi']);
+  if (acik('gunluk', 'haftalik')) o.tarim = v.tarim;
+  else if (acik('ziraat', 'hayvan')) {
+    o.tarim = (v.tarim || []).filter(function (r) { return paylasimHayvanMi_(r[2]) ? acik('hayvan') : acik('ziraat'); });
+  }
+  if (acik('ziraat', 'tarla')) al(['ekim', 'hasat']);
+  if (acik('tarla')) al(['cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel', 'tarlaSezonlari']);
+  if (acik('esk')) al(['eskAylik', 'eskBilgi']);
+  if (acik('urun')) al(['tarimsalUretim', 'urunTeslimat']);
+  if (acik('gecmis', 'hastalik')) al(['gecmis', 'dersler']);
+  if (acik('mali')) o.mali = paylasimMali_(v.mali, pay.maliDetay === true);
+  if (acik('arac')) {
+    al(['aracListe', 'aracPlan']);
+    function sil(l, sut) { return (l || []).map(function (r) { r = r.slice(); sut.forEach(function (i) { if (i < r.length) r[i] = ''; }); return r; }); }
+    o.aracKullanim = sil(v.aracKullanim, [3, 4, 18]);   // personel, (sicil), onaylayan
+    o.aracBakim = sil(v.aracBakim, [11]);               // kaydı giren
+    o.aracAriza = sil(v.aracAriza, [3, 4, 9, 14]);      // bildiren, (sicil), güncelleyen, birlikte çalışan
+    o.aracIsEmri = sil(v.aracIsEmri, [3, 4, 5]);        // personel, (sicil), formen
+  }
+  if (acik('bakim')) o.bakimOnarim = (v.bakimOnarim || []).map(function (r) { r = r.slice(); r[3] = ''; return r; }); // bildiren
+  return o;
+}
+
+function paylasimPersonelMi_(g) {
+  var k = String(g || '').replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase();
+  return ['personel', 'pers.', 'işçi', 'isci', 'taşeron', 'taseron', 'güvenlik'].some(function (x) { return k.indexOf(x) >= 0; });
+}
+
+function paylasimHayvanMi_(f) {
+  var x = String(f || '').toLowerCase().replace(/̇/g, '').replace(/ı/g, 'i').replace(/ğ/g, 'g').replace(/ş/g, 's').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ç/g, 'c');
+  return ['sagim', 'sagmal', 'buzag', 'inek', 'duve', 'dana', 'boga', 'besi', 'kesim', 'asilama', 'tohumlama', 'suni tohum', 'dogum', 'veteriner',
+    'mastitis', 'kupe', 'ahir', 'agil', 'padok', 'tirnak', 'rasyon', 'hayvan'].some(function (k) { return x.indexOf(k) >= 0; });
+}
+
+function maliSayi_(v) {
+  if (typeof v === 'number') return v;
+  var x = String(v === null || v === undefined ? '' : v).replace(/\s/g, '');
+  if (!x) return null;
+  if (x.indexOf(',') >= 0) x = x.replace(/\./g, '').replace(',', '.'); else if (/^-?\d{1,3}(\.\d{3})+$/.test(x)) x = x.replace(/\./g, '');
+  var n = parseFloat(x); return isNaN(n) ? null : n;
+}
+
+/** Mali Raporlar paylaşımı. Detaylı: fatura bazında (Drive dosya bağlantıları çıkarılır).
+ * Özet: tedarikçi bilgisi olmadan ay / birim / hesap / kategori toplamları; kontrol bulguları gönderilmez. */
+function paylasimMali_(mali, detay) {
+  if (!mali) return null;
+  var o = JSON.parse(JSON.stringify(mali));
+  if (o.muhasebeBilgi) o.muhasebeBilgi.link = '';
+  if (detay) {
+    o.kontrol = (o.kontrol || []).map(function (r) { r = r.slice(); if (r.length > 5) r[5] = ''; if (r.length > 7) r[7] = ''; return r; });
+    return o;
+  }
+  function topla(l) {
+    var m = {}, sira = [];
+    (l || []).forEach(function (r) {
+      var ay = String(r[0] || '').slice(0, 7);
+      if (!ay) return;
+      var k = [ay, r[1], r[2], r[3], r[6], r[8]].join('|');
+      if (!m[k]) { m[k] = [ay + '-01', r[1], r[2], r[3], 'Özet (tedarikçi bilgisi yok)', 0, r[6], '', r[8], '', '', '']; sira.push(k); }
+      var t = maliSayi_(r[5]); if (t !== null) m[k][5] += t;
+    });
+    return sira.map(function (k) { return m[k]; });
+  }
+  o.fatura = topla(o.fatura);
+  o.muhasebe = topla(o.muhasebe);
+  var a = {}, as = [];
+  (o.acik || []).forEach(function (r) {
+    var ay = String(r[0] || '').slice(0, 7), k = [ay, r[1], r[2]].join('|');
+    if (!a[k]) { a[k] = [ay + '-01', r[1], r[2], 'Özet', 0, '', '', '']; as.push(k); }
+    var t = maliSayi_(r[4]); if (t !== null) a[k][4] += t;
+  });
+  o.acik = as.map(function (k) { return a[k]; });
+  o.kontrol = [];
   return o;
 }
 
