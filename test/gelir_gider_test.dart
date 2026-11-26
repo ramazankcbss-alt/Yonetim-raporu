@@ -13,7 +13,7 @@ void main() {
       'gider': [
         [2030, 1, 'Şekersüt', 'Yem ve kaba yem', 'Grup dışı', 100, 110],
         [2030, 2, 'Şekersüt', 'Canlı hayvan alımı', 'Grup dışı', 50, 55],
-        [2030, 2, 'Aslım', 'Akaryakıt', 'Grup dışı', 20, 24],
+        [2030, 2, 'Aslım', 'Akaryakıt', 'Grup dışı', 20, 24, 15],
       ],
       'gelir': [
         [2030, 1, 'Şekersüt', 'Çiğ süt', 'Grup içi', 'L', 10, 200, 220],
@@ -28,13 +28,18 @@ void main() {
     expect(m.bos, isFalse);
     expect(g.ciftlikler, ['Aslım', 'Şekersüt']);
     expect(g.aylar, [(2030, 1), (2030, 2)]);
-    const hepsi = (ciftlik: null, yil: null, ay: null);
+    const hepsi = (ciftlik: null, bas: null, bit: null);
     expect(g.giderToplam(hepsi), 170);
     expect(g.giderToplam(hepsi, canliHaric: true), 120);
     expect(g.gelirToplam(hepsi), 230);
     expect(g.gelirToplam(hepsi) - g.giderToplam(hepsi), 60);
-    expect(g.giderToplam((ciftlik: 'Şekersüt', yil: 2030, ay: 2)), 50);
-    expect(g.gelirToplam((ciftlik: 'Aslım', yil: null, ay: null)), 30);
+    expect(g.giderToplam((ciftlik: 'Şekersüt', bas: DateTime(2030, 2), bit: DateTime(2030, 3))), 50);
+    expect(g.gelirToplam((ciftlik: 'Aslım', bas: null, bit: null)), 30);
+    // Gün bilgisi olan satır (15 Şubat) günlük ve haftalık dönemlere girer
+    expect(g.gunVar, isTrue);
+    expect(g.giderToplam((ciftlik: null, bas: DateTime(2030, 2, 15), bit: DateTime(2030, 2, 16))), 20);
+    expect(ggDonemBasi(DateTime(2030, 2, 15), GgDonem.hafta), DateTime(2030, 2, 11));
+    expect(g.donemler(GgDonem.ay).first, DateTime(2030, 2));
     final k = GelirGider.grupla(g.giderler(hepsi), (x) => x.kategori, (x) => x.net);
     expect(k.first.key, 'Yem ve kaba yem');
   });

@@ -131,7 +131,7 @@ def uret(gider_yol, gelir_yol, kat, link_gider='', link_gelir=''):
         if not t:
             continue
         ng += 1
-        k = (t.year, t.month, URETIM_YERI.get(s(r[c['uy']]), 'Diğer birim'), gider_kategori(r[c['metin']], kat), hesap(r[c['firma']]))
+        k = (t.year, t.month, URETIM_YERI.get(s(r[c['uy']]), 'Diğer birim'), gider_kategori(r[c['metin']], kat), hesap(r[c['firma']]), t.day)
         gider[k][0] += sayi(r[c['net']])
         gider[k][1] += sayi(r[c['brut']])
     # --- gelir
@@ -155,14 +155,14 @@ def uret(gider_yol, gelir_yol, kat, link_gider='', link_gelir=''):
             iade[0] += 1
             iade[1] += net
         k = (t.year, t.month, URETIM_YERI.get(s(r[c['ia']]), 'Diğer birim'), gelir_urun(r[c['mlz']]), hesap(r[c['musteri']]),
-             s(r[c['brm']]).upper())
+             s(r[c['brm']]).upper(), t.day)
         gelir[k][0] += sayi(r[c['mkt']])
         gelir[k][1] += net
         gelir[k][2] += sayi(r[c['brut']])
     aylar = sorted({(k[0], k[1]) for k in list(gider) + list(gelir)})
     donem = f'{AY[aylar[0][1] - 1]}–{AY[aylar[-1][1] - 1]} {aylar[-1][0]}' if aylar else ''
     return dict(
-        surum=1,
+        surum=2,
         donem=donem,
         kdv='hariç',
         kaynakGider='aylık gider tablosu',
@@ -173,8 +173,8 @@ def uret(gider_yol, gelir_yol, kat, link_gider='', link_gelir=''):
         satirGelir=nl,
         iadeAdet=iade[0],
         iadeTutar=round(iade[1], 2),
-        # [yıl, ay, çiftlik, kategori, hesap, KDV hariç, KDV dahil]
-        gider=[[k[0], k[1], k[2], k[3], k[4], round(v[0], 2), round(v[1], 2)] for k, v in sorted(gider.items())],
-        # [yıl, ay, çiftlik, ürün, hesap, birim, miktar, KDV hariç, KDV dahil]
-        gelir=[[k[0], k[1], k[2], k[3], k[4], k[5], round(v[0], 3), round(v[1], 2), round(v[2], 2)] for k, v in sorted(gelir.items())],
+        # [yıl, ay, çiftlik, kategori, hesap, KDV hariç, KDV dahil, gün] (surum 2: belge tarihinin günü eklendi)
+        gider=[[k[0], k[1], k[2], k[3], k[4], round(v[0], 2), round(v[1], 2), k[5]] for k, v in sorted(gider.items())],
+        # [yıl, ay, çiftlik, ürün, hesap, birim, miktar, KDV hariç, KDV dahil, gün]
+        gelir=[[k[0], k[1], k[2], k[3], k[4], k[5], round(v[0], 3), round(v[1], 2), round(v[2], 2), k[6]] for k, v in sorted(gelir.items())],
     )

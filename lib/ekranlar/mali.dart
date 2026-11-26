@@ -26,8 +26,9 @@ class MaliEkran extends StatelessWidget {
         final acikVar = m.acik.isNotEmpty;
         final muhVar = m.muhasebe.isNotEmpty;
         final ggVar = !m.gelirGider.bos;
+        if (ggVar) return _GelirGiderAna(m: m);
         return DefaultTabController(
-          length: 5 + (acikVar ? 1 : 0) + (muhVar ? 1 : 0) + (ggVar ? 3 : 0),
+          length: 5 + (acikVar ? 1 : 0) + (muhVar ? 1 : 0),
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Mali Raporlar'),
@@ -39,7 +40,6 @@ class MaliEkran extends StatelessWidget {
                 unselectedLabelColor: const Color(0xCCFFFFFF),
                 indicatorColor: Colors.white,
                 tabs: [
-                  if (ggVar) ...const [Tab(text: 'Gider'), Tab(text: 'Gelir'), Tab(text: 'Kâr / Zarar')],
                   const Tab(text: 'Günlük'),
                   const Tab(text: 'Haftalık'),
                   const Tab(text: 'Aylık'),
@@ -58,11 +58,6 @@ class MaliEkran extends StatelessWidget {
                             'mali_veri.json olmalı ve Apps Script güncel olmalı.'),
                   )
                 : TabBarView(children: [
-                    if (ggVar) ...[
-                      GonderAlani(konu: 'Mali Raporlar – Gider', child: GelirGiderSekmesi(veri: m.gelirGider, sekme: GgSekme.gider)),
-                      GonderAlani(konu: 'Mali Raporlar – Gelir', child: GelirGiderSekmesi(veri: m.gelirGider, sekme: GgSekme.gelir)),
-                      GonderAlani(konu: 'Mali Raporlar – Kâr / Zarar', child: GelirGiderSekmesi(veri: m.gelirGider, sekme: GgSekme.karZarar)),
-                    ],
                     GonderAlani(konu: 'Mali Raporlar – Günlük', child: _Donem(veri: m, donem: MaliDonem.gun)),
                     GonderAlani(konu: 'Mali Raporlar – Haftalık', child: _Donem(veri: m, donem: MaliDonem.hafta)),
                     GonderAlani(konu: 'Mali Raporlar – Aylık', child: _Donem(veri: m, donem: MaliDonem.ay)),
@@ -74,6 +69,69 @@ class MaliEkran extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Gider / Gelir / Kâr-Zarar ana sekmeleri; her birinin içinde Günlük, Haftalık, Aylık,
+/// Yıllık ve Karşılaştırma. Gider içinden 2026 Fatura listesi (fatura bazında) ve fatura
+/// kayıt kontrolü açılır.
+class _GelirGiderAna extends StatelessWidget {
+  const _GelirGiderAna({required this.m});
+  final MaliVeri m;
+
+  @override
+  Widget build(BuildContext context) {
+    final acikVar = m.acik.isNotEmpty;
+    Widget faturalar(DateTime bas, DateTime bit, String baslik) {
+      final l = [for (final f in m.faturalar) if (!f.tarih.isBefore(bas) && f.tarih.isBefore(bit)) f];
+      return Scaffold(
+        appBar: AppBar(title: Text('Faturalar – $baslik')),
+        body: l.isEmpty
+            ? const Center(child: Text('Bu dönemde fatura yok'))
+            : _Donem(
+                veri: MaliVeri(faturalar: l, kdv: m.kdv, kaynak: m.kaynak),
+                donem: bit.difference(bas).inDays <= 1
+                    ? MaliDonem.gun
+                    : bit.difference(bas).inDays <= 7
+                        ? MaliDonem.hafta
+                        : bit.difference(bas).inDays <= 31
+                            ? MaliDonem.ay
+                            : MaliDonem.yil),
+      );
+    }
+
+    Widget kontrol(BuildContext _) => Scaffold(
+          appBar: AppBar(title: const Text('Fatura kayıt kontrolü')),
+          body: _Karsilastirma(veri: m),
+        );
+    return DefaultTabController(
+      length: 3 + (acikVar ? 1 : 0),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Mali Raporlar'),
+          actions: const [TabloGuncelleButonu()],
+          bottom: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelColor: Colors.white,
+            unselectedLabelColor: const Color(0xCCFFFFFF),
+            indicatorColor: Colors.white,
+            tabs: [
+              const Tab(text: 'Gider'),
+              const Tab(text: 'Gelir'),
+              const Tab(text: 'Kâr / Zarar'),
+              if (acikVar) const Tab(text: 'Açık bakiyeler'),
+            ],
+          ),
+        ),
+        body: TabBarView(children: [
+          GelirGiderBolumu(veri: m.gelirGider, sekme: GgSekme.gider, faturalar: m.faturalar.isEmpty ? null : faturalar, kontrol: kontrol),
+          GelirGiderBolumu(veri: m.gelirGider, sekme: GgSekme.gelir),
+          GelirGiderBolumu(veri: m.gelirGider, sekme: GgSekme.karZarar),
+          if (acikVar) GonderAlani(konu: 'Mali Raporlar – Açık bakiyeler', child: _Acik(veri: m)),
+        ]),
+      ),
     );
   }
 }
