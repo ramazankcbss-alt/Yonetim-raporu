@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/services.dart' show rootBundle;
+import 'dosyalar.dart';
 
 import 'model.dart';
 
@@ -15,7 +15,7 @@ class HastalikKaydi {
 const sonuclar = ['Ölüm', 'Tedavi (kalım)', 'Kuru', 'Kesim', 'İmha'];
 const aylar = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
-/// Paketlenmiş arşiv (assets/veri/hastalik.json) çözümleyici.
+/// Hastalık arşivi (Drive'daki hastalık arşivi JSON'u, sunucudan gelir) çözümleyici.
 List<HastalikKaydi> hastalikJsonCoz(String metin) {
   final j = jsonDecode(metin) as Map<String, dynamic>;
   List<String> l(String k) => (j[k] as List).cast<String>();
@@ -39,7 +39,8 @@ HastalikKaydi? gecmistenHastalik(GecmisVeri x) {
 Future<List<HastalikKaydi>> hastalikYukle(List<GecmisVeri> gecmis) async {
   var arsiv = <HastalikKaydi>[];
   try {
-    arsiv = hastalikJsonCoz(await rootBundle.loadString('assets/veri/hastalik.json'));
+    final m = UygulamaDosyalari.metin('hastalik');
+    if (m != null) arsiv = hastalikJsonCoz(m);
   } catch (_) {}
   return hastalikBirlestir(arsiv, gecmis);
 }

@@ -1,12 +1,11 @@
 // Tarla haritası (KMZ) ekiliş verisi ve tarım icmaliyle karşılaştırma.
-// Kaynak: Google Earth "Yerlerim" KMZ dosyasından üretilen assets/veri/tarla_*.json
-// (araclar/tarla). KVKK: kişi adı içermez.
+// Kaynak: Google Earth "Yerlerim" KMZ dosyasından üretilen tarla_*.json (araclar/tarla); dosyalar
+// Drive'daki kapalı "Uygulama Verileri" klasöründe tutulur, sunucudan gelir. KVKK: kişi adı içermez.
 import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:flutter/services.dart';
-
 import '../bicim.dart';
+import 'dosyalar.dart';
 import 'kategori.dart';
 import 'model.dart';
 
@@ -155,20 +154,22 @@ class TarlaSezonu {
   static Future<List<TarlaSezonu>> yukle() async {
     final l = <TarlaSezonu>[];
     for (final a in tarlaSezonDosyalari) {
+      final m = UygulamaDosyalari.metin(a);
+      if (m == null) continue;
       try {
-        l.add(TarlaSezonu.json(jsonDecode(await rootBundle.loadString(a))));
+        l.add(TarlaSezonu.json(jsonDecode(m)));
       } catch (_) {}
     }
     return l;
   }
 }
 
-/// Paketlenmiş sezon dosyaları (yeniden eskiye).
+/// Sezon dosyaları (sunucudan gelir; yeniden eskiye).
 const tarlaSezonDosyalari = [
-  'assets/veri/tarla_2025_2026.json',
+  'tarla_2025_2026',
   // Yerlerim 24.11.2026 GÜNCEL.kmz: sezon katmanları (araclar/tarla/kmz_sezonlar.py)
-  'assets/veri/tarla_2024_2025.json',
-  'assets/veri/tarla_2026_2027.json',
+  'tarla_2024_2025',
+  'tarla_2026_2027',
 ];
 
 String _s(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1).replaceAll('.', ',');

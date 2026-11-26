@@ -1,5 +1,5 @@
 // "ÇİFTLİKLER : MALİYET TAKİP 2026" dosyasından üretilen
-// assets/veri/maliyet_takip_2026.json (araclar/ciftlik_rapor/maliyet_takip.py).
+// maliyet_takip_2026.json (araclar/ciftlik_rapor/maliyet_takip.py; Drive "Uygulama Verileri" klasöründe, sunucudan gelir).
 //
 // KVKK: çiftlik ve kalem bazında toplam tutar, hayvan sayısı ve birim maliyet;
 // işçilik yalnızca çiftlik toplamı. Kişi, ücret ayrıntısı, belge no yoktur.

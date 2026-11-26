@@ -16,15 +16,12 @@ import 'gonder.dart';
 class CiftlikRaporEkran extends StatelessWidget {
   const CiftlikRaporEkran({super.key});
 
-  /// Paketlenmiş veri bir kez okunur.
-  static final Future<CiftlikRaporu> _veri = CiftlikRaporu.yukle();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Çiftlikler Rapor')),
       body: FutureBuilder<CiftlikRaporu>(
-        future: _veri,
+        future: CiftlikRaporu.yukle(),
         builder: (context, s) {
           if (s.hasError) {
             return const Padding(padding: EdgeInsets.all(16), child: BilgiKutusu(uyari: true, yazi: 'Rapor verisi okunamadı.'));

@@ -449,7 +449,19 @@ class Paylasim {
 class PaylasimKaydi {
   const PaylasimKaydi(
       {required this.id, required this.etiket, required this.yetki, required this.acik, this.olusturma = '',
-      this.degisiklik = '', this.link = '', this.menuler = const ['ziraat', 'hayvan', 'tarla'], this.maliDetay = false});
+      this.degisiklik = '', this.link = '', this.menuler = const ['ziraat', 'hayvan', 'tarla'], this.maliDetay = false,
+      this.bitis = '', this.suresiDoldu = false, this.sonErisim = '', this.erisimSayisi = 0});
+
+  /// Süreli paylaşım: bitiş günü (yyyy-MM-dd; boşsa süresiz).
+  final String bitis;
+  final bool suresiDoldu;
+
+  /// Erişim kaydı: son açılış zamanı ve açılış sayısı (kişi bilgisi tutulmaz).
+  final String sonErisim;
+  final int erisimSayisi;
+
+  /// Link şu anda çalışıyor mu (açık ve süresi dolmamış).
+  bool get calisiyor => acik && !suresiDoldu;
   final String id, etiket, yetki, olusturma, degisiklik, link;
   final bool acik;
 
@@ -465,7 +477,9 @@ class PaylasimKaydi {
           id: '${v['id']}', etiket: '${v['etiket'] ?? ''}', yetki: '${v['yetki'] ?? 'gor'}', acik: v['acik'] == true,
           olusturma: '${v['olusturma'] ?? ''}', degisiklik: '${v['degisiklik'] ?? ''}', link: '${v['link'] ?? ''}',
           menuler: v['menuler'] is List ? [for (final m in v['menuler'] as List) '$m'] : const ['ziraat', 'hayvan', 'tarla'],
-          maliDetay: v['maliDetay'] == true)
+          maliDetay: v['maliDetay'] == true,
+          bitis: '${v['bitis'] ?? ''}', suresiDoldu: v['suresiDoldu'] == true, sonErisim: '${v['sonErisim'] ?? ''}',
+          erisimSayisi: v['erisimSayisi'] is num ? (v['erisimSayisi'] as num).toInt() : 0)
       : null;
 }
 

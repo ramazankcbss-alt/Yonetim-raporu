@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../veri/model.dart';
+import '../veri/dosyalar.dart';
+import 'web_kopru.dart';
 import '../veri/ozel.dart';
 
 /// Rapor PDF'inde görünen bilgiler (Ayarlar ekranından).
@@ -105,7 +107,9 @@ class VeriDeposu extends ChangeNotifier {
     final ham = p.getString(_kOnbellek);
     if (ham != null) {
       try {
-        veri = RaporVerisi.json(jsonDecode(ham) as Map<String, dynamic>);
+        final j = jsonDecode(ham) as Map<String, dynamic>;
+        veri = RaporVerisi.json(j);
+        UygulamaDosyalari.guncelle(j['dosyalar']);
         final z = p.getInt(_kOnbellekZaman);
         sonAlinma = z == null ? null : DateTime.fromMillisecondsSinceEpoch(z);
       } catch (_) {
@@ -115,18 +119,15 @@ class VeriDeposu extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Web sürümü: bağlantı sayfa adresinden gelir; yalnızca paylaşım anahtarı ("p…") kabul edilir, kalıcı kaydedilmez.
-  void webBaglantisi(String? l) {
-    final u = Uri.tryParse((l ?? '').trim());
-    final a = u?.queryParameters['anahtar'] ?? '';
-    if (u == null || !a.startsWith('p') || a.length < 16) {
-      link = null;
-      veri = null;
-      hata = 'Bu sayfa yalnızca paylaşım linkiyle açılır. Size gönderilen linki kullanın.';
-    } else if (link != l!.trim()) {
-      link = l.trim();
-      veri = null; // başka paylaşımın önbelleği gösterilmez
-    }
+  /// Web sürümü (şirket paneli içinde): veri ve işlemler panelin köprüsüyle (google.script.run) yapılır.
+  /// KVKK: web sürümünde veri tarayıcıda saklanmaz; her açılışta sunucudan yüklenir.
+  bool kopru = false;
+
+  void webKopruKur() {
+    kopru = true;
+    link = 'kopru://panel?anahtar=pkopru-sirket-paneli';
+    veri = null;
+    UygulamaDosyalari.temizle();
     notifyListeners();
   }
 
@@ -159,6 +160,7 @@ class VeriDeposu extends ChangeNotifier {
     await p.remove(_kOnbellekZaman);
     link = null;
     veri = null;
+    UygulamaDosyalari.temizle();
     sonAlinma = null;
     hata = null;
     notifyListeners();
@@ -201,9 +203,11 @@ class VeriDeposu extends ChangeNotifier {
       ...Map.of(u.queryParameters)..remove('panel'),
       'gun': '400',
     });
-    final govde = sahteIstek != null
-        ? await sahteIstek!(adres)
-        : await _istek(adres);
+    final govde = kopru
+        ? await webKopru('veri', '')
+        : sahteIstek != null
+            ? await sahteIstek!(adres)
+            : await _istek(adres);
     final ham = govde.trimLeft();
     if (ham.startsWith('<')) {
       throw VeriHatasi(
@@ -225,10 +229,13 @@ class VeriDeposu extends ChangeNotifier {
       throw VeriHatasi((j['hata'] ?? 'Veri alınamadı.').toString());
     }
     final v = RaporVerisi.json(j);
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_kOnbellek, ham);
+    UygulamaDosyalari.guncelle(j['dosyalar']);
     final simdi = DateTime.now();
-    await p.setInt(_kOnbellekZaman, simdi.millisecondsSinceEpoch);
+    if (!kopru) {
+      final p = await SharedPreferences.getInstance();
+      await p.setString(_kOnbellek, ham);
+      await p.setInt(_kOnbellekZaman, simdi.millisecondsSinceEpoch);
+    }
     veri = v;
     sonAlinma = simdi;
     hata = null;
@@ -251,6 +258,7 @@ class VeriDeposu extends ChangeNotifier {
     await p.remove(_kOnbellek);
     await p.remove(_kOnbellekZaman);
     veri = null;
+    UygulamaDosyalari.temizle();
     sonAlinma = null;
     paylasimKapali = true;
     notifyListeners();
@@ -261,11 +269,12 @@ class VeriDeposu extends ChangeNotifier {
 
   /// Tarla Haritası paylaşımı (yalnızca sahibin uygulamasından): ekle, yetki, kapat, aç, sil.
   Future<String> paylasimYonet(String tur,
-      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler, bool? maliDetay}) async {
+      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler, bool? maliDetay, int? sure}) async {
     final j = await _islem(tur, {
       'id': id, 'etiket': etiket, 'yetki': yetki,
       if (menuler != null) 'menuler': menuler.join(','),
       if (maliDetay != null) 'maliDetay': '$maliDetay',
+      if (sure != null) 'sure': '$sure',
     });
     await yenile();
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
@@ -352,9 +361,11 @@ class VeriDeposu extends ChangeNotifier {
     if (l == null) throw VeriHatasi('Bağlantı linki yok.');
     final govde = jsonEncode({'tur': tur, ...alan});
     final u = Uri.parse(l);
-    final ham = (sahteGonder != null
-            ? await sahteGonder!(u, govde)
-            : await _gonder(u, govde))
+    final ham = (kopru
+            ? await webKopru(tur, govde)
+            : sahteGonder != null
+                ? await sahteGonder!(u, govde)
+                : await _gonder(u, govde))
         .trimLeft();
     if (ham.startsWith('<')) {
       throw VeriHatasi('Bağlantıdan anlaşılmayan bir cevap geldi. Apps Script '

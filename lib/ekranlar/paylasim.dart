@@ -32,11 +32,11 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
   bool _mesgul = false;
 
   Future<void> _yap(String tur,
-      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler, bool? maliDetay}) async {
+      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler, bool? maliDetay, int? sure}) async {
     setState(() => _mesgul = true);
     try {
       final m = await VeriDeposu.ben
-          .paylasimYonet(tur, id: id, etiket: etiket, yetki: yetki, menuler: menuler, maliDetay: maliDetay);
+          .paylasimYonet(tur, id: id, etiket: etiket, yetki: yetki, menuler: menuler, maliDetay: maliDetay, sure: sure);
       if (mounted) bildir(context, m);
     } catch (e) {
       if (mounted) bildir(context, '$e');
@@ -46,8 +46,8 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
   }
 
   Future<void> _ekle() async {
-    final r = await showDialog<(String, String, List<String>)>(context: context, builder: (_) => const _PaylasimEkle());
-    if (r != null) await _yap('paylasimEkle', etiket: r.$1, yetki: r.$2, menuler: r.$3);
+    final r = await showDialog<(String, String, List<String>, int)>(context: context, builder: (_) => const _PaylasimEkle());
+    if (r != null) await _yap('paylasimEkle', etiket: r.$1, yetki: r.$2, menuler: r.$3, sure: r.$4);
   }
 
   Future<void> _adDegistir(PaylasimKaydi p) async {
@@ -67,6 +67,31 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
             ));
     t.dispose();
     if (ad != null && ad.isNotEmpty && ad != p.etiket) await _yap('paylasimAd', id: p.id, etiket: ad);
+  }
+
+  Future<void> _sureDegistir(PaylasimKaydi p) async {
+    final g = await showDialog<int>(
+        context: context,
+        builder: (d) => SimpleDialog(title: Text('${p.etiket} – paylaşım süresi'), children: [
+              for (final x in paylasimSureleri.entries)
+                SimpleDialogOption(onPressed: () => Navigator.pop(d, x.key), child: Text('${x.value} (bugünden itibaren)')),
+            ]));
+    if (g != null) await _yap('paylasimSure', id: p.id, sure: g);
+  }
+
+  Future<void> _yenile(PaylasimKaydi p) async {
+    final ok = await showDialog<bool>(
+        context: context,
+        builder: (d) => AlertDialog(
+              title: Text('${p.etiket} için link yenilensin mi?'),
+              content: const Text('Eski link hemen çalışmaz olur; menüler, yetki ve süre aynı kalır. '
+                  'Yeni linki kişiye tekrar göndermeniz gerekir. Link başkasına iletildiyse bu yolu kullanın.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Vazgeç')),
+                FilledButton(onPressed: () => Navigator.pop(d, true), child: const Text('Yenile')),
+              ],
+            ));
+    if (ok == true) await _yap('paylasimYenile', id: p.id);
   }
 
   Future<void> _sil(PaylasimKaydi p) async {
@@ -94,7 +119,9 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                 onPressed: _mesgul ? null : _ekle, icon: const Icon(Icons.person_add_alt), label: const Text('Yeni paylaşım')),
             body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 90), children: [
               const BilgiKutusu(
-                  yazi: 'Paylaşım linki tarayıcıda "Tarım ve Hayvancılık" web panelini açar (uygulama kurmak gerekmez). '
+                  yazi: 'Paylaşım linki tarayıcıda "Tarım ve Hayvancılık" web panelini açar (uygulama kurmak gerekmez); '
+                      'panel yalnızca şirket Google hesabıyla (@panagro.com.tr) açılır, veri tarayıcıda saklanmaz. '
+                      'Her paylaşımın son erişim zamanı görünür; süre dolunca link kendiliğinden kapanır; "Linki yenile" eski linki geçersiz kılar. '
                       'Her paylaşımda hangi menülerin görüneceğini işaretleyin; işareti kaldırdığınız menü ve verisi o kişiye hemen '
                       'kapanır. Tarla Haritaları dışındaki menüler yalnızca görüntülenir. KVKK: personel/taşeron sayıları, araç ve bakım '
                       'kayıtlarındaki kişi adları gönderilmez; Mali Raporlar "Özet"te tedarikçi bilgisi olmadan yalnızca toplamlar gider. '
@@ -123,6 +150,18 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                       ]),
                       Text('Açılış: ${p.olusturma}${p.degisiklik.isEmpty ? '' : ' · son değişiklik: ${p.degisiklik}'}',
                           style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+                      Text(
+                          p.suresiDoldu
+                              ? 'Süresi doldu (${_gun(p.bitis)}) – link çalışmıyor'
+                              : p.bitis.isEmpty
+                                  ? 'Süre: süresiz'
+                                  : 'Süre: ${_gun(p.bitis)} tarihine kadar',
+                          style: TextStyle(fontSize: 12.5, color: p.suresiDoldu ? Renk.amber : Renk.yazi, fontWeight: FontWeight.w600)),
+                      Text(
+                          p.sonErisim.isEmpty
+                              ? 'Erişim: henüz açılmadı'
+                              : 'Son erişim: ${p.sonErisim} · toplam ${p.erisimSayisi} kez',
+                          style: const TextStyle(fontSize: 12.5, color: Renk.yazi)),
                       const SizedBox(height: 6),
                       SegmentedButton<String>(
                         segments: const [
@@ -168,16 +207,16 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                       ],
                       Wrap(spacing: 4, children: [
                         TextButton.icon(
-                            onPressed: !p.acik || p.link.isEmpty
+                            onPressed: !p.calisiyor || p.link.isEmpty
                                 ? null
                                 : () => Share.share(
                                     'Tarım ve Hayvancılık (${p.menuler.map((m) => paylasimMenuAdlari[m] ?? m).join(', ')}). '
-                                    'Linki telefonda ya da bilgisayarda tarayıcıda açın:\n${p.link}',
+                                    'Linki telefonda ya da bilgisayarda tarayıcıda, şirket Google hesabınızla (@panagro.com.tr) açın:\n${p.link}',
                                     subject: 'Tarım ve Hayvancılık paylaşımı'),
                             icon: const Icon(Icons.send_outlined),
                             label: const Text('Linki gönder')),
                         TextButton.icon(
-                            onPressed: !p.acik || p.link.isEmpty
+                            onPressed: !p.calisiyor || p.link.isEmpty
                                 ? null
                                 : () {
                                     Clipboard.setData(ClipboardData(text: p.link));
@@ -185,6 +224,14 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                                   },
                             icon: const Icon(Icons.copy),
                             label: const Text('Kopyala')),
+                        TextButton.icon(
+                            onPressed: _mesgul ? null : () => _sureDegistir(p),
+                            icon: const Icon(Icons.timer_outlined),
+                            label: const Text('Süre')),
+                        TextButton.icon(
+                            onPressed: _mesgul ? null : () => _yenile(p),
+                            icon: const Icon(Icons.autorenew),
+                            label: const Text('Linki yenile')),
                         TextButton.icon(
                             onPressed: _mesgul ? null : () => _adDegistir(p),
                             icon: const Icon(Icons.drive_file_rename_outline),
@@ -217,27 +264,36 @@ class _GorunumOzeti extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           const Text('Kim hangi bölümü görüyor', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
           const SizedBox(height: 4),
-          const Text('Yalnızca açık paylaşımlar sayılır. Düzenleme yetkisi yalnızca Tarla Haritaları\'nda geçerlidir; '
+          const Text('Yalnızca açık ve süresi dolmamış paylaşımlar sayılır. Düzenleme yetkisi yalnızca Tarla Haritaları\'nda geçerlidir; '
               'diğer menüler yalnızca görüntülenir.',
               style: TextStyle(fontSize: 12, color: Renk.soluk)),
           for (final m in paylasimMenuAdlari.entries) ...[
             const SizedBox(height: 10),
             Text(m.value, style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.ana)),
             Builder(builder: (_) {
-              final x = [for (final p in l) if (p.acik && p.menuler.contains(m.key)) kim(p, m.key)];
+              final x = [for (final p in l) if (p.calisiyor && p.menuler.contains(m.key)) kim(p, m.key)];
               return Text(x.isEmpty ? 'Kimse görmüyor' : x.join(' · '),
                   style: TextStyle(fontSize: 13.5, color: x.isEmpty ? Renk.soluk : Renk.yazi));
             }),
           ],
-          if (l.any((p) => !p.acik)) ...[
+          if (l.any((p) => !p.calisiyor)) ...[
             const SizedBox(height: 10),
-            Text('Kapalı paylaşımlar: ${[for (final p in l) if (!p.acik) p.etiket].join(' · ')}',
+            Text('Kapalı / süresi dolmuş paylaşımlar: ${[for (final p in l) if (!p.calisiyor) p.etiket].join(' · ')}',
                 style: const TextStyle(fontSize: 12.5, color: Renk.amber)),
           ],
         ]),
       ),
     );
   }
+}
+
+/// Paylaşım süreleri (gün → etiket); 0 = süresiz.
+const paylasimSureleri = {30: '30 gün', 90: '90 gün', 180: '180 gün', 0: 'Süresiz'};
+
+/// yyyy-MM-dd → dd.MM.yyyy
+String _gun(String s) {
+  final p = s.split('-');
+  return p.length == 3 ? '${p[2]}.${p[1]}.${p[0]}' : s;
 }
 
 /// Paylaşımda seçilebilen menüler (web panelindeki adlarıyla).
@@ -284,6 +340,7 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
   final _ad = TextEditingController();
   String _yetki = 'gor';
   final _menuler = <String>{'tarla'};
+  int _sure = 90;
   @override
   void dispose() {
     _ad.dispose();
@@ -293,7 +350,7 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
   @override
   Widget build(BuildContext context) => AlertDialog(
         title: const Text('Yeni paylaşım'),
-        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           TextField(
             controller: _ad,
             maxLength: 40,
@@ -328,14 +385,20 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
                 onSelected: (x) => setState(() => x ? _menuler.add(m.key) : _menuler.remove(m.key)),
               ),
           ]),
-        ]),
+          const SizedBox(height: 10),
+          const Text('Paylaşım süresi (dolunca link kendiliğinden kapanır)', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+          Wrap(spacing: 6, children: [
+            for (final x in paylasimSureleri.entries)
+              ChoiceChip(label: Text(x.value), selected: _sure == x.key, onSelected: (_) => setState(() => _sure = x.key)),
+          ]),
+        ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
           FilledButton(
               onPressed: _ad.text.trim().isEmpty || _menuler.isEmpty
                   ? null
                   : () => Navigator.pop(context,
-                      (_ad.text.trim(), _yetki, [for (final k in paylasimMenuAdlari.keys) if (_menuler.contains(k)) k])),
+                      (_ad.text.trim(), _yetki, [for (final k in paylasimMenuAdlari.keys) if (_menuler.contains(k)) k], _sure)),
               child: const Text('Oluştur')),
         ],
       );

@@ -95,8 +95,8 @@
 <div id="durum"></div>
 <script>
 var ANAHTAR = __ANAHTAR__;
-var VERI_ADRESI = 'https://raw.githubusercontent.com/ramazankcbss-alt/Yonetim-raporu/main/assets/veri/';
-var DOSYALAR = ['tarla_2025_2026.json', 'tarla_2024_2025.json', 'tarla_2026_2027.json'];
+// Harita dosyaları sunucudan, paylaşım anahtarıyla gelir (depoda bulunmaz).
+var DOSYALAR = ['tarla_2025_2026', 'tarla_2024_2025', 'tarla_2026_2027'];
 var SINIR = 400;
 var URUNLER = ['Buğday', 'Arpa', 'Tritikale', 'Çavdar', 'Yulaf', 'Dane mısır', 'Şeker pancarı', 'Patates', 'Soğan',
   'Yağlık ayçiçeği', 'Çerezlik ayçiçeği', 'Kanola (kolza)', 'Aspir', 'Soya', 'Nohut', 'Kuru fasulye', 'Mercimek',
@@ -1644,7 +1644,7 @@ function tarimCiz(kok, bas) {
 }
 // ---------- açılış ----------
 function yukle() {
-  var bekle = DOSYALAR.length + 1, hata = null, haritaHata = null;
+  var bekle = 1, hata = null, haritaHata = null;
   function bitti() {
     if (--bekle) return;
     if (haritaHata && (!S.menuler || menuAcik('tarla'))) hata = hata || haritaHata;
@@ -1655,6 +1655,9 @@ function yukle() {
     if (!r || !r.ok) { hata = (r && r.hata) || 'Veri alınamadı.'; if (r && r.kapali) hata = 'Bu paylaşım kapatıldı.'; return bitti(); }
     S.sezonParsel = r.sezonParsel || []; S.parselSinir = r.parselSinir || []; S.tarlaSezonlari = r.tarlaSezonlari || []; S.yetki = r.yetki; S.etiket = r.etiket; S.menuler = r.menuler || ['ziraat', 'hayvan', 'tarla']; SINIR = r.sezonParselSiniri || 400;
     S.ekim = r.ekim || []; S.ekimPlani = r.ekimPlani || []; S.cks = r.cks || [];
+    var dos = r.dosyalar || {};
+    S.paket = DOSYALAR.map(function (d) { try { return dos[d] ? sezonOku(JSON.parse(dos[d])) : null; } catch (e) { return null; } }).filter(Boolean);
+    if (!S.paket.length && S.menuler.indexOf('tarla') >= 0) haritaHata = 'Harita dosyası alınamadı.';
     document.getElementById('ust').textContent = r.etiket + ' · ' + (r.yetki === 'duzenle' ? 'düzenleme yetkisi' : 'yalnızca görüntüleme');
     bitti();
   }).withFailureHandler(function (e) { hata = 'Veri alınamadı: ' + e.message; bitti(); }).tarlaPanelVeri(ANAHTAR);
@@ -1662,12 +1665,6 @@ function yukle() {
     if (!r || !r.ok) T.hata = (r && r.hata) || 'Ziraat ve Hayvancılık verisi alınamadı.'; else tarimVerisiOku(r);
     if (S.ekran === 'ziraat' || S.ekran === 'hayvan') ciz();
   }).withFailureHandler(function (e) { T.hata = 'Ziraat ve Hayvancılık verisi alınamadı: ' + e.message; if (S.ekran === 'ziraat' || S.ekran === 'hayvan') ciz(); }).tarlaPanelTarim(ANAHTAR);
-  var sira = {};
-  DOSYALAR.forEach(function (d, i) {
-    fetch(VERI_ADRESI + d, { cache: 'no-store' }).then(function (x) { if (!x.ok) throw new Error(x.status); return x.json(); })
-      .then(function (j) { sira[i] = sezonOku(j); }).catch(function () { if (i === 0) haritaHata = 'Harita dosyası alınamadı. İnternet bağlantınızı kontrol edin.'; })
-      .then(function () { S.paket = DOSYALAR.map(function (_, k) { return sira[k]; }).filter(Boolean); bitti(); });
-  });
 }
 yukle();
 </script>

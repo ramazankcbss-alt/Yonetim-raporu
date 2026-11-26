@@ -1,12 +1,12 @@
 // Çiftlikler Rapor 2026: "2026 Yılı Çiftlik Raporları" dosyasının gelir
 // tabloları, satış özeti ve satılan mamul maliyeti (SMM) detayından üretilen
-// assets/veri/ciftlik_rapor_2026.json (araclar/ciftlik_rapor/uret.py).
+// ciftlik_rapor_2026.json (araclar/ciftlik_rapor/uret.py; Drive "Uygulama Verileri" klasöründe, sunucudan gelir).
 //
 // KVKK: yalnızca çiftlik bazında toplam tutar, miktar ve birim maliyet içerir;
 // alıcı, kişi adı ve küpe numarası yoktur.
 import 'dart:convert';
 
-import 'package:flutter/services.dart' show rootBundle;
+import 'dosyalar.dart';
 
 import '../bicim.dart';
 import 'maliyet_takip.dart';
@@ -210,12 +210,16 @@ class CiftlikRaporu {
     );
   }
 
-  static Future<CiftlikRaporu> yukle() async {
-    String? mt;
-    try {
-      mt = await rootBundle.loadString('assets/veri/maliyet_takip_2026.json');
-    } catch (_) {}
-    return coz(await rootBundle.loadString('assets/veri/ciftlik_rapor_2026.json'), maliyetTakip: mt);
+  static String? _sonMetin;
+  static Future<CiftlikRaporu>? _son;
+
+  /// Sunucudan gelen dosyadan okunur (aynı dosya için bir kez çözülür).
+  static Future<CiftlikRaporu> yukle() {
+    final m = UygulamaDosyalari.metin('ciftlik_rapor_2026');
+    if (m == null) return Future.error(StateError('Çiftlikler Rapor verisi henüz alınmadı.'));
+    if (m == _sonMetin && _son != null) return _son!;
+    _sonMetin = m;
+    return _son = Future(() => coz(m, maliyetTakip: UygulamaDosyalari.metin('maliyet_takip_2026')));
   }
 
   /// Seçicide gösterilen çiftlikler (dosyadaki sırayla, toplamlar başta).

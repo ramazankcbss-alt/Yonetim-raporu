@@ -7,6 +7,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'ekranlar/ana.dart';
 import 'servis/rapor_arsivi.dart';
 import 'servis/veri_servisi.dart';
+import 'servis/web_kopru.dart';
 import 'tema.dart';
 
 Future<void> main() async {
@@ -14,8 +15,12 @@ Future<void> main() async {
   await initializeDateFormatting('tr_TR');
   await VeriDeposu.ben.baslat();
   if (kIsWeb) {
-    // Web sürümü yalnızca paylaşım linkiyle açılır: ?baglanti=<Apps Script linki + paylaşım anahtarı>
-    VeriDeposu.ben.webBaglantisi(Uri.base.queryParameters['baglanti']);
+    // Web sürümü yalnızca şirket paneli içinde (şirket hesabıyla girişten sonra) çalışır.
+    if (webKopruVar) {
+      VeriDeposu.ben.webKopruKur();
+    } else {
+      VeriDeposu.ben.hata = 'Bu sayfa yalnızca size gönderilen paylaşım linkiyle, şirket hesabınızla açılır.';
+    }
   } else {
     VeriDeposu.ben.veriGeldi = RaporArsivi.guncelle;
   }

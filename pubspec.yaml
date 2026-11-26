@@ -32,9 +32,3 @@ flutter:
   assets:
     - assets/fonts/DejaVuSans.ttf
     - assets/fonts/DejaVuSans-Bold.ttf
-    - assets/veri/hastalik.json
-    - assets/veri/ciftlik_rapor_2026.json
-    - assets/veri/maliyet_takip_2026.json
-    - assets/veri/tarla_2025_2026.json
-    - assets/veri/tarla_2024_2025.json
-    - assets/veri/tarla_2026_2027.json
