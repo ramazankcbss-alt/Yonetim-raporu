@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+/// Web sürümü: yazı tipi uygulamayla gelir (dış yazı tipi sunucusuna bağlı kalmaz).
+const String? _yazi = kIsWeb ? 'DejaVuSans' : null;
+
 /// Kurumsal, açık renkli tema: koyu yeşil ana renk, beyaz kartlar, sade butonlar.
 class Renk {
   static const ana = Color(0xFF1F7A4D); // tarım yeşili
@@ -51,7 +54,7 @@ ThemeData temaOlustur() {
       RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
   return ThemeData(
     // Web sürümü: yazı tipi uygulamayla gelir (dış yazı tipi sunucusuna bağlı kalmaz).
-    fontFamily: kIsWeb ? 'DejaVuSans' : null,
+    fontFamily: _yazi,
     useMaterial3: true,
     colorScheme: cs,
     scaffoldBackgroundColor: Renk.zemin,
@@ -63,7 +66,7 @@ ThemeData temaOlustur() {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(
+      titleTextStyle: TextStyle(fontFamily: _yazi, 
           fontSize: 19, fontWeight: FontWeight.w600, color: Colors.white),
     ),
     // Üst yeşil şeritteki sekmeler: seçili beyaz, diğerleri açık beyaz.
@@ -72,14 +75,14 @@ ThemeData temaOlustur() {
       unselectedLabelColor: Color(0xCCFFFFFF),
       indicatorColor: Colors.white,
       dividerColor: Colors.transparent,
-      labelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-      unselectedLabelStyle: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+      labelStyle: TextStyle(fontFamily: _yazi, fontSize: 15, fontWeight: FontWeight.w700),
+      unselectedLabelStyle: TextStyle(fontFamily: _yazi, fontSize: 15, fontWeight: FontWeight.w500),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: Colors.white,
-      labelStyle: const TextStyle(color: Renk.soluk),
-      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+      labelStyle: const TextStyle(fontFamily: _yazi, color: Renk.soluk),
+      hintStyle: const TextStyle(fontFamily: _yazi, color: Color(0xFF94A3B8)),
       border: kenar,
       enabledBorder: kenar,
       focusedBorder:
@@ -90,7 +93,7 @@ ThemeData temaOlustur() {
       style: FilledButton.styleFrom(
         minimumSize: const Size(64, 46),
         shape: yuvarlak,
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontFamily: _yazi, fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -99,7 +102,7 @@ ThemeData temaOlustur() {
         shape: yuvarlak,
         foregroundColor: Renk.yazi,
         side: const BorderSide(color: Color(0xFFCBD5DC)),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontFamily: _yazi, fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -118,7 +121,7 @@ ThemeData temaOlustur() {
       height: 68,
       iconTheme: WidgetStateProperty.resolveWith((s) => IconThemeData(
           color: s.contains(WidgetState.selected) ? Renk.anaKoyu : Renk.soluk)),
-      labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(
+      labelTextStyle: WidgetStateProperty.resolveWith((s) => TextStyle(fontFamily: _yazi, 
           fontSize: 12,
           fontWeight:
               s.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
@@ -128,7 +131,7 @@ ThemeData temaOlustur() {
       backgroundColor: Colors.white,
       selectedColor: Renk.anaAcik,
       side: const BorderSide(color: Renk.cizgi),
-      labelStyle: const TextStyle(color: Renk.yazi, fontSize: 14),
+      labelStyle: const TextStyle(fontFamily: _yazi, color: Renk.yazi, fontSize: 14),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       showCheckmark: false,
     ),
@@ -143,7 +146,7 @@ ThemeData temaOlustur() {
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: Renk.yazi,
-      contentTextStyle: const TextStyle(color: Colors.white, fontSize: 15),
+      contentTextStyle: const TextStyle(fontFamily: _yazi, color: Colors.white, fontSize: 15),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     ),
     progressIndicatorTheme: const ProgressIndicatorThemeData(color: Renk.ana),
@@ -192,7 +195,7 @@ class Panel extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(baslik!,
-                        style: const TextStyle(
+                        style: const TextStyle(fontFamily: _yazi, 
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Renk.yazi)),
@@ -290,7 +293,7 @@ class BosDurum extends StatelessWidget {
             const SizedBox(height: 10),
             Text(yazi,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Renk.soluk, fontSize: 15)),
+                style: const TextStyle(fontFamily: _yazi, color: Renk.soluk, fontSize: 15)),
           ],
         ),
       );
