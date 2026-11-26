@@ -1,20 +1,18 @@
 name: Web Sürümü (şirket paneli)
 
-# Paylaşım panelinin kullandığı web sürümü: uygulama web için derlenir ve GitHub Pages'e konur.
-# Yalnızca program kodu yayınlanır; veri içermez. Veri şirket panelinde (Apps Script, şirket hesabıyla
-# giriş zorunlu) paylaşım anahtarıyla gelir; tarayıcıda saklanmaz.
+# Paylaşım panelinin kullandığı web sürümü: uygulama web için derlenir ve "web-yayin" dalına konur.
+# Şirket paneli (Apps Script) bu dosyaları jsDelivr üzerinden yükler. Yalnızca program kodu yayınlanır;
+# veri içermez. Veri şirket hesabıyla girişten sonra paylaşım anahtarıyla gelir; tarayıcıda saklanmaz.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: web-yayin
   cancel-in-progress: true
 
 jobs:
@@ -32,21 +30,18 @@ jobs:
         run: |
           flutter pub get
           flutter create --platforms=web --org com.panagro --project-name yonetim_raporu .
-          flutter build web --release --base-href /Yonetim-raporu/ --no-web-resources-cdn
+          flutter build web --release
           sed -i 's#<head>#<head><meta name="robots" content="noindex, nofollow">#' build/web/index.html
           sed -i 's#<title>[^<]*</title>#<title>Tarım ve Hayvancılık</title>#' build/web/index.html
           printf 'User-agent: *\nDisallow: /\n' > build/web/robots.txt
-          ls -la build/web
+          du -sh build/web
 
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-    steps:
-      - uses: actions/deploy-pages@v4
+      - name: web-yayin dalına koy
+        run: |
+          cd build/web
+          git init -q -b web-yayin
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Web sürümü ${GITHUB_SHA::7} (yalnızca program kodu, veri içermez)"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" web-yayin

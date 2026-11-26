@@ -1739,8 +1739,29 @@ function paylasimLinki_(p) {
   return paylasimAdresi_() + '?panel=tarla&anahtar=' + p.anahtar;
 }
 
-/** Web sürümünün yayın adresi (GitHub Pages; yalnızca program kodu, veri içermez). */
-var WEB_SURUM_ADRESI_ = 'https://ramazankcbss-alt.github.io/Yonetim-raporu/';
+/** Web sürümü: depodaki "web-yayin" dalı (yalnızca program kodu, veri içermez), jsDelivr üzerinden yüklenir.
+ * Dalın son sürümü (commit) 10 dakikada bir sorgulanır; adres o sürüme sabitlenir. */
+var WEB_DEPO_ = 'ramazankcbss-alt/Yonetim-raporu';
+function webSurumAdresi_() {
+  var c = CacheService.getScriptCache(), k = 'web_surum_adresi';
+  var x = c.get(k);
+  if (x) return x;
+  var sha = '';
+  try {
+    var r = UrlFetchApp.fetch('https://data.jsdelivr.com/v1/packages/gh/' + WEB_DEPO_ + '/resolved?specifier=web-yayin', { muteHttpExceptions: true });
+    if (r.getResponseCode() === 200) sha = String(JSON.parse(r.getContentText()).version || '');
+  } catch (e) { sha = ''; }
+  if (!/^[0-9a-f]{7,40}$/.test(sha)) {
+    try {
+      var g = UrlFetchApp.fetch('https://api.github.com/repos/' + WEB_DEPO_ + '/branches/web-yayin', { muteHttpExceptions: true });
+      if (g.getResponseCode() === 200) sha = String(JSON.parse(g.getContentText()).commit.sha || '');
+    } catch (e) { sha = ''; }
+  }
+  if (!/^[0-9a-f]{7,40}$/.test(sha)) return '';
+  x = 'https://cdn.jsdelivr.net/gh/' + WEB_DEPO_ + '@' + sha + '/';
+  c.put(k, x, 600);
+  return x;
+}
 
 /** Paylaşım paneli: şirket hesabı zorunlu. Sayfa veri içermez; veri anahtarla google.script.run üzerinden gelir. */
 function tarlaPanel_(anahtar, eski) {
@@ -1763,14 +1784,15 @@ function tarlaPanel_(anahtar, eski) {
       .setTitle('Tarım ve Hayvancılık').addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
   }
-  var html = '<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><base href="' + WEB_SURUM_ADRESI_ + '" target="_top">' +
+  var WEB_ADRES = webSurumAdresi_();
+  var html = '<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><base href="' + WEB_ADRES + '" target="_top">' +
     '<meta name="robots" content="noindex, nofollow"><title>Tarım ve Hayvancılık</title>' +
     '<style>html,body{margin:0;height:100%;background:#f8fafc;font-family:sans-serif}#yukl{padding:40px;text-align:center;color:#64748b}</style>' +
-    '<script>window.YR_WEB=' + JSON.stringify(WEB_SURUM_ADRESI_) + ';var YR_ANAHTAR=' + JSON.stringify(pay.anahtar) + ';' +
+    '<script>window.YR_WEB=' + JSON.stringify(WEB_ADRES) + ';var YR_ANAHTAR=' + JSON.stringify(pay.anahtar) + ';' +
     'window.yrSunucu=function(islem,govde){return new Promise(function(ok,hata){google.script.run' +
     '.withSuccessHandler(function(r){ok(String(r));}).withFailureHandler(function(e){hata(e&&e.message?e.message:String(e));})' +
     '.paylasimSunucu(YR_ANAHTAR,String(islem),String(govde||""));});};</script>' +
-    '<script src="' + WEB_SURUM_ADRESI_ + 'flutter_bootstrap.js" async></script></head>' +
+    '<script src="' + WEB_ADRES + 'flutter_bootstrap.js" async></script></head>' +
     '<body><div id="yukl">Yükleniyor…</div></body></html>';
   return HtmlService.createHtmlOutput(html)
     .setTitle('Tarım ve Hayvancılık')
@@ -1780,17 +1802,17 @@ function tarlaPanel_(anahtar, eski) {
 
 /** Kurulum sonrası bir kez düzenleyicide çalıştırın: web sürümü kontrolü için gereken izni (harici istek) verir. */
 function yetkiVer() {
-  CacheService.getScriptCache().remove('web_surum_hazir');
+  CacheService.getScriptCache().removeAll(['web_surum_hazir', 'web_surum_adresi']);
   Logger.log('Web sürümü yayında: ' + webSurumHazir_() + ' · Paylaşım adresi: ' + paylasimAdresi_());
 }
 
-/** Web sürümü yayında mı (GitHub Pages). Değilse eski panel açılır. Sonuç 10 dakika önbellekte. */
+/** Web sürümü yayında mı (web-yayin dalı, jsDelivr). Değilse eski panel açılır. Sonuç 10 dakika önbellekte. */
 function webSurumHazir_() {
   var c = CacheService.getScriptCache(), k = 'web_surum_hazir';
   var x = c.get(k);
   if (x) return x === '1';
-  var ok = false;
-  try { ok = UrlFetchApp.fetch(WEB_SURUM_ADRESI_ + 'flutter_bootstrap.js', { muteHttpExceptions: true }).getResponseCode() === 200; } catch (e) { ok = false; }
+  var ok = false, WEB_ADRES = webSurumAdresi_();
+  try { ok = !!WEB_ADRES && UrlFetchApp.fetch(WEB_ADRES + 'flutter_bootstrap.js', { muteHttpExceptions: true }).getResponseCode() === 200; } catch (e) { ok = false; }
   c.put(k, ok ? '1' : '0', 600);
   return ok;
 }
