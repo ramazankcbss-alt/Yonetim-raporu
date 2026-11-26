@@ -90,6 +90,7 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                       'işaretlenir. Paylaşımı kapattığınızda link hemen çalışmaz olur. KVKK: paylaşım adına kişi adı değil '
                       'görev/birim yazın.'),
               if (_mesgul) const LinearProgressIndicator(),
+              if (l.isNotEmpty) _GorunumOzeti(l: l),
               if (l.isEmpty)
                 const Padding(padding: EdgeInsets.all(16), child: Text('Henüz paylaşım yok.', style: TextStyle(color: Renk.soluk))),
               for (final p in l)
@@ -167,6 +168,42 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
           );
         },
       );
+}
+
+/// Kimin hangi bölümü gördüğünün özeti: menü başına paylaşımlar (yalnızca açık paylaşımlar erişebilir).
+class _GorunumOzeti extends StatelessWidget {
+  const _GorunumOzeti({required this.l});
+  final List<PaylasimKaydi> l;
+
+  @override
+  Widget build(BuildContext context) {
+    String kim(PaylasimKaydi p) => '${p.etiket} (${p.duzenler && p.menuler.contains('tarla') ? 'düzenleme' : 'görüntüleme'})';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Kim hangi bölümü görüyor', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          const Text('Yalnızca açık paylaşımlar sayılır. Düzenleme yetkisi yalnızca Tarla Haritaları\'nda geçerlidir.',
+              style: TextStyle(fontSize: 12, color: Renk.soluk)),
+          for (final m in paylasimMenuAdlari.entries) ...[
+            const SizedBox(height: 10),
+            Text(m.value, style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.ana)),
+            Builder(builder: (_) {
+              final x = [for (final p in l) if (p.acik && p.menuler.contains(m.key)) kim(p)];
+              return Text(x.isEmpty ? 'Kimse görmüyor' : x.join(' · '),
+                  style: TextStyle(fontSize: 13.5, color: x.isEmpty ? Renk.soluk : Renk.yazi));
+            }),
+          ],
+          if (l.any((p) => !p.acik)) ...[
+            const SizedBox(height: 10),
+            Text('Kapalı paylaşımlar: ${[for (final p in l) if (!p.acik) p.etiket].join(' · ')}',
+                style: const TextStyle(fontSize: 12.5, color: Renk.amber)),
+          ],
+        ]),
+      ),
+    );
+  }
 }
 
 /// Paylaşımda seçilebilen menüler (web panelindeki adlarıyla).
