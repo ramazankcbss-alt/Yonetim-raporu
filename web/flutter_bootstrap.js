@@ -10,6 +10,10 @@
   kutu.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#fff7ed;color:#9a3412;' +
     'font:13px sans-serif;padding:8px 12px;border-top:1px solid #fdba74;white-space:pre-wrap;max-height:40%;overflow:auto';
   function yaz(t) { if (!kutu.parentNode && document.body) document.body.appendChild(kutu); kutu.textContent += t + '\n'; }
+  ['error', 'warn'].forEach(function (k) {
+    var eski = console[k];
+    console[k] = function () { try { yaz((k === 'error' ? 'KONSOL HATA: ' : 'KONSOL UYARI: ') + Array.prototype.join.call(arguments, ' ').slice(0, 400)); } catch (e) {} return eski.apply(console, arguments); };
+  });
   window.addEventListener('error', function (e) { yaz('HATA: ' + (e.message || e) + (e.filename ? ' @ ' + e.filename + ':' + e.lineno : '')); });
   window.addEventListener('unhandledrejection', function (e) { yaz('HATA (söz): ' + (e.reason && (e.reason.message || e.reason))); });
   yaz('1/4 Açılış dosyası yüklendi · köprü: ' + (typeof window.yrSunucu === 'function' ? 'var' : 'yok'));
@@ -27,7 +31,14 @@
           if (y) y.remove();
           await calistir.runApp();
           yaz('4/4 Uygulama çalışıyor');
-          setTimeout(function () { if (kutu.textContent.indexOf('HATA') < 0 && kutu.parentNode) kutu.parentNode.removeChild(kutu); }, 8000);
+          setTimeout(function () {
+            var v = document.querySelector('flutter-view') || document.querySelector('flt-glass-pane');
+            var r = v ? v.getBoundingClientRect() : null;
+            var gl = false;
+            try { gl = !!document.createElement('canvas').getContext('webgl2'); } catch (e) {}
+            yaz('Tanı: görünüm ' + (r ? Math.round(r.width) + 'x' + Math.round(r.height) : 'yok') + ' · tuval ' +
+              document.querySelectorAll('canvas').length + ' · WebGL2 ' + (gl ? 'var' : 'yok') + ' · pencere ' + innerWidth + 'x' + innerHeight);
+          }, 6000);
         } catch (e) { yaz('HATA (başlatma): ' + (e && (e.message || e))); }
       },
     });
