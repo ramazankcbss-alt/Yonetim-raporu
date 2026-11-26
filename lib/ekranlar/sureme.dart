@@ -33,8 +33,18 @@ String _liste(Map<String, double> m, {String son = ''}) {
   return e.map((x) => '${x.key} ${_s(x.value)}$son').join(' · ');
 }
 
+/// Dönem seçimi: 0 günlük, 1 haftalık, 2 aylık, 3 yıllık (tüm sekmelere uygulanır).
+class _Donem extends InheritedWidget {
+  const _Donem({required this.donem, required super.child});
+  final int donem;
+  static int of(BuildContext c) => c.dependOnInheritedWidgetOfExactType<_Donem>()?.donem ?? 2;
+  @override
+  bool updateShouldNotify(_Donem old) => old.donem != donem;
+}
+
 class _SuremeEkranState extends State<SuremeEkran> {
   late final SuremeArsiv _a = SuremeArsiv.yukle();
+  int _donem = 0;
   int? _yil;
   String? _ciftlik;
 
@@ -64,9 +74,13 @@ class _SuremeEkranState extends State<SuremeEkran> {
             : Column(children: [
                 _filtreler(a),
                 Expanded(
-                  child: TabBarView(children: [
-                    for (final (i, s) in sekmeler.indexed) GonderAlani(konu: 'Sürü Sağlığı ve Üreme – $s', child: _sekme(i, a)),
-                  ]),
+                  child: _Donem(
+                    donem: _donem,
+                    child: TabBarView(children: [
+                      for (final (i, s) in sekmeler.indexed)
+                        GonderAlani(konu: 'Sürü Sağlığı ve Üreme – $s (${_donemAd[_donem]})', child: _sekme(i, a)),
+                    ]),
+                  ),
                 ),
               ]),
       ),
@@ -114,6 +128,18 @@ class _SuremeEkranState extends State<SuremeEkran> {
       child: Column(children: [
         satir<int>([null, ...yillar], _yil, (y) => y?.toString() ?? 'Tüm yıllar', (y) => _yil = y),
         satir<String>([null, ...cf], _ciftlik, (c) => c ?? 'Tüm çiftlikler', (c) => _ciftlik = c),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 6, 10, 2),
+          child: SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<int>(
+              showSelectedIcon: false,
+              segments: [for (var i = 0; i < 4; i++) ButtonSegment(value: i, label: Text(_donemAd[i]))],
+              selected: {_donem},
+              onSelectionChanged: (s) => setState(() => _donem = s.first),
+            ),
+          ),
+        ),
         const SizedBox(height: 4),
         const Divider(height: 1),
       ]),
@@ -121,7 +147,11 @@ class _SuremeEkranState extends State<SuremeEkran> {
   }
 }
 
-/// Kayıtları yıl → ay gruplar; her ay bir kart (başlık + alt satır), açılınca ayrıntı.
+const _donemAd = ['Günlük', 'Haftalık', 'Aylık', 'Yıllık'];
+const _gunAd = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+
+/// Kayıtları seçilen döneme (gün, hafta, ay, yıl) göre gruplar; her dönem bir kart
+/// (başlık + özet), açılınca ayrıntı. Günlük ve haftalıkta üst başlık ay/yıl, aylıkta yıl.
 class _AyListe extends StatelessWidget {
   const _AyListe({
     required this.l,
@@ -148,47 +178,93 @@ class _AyListe extends StatelessWidget {
         const Padding(padding: EdgeInsets.all(24), child: Center(child: Text('Bu seçimde kayıt yok'))),
       ]);
     }
-    final ay = <int, List<SuremeSatir>>{};
+    final donem = _Donem.of(context);
+    DateTime anahtarOf(DateTime t) => switch (donem) {
+          0 => DateTime(t.year, t.month, t.day),
+          1 => DateTime(t.year, t.month, t.day).subtract(Duration(days: t.weekday - 1)),
+          2 => DateTime(t.year, t.month),
+          _ => DateTime(t.year),
+        };
+    int ustAnahtar(DateTime k) => switch (donem) { 0 => k.year * 100 + k.month, 1 || 2 => k.year, _ => -1 };
+    final grp = <DateTime, List<SuremeSatir>>{};
     for (final x in l) {
-      ay.putIfAbsent(x.t.year * 100 + x.t.month, () => []).add(x);
+      grp.putIfAbsent(anahtarOf(x.t), () => []).add(x);
     }
-    final anahtar = ay.keys.toList()..sort((a, b) => b.compareTo(a));
+    final anahtar = grp.keys.toList()..sort((a, b) => b.compareTo(a));
     final ogeler = <Object>[];
     int? onceki;
     for (final k in anahtar) {
-      if (k ~/ 100 != onceki) {
-        onceki = k ~/ 100;
-        ogeler.add(onceki);
+      if (ustAnahtar(k) != onceki && ustAnahtar(k) >= 0) {
+        onceki = ustAnahtar(k);
+        ogeler.add(ustAnahtar(k));
       }
       ogeler.add(k);
     }
+    String etiket(DateTime k) {
+      switch (donem) {
+        case 0:
+          return '${k.day} ${aylar[k.month - 1]} ${k.year}, ${_gunAd[k.weekday - 1]}';
+        case 1:
+          final b = k.add(const Duration(days: 6));
+          return '${k.day} ${aylar[k.month - 1]} – ${b.day} ${aylar[b.month - 1]} ${b.year}';
+        case 2:
+          return '${aylar[k.month - 1]} ${k.year}';
+        default:
+          return '${k.year}';
+      }
+    }
+
+    List<Widget> yillikDetay(List<SuremeSatir> kl) {
+      final ay = <int, List<SuremeSatir>>{};
+      for (final x in kl) {
+        ay.putIfAbsent(x.t.month, () => []).add(x);
+      }
+      final a = ay.keys.toList()..sort((x, y) => y.compareTo(x));
+      return [
+        for (final m in a)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SizedBox(width: 70, child: Text(aylar[m - 1], style: const TextStyle(fontWeight: FontWeight.w600))),
+              Expanded(child: Text(ozet(ay[m]!..sort((x, y) => y.t.compareTo(x.t))))),
+            ]),
+          ),
+      ];
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(12),
       itemCount: ust.length + ogeler.length,
       itemBuilder: (context, i) {
         if (i < ust.length) return ust[i];
-        final o = ogeler[i - ust.length] as int;
-        if (o < 10000) {
-          final yl = l.where((x) => x.t.year == o).toList();
-          final yo = (yilOzet ?? ozet)(yl);
+        final oo = ogeler[i - ust.length];
+        if (oo is int) {
+          final o = oo;
+          final yl = o > 10000
+              ? l.where((x) => x.t.year == o ~/ 100 && x.t.month == o % 100).toList()
+              : l.where((x) => x.t.year == o).toList();
+          yl.sort((a, b) => b.t.compareTo(a.t));
+          final yo = (o > 10000 ? ozet : (yilOzet ?? ozet))(yl);
           return Padding(
             padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
             child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('$o', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              Text(o > 10000 ? '${aylar[o % 100 - 1]} ${o ~/ 100}' : '$o',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
               const SizedBox(width: 10),
               if (yo != null) Expanded(child: Text(yo, style: const TextStyle(color: Renk.soluk, fontSize: 12.5))),
             ]),
           );
         }
-        final kl = ay[o]!..sort((a, b) => b.t.compareTo(a.t));
+        final k = oo as DateTime;
+        final kl = grp[k]!..sort((a, b) => b.t.compareTo(a.t));
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ExpansionTile(
-            title: Text('${aylar[o % 100 - 1]} ${o ~/ 100}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            title: Text(etiket(k), style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(ozet(kl), style: const TextStyle(fontSize: 12.5)),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
-            children: detay(kl),
+            children: donem == 3 ? yillikDetay(kl) : detay(kl),
           ),
         );
       },
