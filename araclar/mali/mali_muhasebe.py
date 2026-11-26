@@ -4,11 +4,16 @@
 Karar (26.11.2026): Mali Raporlar yalnızca muhasebenin gönderdiği "2026 Fatura" dosyasından beslenir.
 "2026 Çiftlikler İş Birimi Gelen Fatura Raporları" artık okunmaz; ondan alınan veriler kaldırıldı.
 
-Kullanım: python3 -I mali_muhasebe.py 2026_Fatura.xlsx CIKTI.json [DRIVE_LINK]
+Kullanım: python3 -I mali_muhasebe.py 2026_Fatura.xlsx CIKTI.json [DRIVE_LINK] [--gelir "aylık gelir satış tablosu.xlsx"]
 KVKK: "Kullanıcı adı" sütunu okunmaz; şahıs / teyitsiz tedarikçi adları ve onların fatura numaraları
 çıktıya yazılmaz; kalem açıklaması aktarılmaz (yalnızca kategori).
 """
-import openpyxl, datetime, collections, re, json, sys
+import openpyxl, datetime, collections, re, json, sys, os
+# İsteğe bağlı: --gelir "aylık gelir satış tablosu.xlsx" → Gider / Gelir / Kâr-Zarar verisi (gelir_gider.py)
+GELIR = None
+if '--gelir' in sys.argv:
+    i = sys.argv.index('--gelir'); GELIR = sys.argv[i + 1]; del sys.argv[i:i + 2]
+L_GELIR = 'https://drive.google.com/file/d/1_68Qn8esEbBH2LnTAfUCtP_V1OsXe1Ci/view'
 KAYNAK, CIKTI = sys.argv[1], sys.argv[2]
 L5 = sys.argv[3] if len(sys.argv) > 3 else 'https://drive.google.com/file/d/1SZdjPUrz3_1aHcWn5xBQJSpMeqBntKMw/view'
 F5 = '2026 Fatura (muhasebe)'
@@ -103,5 +108,9 @@ kontrol('Bilgi','Kaynak dosya','1 dosya',
 kontrol('Bilgi','KVKK','—','Kullanıcı adı sütunu okunmaz. Şahıs işletmeleri ve gerçek kişi tedarikçilerin adları ve fatura numaraları gösterilmez ("Şahıs / teyitsiz tedarikçi"); kalem açıklaması aktarılmaz.')
 out=dict(surum=5,olusturma=datetime.date.today().isoformat(),kaynak=F5,kdv='dahil',dosyalar=[['muhasebe',F5,L5]],
          fatura=fat,acik=[],kontrol=K,muhasebe=[],muhasebeBilgi=dict(kaynak=F5,link=L5,donem=donem,kdv='dahil'))
+if GELIR:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import gelir_gider
+    out['gelirGider'] = gelir_gider.uret(KAYNAK, GELIR, kategori, L5, L_GELIR)
 json.dump(out,open(CIKTI,'w'),ensure_ascii=False,separators=(',',':'))
 print(len(fat),round(sum(f[5] for f in fat)),donem,[k[1] for k in K])

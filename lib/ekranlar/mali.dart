@@ -8,6 +8,7 @@ import '../veri/model.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 import 'esk.dart' show tl;
+import 'mali_gelir_gider.dart';
 
 /// Mali Raporlar: çiftliklerin gelen faturaları günlük, haftalık, aylık ve
 /// yıllık; açık bakiyeler; dosyalar arası karşılaştırma ve tutarsızlıklar.
@@ -24,8 +25,9 @@ class MaliEkran extends StatelessWidget {
         final m = (VeriDeposu.ben.veri ?? veri).mali;
         final acikVar = m.acik.isNotEmpty;
         final muhVar = m.muhasebe.isNotEmpty;
+        final ggVar = !m.gelirGider.bos;
         return DefaultTabController(
-          length: 5 + (acikVar ? 1 : 0) + (muhVar ? 1 : 0),
+          length: 5 + (acikVar ? 1 : 0) + (muhVar ? 1 : 0) + (ggVar ? 3 : 0),
           child: Scaffold(
             appBar: AppBar(
               title: const Text('Mali Raporlar'),
@@ -37,6 +39,7 @@ class MaliEkran extends StatelessWidget {
                 unselectedLabelColor: const Color(0xCCFFFFFF),
                 indicatorColor: Colors.white,
                 tabs: [
+                  if (ggVar) ...const [Tab(text: 'Gider'), Tab(text: 'Gelir'), Tab(text: 'Kâr / Zarar')],
                   const Tab(text: 'Günlük'),
                   const Tab(text: 'Haftalık'),
                   const Tab(text: 'Aylık'),
@@ -55,6 +58,11 @@ class MaliEkran extends StatelessWidget {
                             'mali_veri.json olmalı ve Apps Script güncel olmalı.'),
                   )
                 : TabBarView(children: [
+                    if (ggVar) ...[
+                      GonderAlani(konu: 'Mali Raporlar – Gider', child: GelirGiderSekmesi(veri: m.gelirGider, sekme: GgSekme.gider)),
+                      GonderAlani(konu: 'Mali Raporlar – Gelir', child: GelirGiderSekmesi(veri: m.gelirGider, sekme: GgSekme.gelir)),
+                      GonderAlani(konu: 'Mali Raporlar – Kâr / Zarar', child: GelirGiderSekmesi(veri: m.gelirGider, sekme: GgSekme.karZarar)),
+                    ],
                     GonderAlani(konu: 'Mali Raporlar – Günlük', child: _Donem(veri: m, donem: MaliDonem.gun)),
                     GonderAlani(konu: 'Mali Raporlar – Haftalık', child: _Donem(veri: m, donem: MaliDonem.hafta)),
                     GonderAlani(konu: 'Mali Raporlar – Aylık', child: _Donem(veri: m, donem: MaliDonem.ay)),

@@ -6,6 +6,8 @@
 // ve personel ücret ayrıntısı veride yoktur ("Şahıs / teyitsiz tedarikçi").
 
 import 'model.dart';
+import 'gelir_gider.dart';
+export 'gelir_gider.dart';
 
 class MaliFatura {
   const MaliFatura({
@@ -181,7 +183,11 @@ class MaliVeri {
     this.muhasebeKaynak = '',
     this.muhasebeDonem = '',
     this.muhasebeLink = '',
+    this.gelirGider = const GelirGider(),
   });
+
+  /// Gider, gelir ve kâr/zarar (aylık gider ve aylık gelir satış tabloları).
+  final GelirGider gelirGider;
 
   /// Muhasebenin gönderdiği 2026 fatura listesi (SAP), fatura bazında; tutarlar KDV dahil.
   /// Her faturanın kontrol alanı birim fatura raporuyla karşılaştırma sonucudur.
@@ -200,7 +206,7 @@ class MaliVeri {
   /// Ödeme durumu (ödendi/açık) veride var mı.
   bool get odemeVar => faturalar.any((f) => f.durum.isNotEmpty);
 
-  bool get bos => faturalar.isEmpty && acik.isEmpty && kontrol.isEmpty;
+  bool get bos => faturalar.isEmpty && acik.isEmpty && kontrol.isEmpty && gelirGider.bos;
 
   factory MaliVeri.json(Object? j) {
     if (j is! Map) return const MaliVeri();
@@ -217,6 +223,7 @@ class MaliVeri {
       muhasebeKaynak: _bilgi(j, 'kaynak'),
       muhasebeDonem: _bilgi(j, 'donem'),
       muhasebeLink: _bilgi(j, 'link'),
+      gelirGider: GelirGider.json(j['gelirGider']),
     );
   }
 
