@@ -45,6 +45,7 @@ jobs:
           git add -A
           git commit -q -m "Web sürümü ${GITHUB_SHA::7} (yalnızca program kodu, veri içermez)"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" web-yayin
-          # Değişmez sürüm etiketi: şirket paneli en son "1.0.N" etiketini jsDelivr'dan yükler
-          git tag "1.0.${GITHUB_RUN_NUMBER}"
-          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" "1.0.${GITHUB_RUN_NUMBER}"
+          # jsDelivr önbelleğini yenile: şirket paneli dosyaları @web-yayin adresinden yükler
+          for f in $(find . -type f -not -path './.git/*' | sed 's#^\./##'); do
+            curl -s -o /dev/null "https://purge.jsdelivr.net/gh/${GITHUB_REPOSITORY}@web-yayin/$f" || true
+          done

@@ -1739,22 +1739,11 @@ function paylasimLinki_(p) {
   return paylasimAdresi_() + '?panel=tarla&anahtar=' + p.anahtar;
 }
 
-/** Web sürümü: depodaki "1.0.N" etiketleri (yalnızca program kodu, veri içermez), jsDelivr üzerinden yüklenir.
- * En son sürüm 10 dakikada bir sorgulanır; adres o değişmez sürüme sabitlenir. */
+/** Web sürümü: depodaki "web-yayin" dalı (yalnızca program kodu, veri içermez), jsDelivr üzerinden yüklenir.
+ * Her derlemede jsDelivr önbelleği yenilenir (.github/workflows/web.yml). */
 var WEB_DEPO_ = 'ramazankcbss-alt/Yonetim-raporu';
 function webSurumAdresi_() {
-  var c = CacheService.getScriptCache(), k = 'web_surum_adresi';
-  var x = c.get(k);
-  if (x) return x;
-  var surum = '';
-  try {
-    var r = UrlFetchApp.fetch('https://data.jsdelivr.com/v1/packages/gh/' + WEB_DEPO_ + '/resolved?specifier=latest', { muteHttpExceptions: true });
-    if (r.getResponseCode() === 200) surum = String(JSON.parse(r.getContentText()).version || '');
-  } catch (e) { surum = ''; }
-  if (!/^1\.0\.\d+$/.test(surum)) return '';
-  x = 'https://cdn.jsdelivr.net/gh/' + WEB_DEPO_ + '@' + surum + '/';
-  c.put(k, x, 600);
-  return x;
+  return 'https://cdn.jsdelivr.net/gh/' + WEB_DEPO_ + '@web-yayin/';
 }
 
 /** Paylaşım paneli: şirket hesabı zorunlu. Sayfa veri içermez; veri anahtarla google.script.run üzerinden gelir. */
@@ -1796,7 +1785,7 @@ function tarlaPanel_(anahtar, eski) {
 
 /** Kurulum sonrası bir kez düzenleyicide çalıştırın: web sürümü kontrolü için gereken izni (harici istek) verir. */
 function yetkiVer() {
-  CacheService.getScriptCache().removeAll(['web_surum_hazir', 'web_surum_adresi']);
+  CacheService.getScriptCache().remove('web_surum_hazir');
   Logger.log('Web sürümü yayında: ' + webSurumHazir_() + ' · Paylaşım adresi: ' + paylasimAdresi_());
 }
 
