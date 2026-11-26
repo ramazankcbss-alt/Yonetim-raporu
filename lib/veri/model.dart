@@ -441,15 +441,19 @@ class Paylasim {
 class PaylasimKaydi {
   const PaylasimKaydi(
       {required this.id, required this.etiket, required this.yetki, required this.acik, this.olusturma = '',
-      this.degisiklik = '', this.link = ''});
+      this.degisiklik = '', this.link = '', this.menuler = const ['ziraat', 'hayvan', 'tarla']});
   final String id, etiket, yetki, olusturma, degisiklik, link;
   final bool acik;
+
+  /// Paylaşımda görünen menüler: 'ziraat', 'hayvan', 'tarla'.
+  final List<String> menuler;
   bool get duzenler => yetki == 'duzenle';
 
   static PaylasimKaydi? oku(Object? v) => v is Map && v['id'] != null
       ? PaylasimKaydi(
           id: '${v['id']}', etiket: '${v['etiket'] ?? ''}', yetki: '${v['yetki'] ?? 'gor'}', acik: v['acik'] == true,
-          olusturma: '${v['olusturma'] ?? ''}', degisiklik: '${v['degisiklik'] ?? ''}', link: '${v['link'] ?? ''}')
+          olusturma: '${v['olusturma'] ?? ''}', degisiklik: '${v['degisiklik'] ?? ''}', link: '${v['link'] ?? ''}',
+          menuler: v['menuler'] is List ? [for (final m in v['menuler'] as List) '$m'] : const ['ziraat', 'hayvan', 'tarla'])
       : null;
 }
 

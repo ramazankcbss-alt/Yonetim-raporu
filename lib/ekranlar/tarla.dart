@@ -82,7 +82,7 @@ class _TarlaEkranState extends State<TarlaEkran> {
                     else
                       _MenuKarti(
                         baslik: 'Paylaşım',
-                        alt: 'Tarla Haritası\'nı iş arkadaşınızla paylaşın: görüntüleme / düzenleme yetkisi, istediğiniz zaman kapatma',
+                        alt: 'İş arkadaşınızla paylaşın: kişiye göre menü seçimi (Ziraat, Hayvancılık, Tarla Haritaları), görüntüleme / düzenleme yetkisi, istediğiniz zaman kapatma',
                         ikon: Icons.share_outlined,
                         dokun: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PaylasimEkrani())),
                       ),

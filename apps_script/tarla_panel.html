@@ -396,6 +396,8 @@ function ciz() {
   kok.className = '';
   var geriB = document.getElementById('geri'), bas = document.getElementById('baslik'), sek = document.getElementById('sekmeler');
   geriB.style.visibility = S.ekran === 'kok' ? 'hidden' : 'visible'; sek.innerHTML = '';
+  if (S.menuler && ((S.ekran === 'ziraat' && !menuAcik('ziraat')) || (S.ekran === 'hayvan' && !menuAcik('hayvan')) ||
+      (['kok', 'ziraat', 'hayvan'].indexOf(S.ekran) < 0 && !menuAcik('tarla')))) { S.ekran = 'kok'; geriB.style.visibility = 'hidden'; }
   if (S.ekran === 'kok' || S.ekran === 'ziraat' || S.ekran === 'hayvan') return tarimCiz(kok, bas);
   if (!l.length) { kok.innerHTML = '<div class="kart">Harita verisi yok.</div>'; return; }
   if (S.ekran === 'ana') { bas.textContent = 'Tarla Haritaları'; kok.innerHTML = anaEkran(l); return; }
@@ -1566,7 +1568,7 @@ function ziraatEkrani() {
   var d = donemSecici(TS.gunluk), bas = d.bas, son = bas && (TS.gunluk ? bas : tEkle(bas, 6)), ekim = tEkim();
   var plan = ekim.reduce(function (a, e) { return a + (e.plan || 0); }, 0), ekilen = ekim.reduce(function (a, e) { return a + (e.ekilen || 0); }, 0);
   var h = d.html + '<div class="gizgara">' + gKart('Planlanan Alan', ts(plan) + ' da') + gKart('Ekilen Alan', ts(ekilen) + ' da', plan > 0 ? "Planın %" + ts(ekilen / plan * 100) + "'i" : '', '#15803D') + '</div>';
-  h += menu('▦', 'Tarla Haritaları', 'Parseller, haritadaki ekiliş ve tarım icmaliyle karşılaştırma', "git('ana')");
+  if (menuAcik('tarla')) h += menu('▦', 'Tarla Haritaları', 'Parseller, haritadaki ekiliş ve tarım icmaliyle karşılaştırma', "git('ana')");
   h += '<h3>Ekim Alanları (dekar)</h3><div class="kart">' + (!ekim.length ? 'Ekim alanı verisi yok.' : ekim.map(function (e) {
     var o = (e.plan || 0) > 0 && e.ekilen != null ? Math.min(1.5, e.ekilen / e.plan) : null;
     return '<div style="padding:7px 0"><div style="display:flex;justify-content:space-between;gap:8px;font-size:14px"><span><b style="color:' + ciftlikRengi(e.ciftlik) + '">' + esc(e.ciftlik) + '</b>&nbsp; ' + esc(e.urun) + '</span>' +
@@ -1622,12 +1624,15 @@ function hayvancilikEkrani() {
       T.besi.map(function (b) { return [b.isletme, tsT(b.yerli), tsT(b.erkek), tsT(b.inek)]; }).concat([['TOPLAM', ts(t('yerli')), ts(t('erkek')), ts(t('inek'))]]), true); }
   return h + faaliyetPaneli(true, bas, son);
 }
+function menuAcik(m) { return (S.menuler || []).indexOf(m) >= 0; }
 function kokEkrani() {
-  var h = '<div class="bilgi">Ziraat ve Hayvancılık bölümleri yalnızca görüntülenir; günlük ya da haftalık dönem seçilebilir. ' +
-    (S.yetki === 'duzenle' ? 'Tarla Haritaları bölümünde parsel bilgisi girebilirsiniz.' : 'Tarla Haritaları bölümünde yalnızca görüntüleme yetkiniz var.') + '</div>';
-  h += menu('🌾', 'Ziraat', 'Ekim alanları, hasat ve verim, günlük / haftalık ziraat faaliyetleri', "TS.ciftlik=null;git('ziraat')");
-  h += menu('🐄', 'Hayvancılık', 'Hayvan sayıları, süt, doğum ve kayıplar, işletme bazlı canlı hayvan, besi, günlük / haftalık faaliyetler', "TS.ciftlik=null;git('hayvan')");
-  h += menu('▦', 'Tarla Haritaları', 'Sezonlar, parseller, karşılaştırma ve ÇKS', "git('ana')");
+  if (!S.menuler) return '<div class="yukleniyor">Yükleniyor…</div>';
+  if (!S.menuler.length) return '<div class="kart">Bu paylaşımda görüntülenebilecek bölüm bulunmuyor.</div>';
+  var h = '<div class="bilgi">' + (menuAcik('ziraat') || menuAcik('hayvan') ? 'Ziraat ve Hayvancılık bölümleri yalnızca görüntülenir; günlük ya da haftalık dönem seçilebilir. ' : '') +
+    (!menuAcik('tarla') ? '' : S.yetki === 'duzenle' ? 'Tarla Haritaları bölümünde parsel bilgisi girebilirsiniz.' : 'Tarla Haritaları bölümünde yalnızca görüntüleme yetkiniz var.') + '</div>';
+  if (menuAcik('ziraat')) h += menu('🌾', 'Ziraat', 'Ekim alanları, hasat ve verim, günlük / haftalık ziraat faaliyetleri', "TS.ciftlik=null;git('ziraat')");
+  if (menuAcik('hayvan')) h += menu('🐄', 'Hayvancılık', 'Hayvan sayıları, süt, doğum ve kayıplar, işletme raporları, besi, günlük / haftalık faaliyetler', "TS.ciftlik=null;git('hayvan')");
+  if (menuAcik('tarla')) h += menu('▦', 'Tarla Haritaları', 'Sezonlar, parseller, karşılaştırma ve ÇKS', "git('ana')");
   return h;
 }
 function tarimCiz(kok, bas) {
@@ -1639,15 +1644,16 @@ function tarimCiz(kok, bas) {
 }
 // ---------- açılış ----------
 function yukle() {
-  var bekle = DOSYALAR.length + 1, hata = null;
+  var bekle = DOSYALAR.length + 1, hata = null, haritaHata = null;
   function bitti() {
     if (--bekle) return;
+    if (haritaHata && (!S.menuler || menuAcik('tarla'))) hata = hata || haritaHata;
     if (hata) { document.getElementById('icerik').innerHTML = '<div class="kart">' + esc(hata) + '</div>'; return; }
     ciz();
   }
   google.script.run.withSuccessHandler(function (r) {
     if (!r || !r.ok) { hata = (r && r.hata) || 'Veri alınamadı.'; if (r && r.kapali) hata = 'Bu paylaşım kapatıldı.'; return bitti(); }
-    S.sezonParsel = r.sezonParsel || []; S.parselSinir = r.parselSinir || []; S.tarlaSezonlari = r.tarlaSezonlari || []; S.yetki = r.yetki; S.etiket = r.etiket; SINIR = r.sezonParselSiniri || 400;
+    S.sezonParsel = r.sezonParsel || []; S.parselSinir = r.parselSinir || []; S.tarlaSezonlari = r.tarlaSezonlari || []; S.yetki = r.yetki; S.etiket = r.etiket; S.menuler = r.menuler || ['ziraat', 'hayvan', 'tarla']; SINIR = r.sezonParselSiniri || 400;
     S.ekim = r.ekim || []; S.ekimPlani = r.ekimPlani || []; S.cks = r.cks || [];
     document.getElementById('ust').textContent = r.etiket + ' · ' + (r.yetki === 'duzenle' ? 'düzenleme yetkisi' : 'yalnızca görüntüleme');
     bitti();
@@ -1659,7 +1665,7 @@ function yukle() {
   var sira = {};
   DOSYALAR.forEach(function (d, i) {
     fetch(VERI_ADRESI + d, { cache: 'no-store' }).then(function (x) { if (!x.ok) throw new Error(x.status); return x.json(); })
-      .then(function (j) { sira[i] = sezonOku(j); }).catch(function () { if (i === 0) hata = 'Harita dosyası alınamadı. İnternet bağlantınızı kontrol edin.'; })
+      .then(function (j) { sira[i] = sezonOku(j); }).catch(function () { if (i === 0) haritaHata = 'Harita dosyası alınamadı. İnternet bağlantınızı kontrol edin.'; })
       .then(function () { S.paket = DOSYALAR.map(function (_, k) { return sira[k]; }).filter(Boolean); bitti(); });
   });
 }

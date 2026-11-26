@@ -245,8 +245,9 @@ class VeriDeposu extends ChangeNotifier {
   bool paylasimKapali = false;
 
   /// Tarla Haritası paylaşımı (yalnızca sahibin uygulamasından): ekle, yetki, kapat, aç, sil.
-  Future<String> paylasimYonet(String tur, {String id = '', String etiket = '', String yetki = 'gor'}) async {
-    final j = await _islem(tur, {'id': id, 'etiket': etiket, 'yetki': yetki});
+  Future<String> paylasimYonet(String tur,
+      {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler}) async {
+    final j = await _islem(tur, {'id': id, 'etiket': etiket, 'yetki': yetki, if (menuler != null) 'menuler': menuler.join(',')});
     await yenile();
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }

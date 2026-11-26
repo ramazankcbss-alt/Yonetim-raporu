@@ -20,10 +20,10 @@ class PaylasimEkrani extends StatefulWidget {
 class _PaylasimEkraniState extends State<PaylasimEkrani> {
   bool _mesgul = false;
 
-  Future<void> _yap(String tur, {String id = '', String etiket = '', String yetki = 'gor'}) async {
+  Future<void> _yap(String tur, {String id = '', String etiket = '', String yetki = 'gor', List<String>? menuler}) async {
     setState(() => _mesgul = true);
     try {
-      final m = await VeriDeposu.ben.paylasimYonet(tur, id: id, etiket: etiket, yetki: yetki);
+      final m = await VeriDeposu.ben.paylasimYonet(tur, id: id, etiket: etiket, yetki: yetki, menuler: menuler);
       if (mounted) bildir(context, m);
     } catch (e) {
       if (mounted) bildir(context, '$e');
@@ -33,8 +33,8 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
   }
 
   Future<void> _ekle() async {
-    final r = await showDialog<(String, String)>(context: context, builder: (_) => const _PaylasimEkle());
-    if (r != null) await _yap('paylasimEkle', etiket: r.$1, yetki: r.$2);
+    final r = await showDialog<(String, String, List<String>)>(context: context, builder: (_) => const _PaylasimEkle());
+    if (r != null) await _yap('paylasimEkle', etiket: r.$1, yetki: r.$2, menuler: r.$3);
   }
 
   Future<void> _adDegistir(PaylasimKaydi p) async {
@@ -76,13 +76,15 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
         builder: (context, _) {
           final l = VeriDeposu.ben.veri?.paylasimlar ?? const <PaylasimKaydi>[];
           return Scaffold(
-            appBar: AppBar(title: const Text('Tarla Haritası paylaşımı')),
+            appBar: AppBar(title: const Text('Tarım ve Hayvancılık paylaşımı')),
             floatingActionButton: FloatingActionButton.extended(
                 onPressed: _mesgul ? null : _ekle, icon: const Icon(Icons.person_add_alt), label: const Text('Yeni paylaşım')),
             body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 90), children: [
               const BilgiKutusu(
-                  yazi: 'Paylaşım linki tarayıcıda Tarla Haritası web panelini açar (uygulama kurmak gerekmez). Rapor, mali, '
-                      'hayvan ve araç verileri gitmez. "Düzenleme" yetkisinde Tarla Haritası\'nda sizin yapabildiğiniz her işlem '
+                  yazi: 'Paylaşım linki tarayıcıda "Tarım ve Hayvancılık" web panelini açar (uygulama kurmak gerekmez). '
+                      'Her paylaşımda hangi menülerin (Ziraat, Hayvancılık, Tarla Haritaları) görüneceğini işaretleyin; işareti '
+                      'kaldırdığınız menü ve verisi o kişiye hemen kapanır. Ziraat ve Hayvancılık yalnızca görüntülenir; personel/taşeron '
+                      'sayıları gönderilmez. Rapor, mali ve araç verileri gitmez. "Düzenleme" yetkisinde Tarla Haritası\'nda sizin yapabildiğiniz her işlem '
                       '(ürün/dekar/tohum, bölme, birleştirme, çizgi ve şekille bölge, sınır düzenleme, yeni parsel) yapılabilir; '
                       '"Görüntüleme" yetkisinde hiçbir şey değiştirilemez. Girişler tabloda paylaşım adıyla '
                       'işaretlenir. Paylaşımı kapattığınızda link hemen çalışmaz olur. KVKK: paylaşım adına kişi adı değil '
@@ -115,14 +117,29 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                         selected: {p.yetki},
                         onSelectionChanged: _mesgul ? null : (x) => _yap('paylasimYetki', id: p.id, yetki: x.first),
                       ),
+                      const SizedBox(height: 6),
+                      const Text('Görebileceği menüler', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+                      Wrap(spacing: 6, children: [
+                        for (final m in paylasimMenuAdlari.entries)
+                          FilterChip(
+                            label: Text(m.value),
+                            selected: p.menuler.contains(m.key),
+                            onSelected: _mesgul
+                                ? null
+                                : (x) => _yap('paylasimMenu', id: p.id, menuler: [
+                                      for (final k in paylasimMenuAdlari.keys)
+                                        if (k == m.key ? x : p.menuler.contains(k)) k
+                                    ]),
+                          ),
+                      ]),
                       Wrap(spacing: 4, children: [
                         TextButton.icon(
                             onPressed: !p.acik || p.link.isEmpty
                                 ? null
                                 : () => Share.share(
-                                    'Tarla Haritası (${p.yetki == 'duzenle' ? 'ürün ve dekar girişi' : 'görüntüleme'}). '
+                                    'Tarım ve Hayvancılık (${p.menuler.map((m) => paylasimMenuAdlari[m] ?? m).join(', ')}). '
                                     'Linki telefonda ya da bilgisayarda tarayıcıda açın:\n${p.link}',
-                                    subject: 'Tarla Haritası paylaşımı'),
+                                    subject: 'Tarım ve Hayvancılık paylaşımı'),
                             icon: const Icon(Icons.send_outlined),
                             label: const Text('Linki gönder')),
                         TextButton.icon(
@@ -152,6 +169,9 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
       );
 }
 
+/// Paylaşımda seçilebilen menüler (web panelindeki adlarıyla).
+const paylasimMenuAdlari = {'ziraat': 'Ziraat', 'hayvan': 'Hayvancılık', 'tarla': 'Tarla Haritaları'};
+
 class _PaylasimEkle extends StatefulWidget {
   const _PaylasimEkle();
   @override
@@ -161,6 +181,7 @@ class _PaylasimEkle extends StatefulWidget {
 class _PaylasimEkleState extends State<_PaylasimEkle> {
   final _ad = TextEditingController();
   String _yetki = 'gor';
+  final _menuler = <String>{'tarla'};
   @override
   void dispose() {
     _ad.dispose();
@@ -188,11 +209,23 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
             selected: {_yetki},
             onSelectionChanged: (x) => setState(() => _yetki = x.first),
           ),
-        ]),
+          const SizedBox(height: 10),
+          const Text('Görebileceği menüler', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+          Wrap(spacing: 6, children: [
+            for (final m in paylasimMenuAdlari.entries)
+              FilterChip(
+                label: Text(m.value),
+                selected: _menuler.contains(m.key),
+                onSelected: (x) => setState(() => x ? _menuler.add(m.key) : _menuler.remove(m.key)),
+              ),
+          ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
           FilledButton(
-              onPressed: _ad.text.trim().isEmpty ? null : () => Navigator.pop(context, (_ad.text.trim(), _yetki)),
+              onPressed: _ad.text.trim().isEmpty || _menuler.isEmpty
+                  ? null
+                  : () => Navigator.pop(context,
+                      (_ad.text.trim(), _yetki, [for (final k in paylasimMenuAdlari.keys) if (_menuler.contains(k)) k])),
               child: const Text('Oluştur')),
         ],
       );
