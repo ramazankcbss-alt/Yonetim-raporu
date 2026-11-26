@@ -47,7 +47,9 @@
             try { gl = !!document.createElement('canvas').getContext('webgl2'); } catch (e) {}
             yaz('Tanı: görünüm ' + (r ? Math.round(r.width) + 'x' + Math.round(r.height) : 'yok') + ' · tuval ' +
               document.querySelectorAll('canvas').length + ' · WebGL2 ' + (gl ? 'var' : 'yok') + ' · pencere ' + innerWidth + 'x' + innerHeight);
-          }, 6000);
+            // Sorun yoksa durum kutusu kaldırılır.
+            setTimeout(function () { if (kutu.textContent.indexOf('HATA') < 0 && kutu.parentNode) kutu.parentNode.removeChild(kutu); }, 3000);
+          }, 4000);
         } catch (e) { yaz('HATA (başlatma): ' + (e && (e.message || e))); }
       },
     });
