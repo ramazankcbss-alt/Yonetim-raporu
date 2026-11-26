@@ -391,10 +391,8 @@ class _Karsilastirma extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
       children: [
         const BilgiKutusu(
-            yazi: 'Gelen fatura raporundaki hatalı ya da tutarsız kayıtlar; muhasebenin 2026 fatura listesiyle '
-                'karşılaştırma (eksik, fazla, tutarı ya da üretim yeri farklı faturalar) ve uygulamadaki diğer verilerle '
-                '(ESK, hayvancılık, bakım onarım) karşılaştırma. Her bulgunun altındaki "Nerede?" ile '
-                'sayfa ve satır numaraları açılır.'),
+            yazi: 'Muhasebenin 2026 fatura listesindeki hatalı ya da eksik kayıtlar ve kaynak bilgisi. '
+                'Her bulgunun altındaki "Nerede?" ile dosyadaki satır numaraları açılır.'),
         if (hatalar.isNotEmpty)
           Card(
             margin: const EdgeInsets.only(top: 10, bottom: 4),
@@ -611,6 +609,6 @@ class DuzeltmeTalebiEkran extends StatelessWidget {
   @override
   Widget build(BuildContext context) => PaylasimOnizleme(
       baslik: 'Düzeltme talebi',
-      konu: '2026 Gelen Fatura Raporları – kayıt düzeltme',
+      konu: '2026 Fatura (muhasebe) – kayıt düzeltme',
       metin: duzeltmeTalebi(bulgular));
 }
