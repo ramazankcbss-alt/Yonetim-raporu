@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 /// Kurumsal, açık renkli tema: koyu yeşil ana renk, beyaz kartlar, sade butonlar.
@@ -49,6 +50,8 @@ ThemeData temaOlustur() {
   final yuvarlak =
       RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
   return ThemeData(
+    // Web sürümü: yazı tipi uygulamayla gelir (dış yazı tipi sunucusuna bağlı kalmaz).
+    fontFamily: kIsWeb ? 'DejaVuSans' : null,
     useMaterial3: true,
     colorScheme: cs,
     scaffoldBackgroundColor: Renk.zemin,

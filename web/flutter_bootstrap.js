@@ -9,8 +9,13 @@
   kutu.id = 'yr-durum';
   kutu.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#fff7ed;color:#9a3412;' +
     'font:13px sans-serif;padding:8px 12px;border-top:1px solid #fdba74;white-space:pre-wrap;max-height:40%;overflow:auto';
-  function yaz(t) { if (!kutu.parentNode && document.body) document.body.appendChild(kutu); kutu.textContent += t + '\n'; }
-  ['error', 'warn'].forEach(function (k) {
+  var satir = 0;
+  function yaz(t) {
+    if (++satir > 25) return; // aynı hata tekrar tekrar gelirse sayfa kilitlenmesin
+    if (!kutu.parentNode && document.body) document.body.appendChild(kutu);
+    kutu.textContent += t + '\n';
+  }
+  ['error'].forEach(function (k) {
     var eski = console[k];
     console[k] = function () { try { yaz((k === 'error' ? 'KONSOL HATA: ' : 'KONSOL UYARI: ') + Array.prototype.join.call(arguments, ' ').slice(0, 400)); } catch (e) {} return eski.apply(console, arguments); };
   });
@@ -18,6 +23,10 @@
   window.addEventListener('unhandledrejection', function (e) { yaz('HATA (söz): ' + (e.reason && (e.reason.message || e.reason))); });
   yaz('1/4 Açılış dosyası yüklendi · köprü: ' + (typeof window.yrSunucu === 'function' ? 'var' : 'yok'));
   var taban = window.YR_WEB;
+  // Sayfanın <base> adresi başka bir siteyi (CDN) gösterirse uygulamanın adres geçmişi işlemleri güvenlik hatası verir
+  // ve sayfa kilitlenir; dosya adresleri aşağıda tam yazıldığı için <base> adresi kaldırılır.
+  var b = document.querySelector('base');
+  if (b && taban) b.removeAttribute('href');
   var ayar = taban ? { entrypointBaseUrl: taban, assetBase: taban } : {};
   try {
     _flutter.loader.load({
