@@ -256,6 +256,7 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
                 onSelected: (x) => setState(() => x ? _menuler.add(m.key) : _menuler.remove(m.key)),
               ),
           ]),
+        ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Vazgeç')),
           FilledButton(
