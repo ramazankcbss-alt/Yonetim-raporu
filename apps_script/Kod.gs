@@ -1758,7 +1758,7 @@ function tarlaPanel_(anahtar, eski) {
         adres + '?panel=tarla&anahtar=' + encodeURIComponent(anahtar) + '">Şirket hesabıyla aç</a></p>' : '';
     return sayfa('<b>Tarım ve Hayvancılık</b><p>Bu panel yalnızca şirket Google hesabıyla (@' + SIRKET_ALANI_ + ') açılır.</p>' + git);
   }
-  if (eski) {
+  if (eski || !webSurumHazir_()) {
     return HtmlService.createHtmlOutput(TARLA_PANEL_HTML_.replace('__ANAHTAR__', JSON.stringify(pay.anahtar)))
       .setTitle('Tarım ve Hayvancılık').addMetaTag('viewport', 'width=device-width, initial-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
@@ -1776,6 +1776,23 @@ function tarlaPanel_(anahtar, eski) {
     .setTitle('Tarım ve Hayvancılık')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DEFAULT);
+}
+
+/** Kurulum sonrası bir kez düzenleyicide çalıştırın: web sürümü kontrolü için gereken izni (harici istek) verir. */
+function yetkiVer() {
+  CacheService.getScriptCache().remove('web_surum_hazir');
+  Logger.log('Web sürümü yayında: ' + webSurumHazir_() + ' · Paylaşım adresi: ' + paylasimAdresi_());
+}
+
+/** Web sürümü yayında mı (GitHub Pages). Değilse eski panel açılır. Sonuç 10 dakika önbellekte. */
+function webSurumHazir_() {
+  var c = CacheService.getScriptCache(), k = 'web_surum_hazir';
+  var x = c.get(k);
+  if (x) return x === '1';
+  var ok = false;
+  try { ok = UrlFetchApp.fetch(WEB_SURUM_ADRESI_ + 'flutter_bootstrap.js', { muteHttpExceptions: true }).getResponseCode() === 200; } catch (e) { ok = false; }
+  c.put(k, ok ? '1' : '0', 600);
+  return ok;
 }
 
 /** google.script.run (web sürümü): veri ('veri') ya da paylaşım işlemi. Şirket hesabı ve açık paylaşım zorunlu.
