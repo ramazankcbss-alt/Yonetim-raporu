@@ -67,7 +67,7 @@ class _TarlaEkranState extends State<TarlaEkran> {
                             'alınır. Haritada parsele dokunularak yapılan girişler KMZ bilgisinin önüne geçer.'),
                     const SizedBox(height: 8),
                     for (final x in hepsi) _sezonKarti(context, l, x, v),
-                    if (!_yalnizGor && VeriDeposu.ben.paylasim == null && hepsi.isNotEmpty)
+                    if (!_yalnizGor && hepsi.isNotEmpty)
                       _MenuKarti(
                         baslik: 'Yeni sezon ekle',
                         alt: '${sonrakiSezon(hepsi.last.sezon)} sezonunu açın; parseller güncel harita çizimleriyle gelir, '
@@ -106,13 +106,14 @@ class _TarlaEkranState extends State<TarlaEkran> {
     final yeni = sonrakiSezon(hepsi.last.sezon);
     final son = hepsi.last.sezon;
     final acilan = VeriDeposu.ben.tarlaEkSezonlari(v);
-    final kayitsiz = acilan.contains(son) && !VeriDeposu.ben.sezonParselleri(v).any((x) => x.sezon == son);
+    final kayitsiz = VeriDeposu.ben.paylasim == null && acilan.contains(son) && !VeriDeposu.ben.sezonParselleri(v).any((x) => x.sezon == son);
     final secim = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('$yeni sezonu açılsın mı?'),
         content: Text('Yeni sezon $son sezonunun ardından eklenir. Parseller güncel harita çizimleriyle açılır; ürün ve dekarları '
-            'haritada parsele dokunarak girersiniz. Sezon, paylaştığınız web panelinde de görünür.'
+            'haritada parsele dokunarak girersiniz. '
+            '${VeriDeposu.ben.paylasim == null ? 'Sezon, paylaştığınız web panelinde de görünür.' : 'Açılan sezonu yalnızca harita sahibi kaldırabilir.'}'
             '${kayitsiz ? '\n\n$son sezonunda henüz kayıt yok; isterseniz onu kaldırabilirsiniz.' : ''}'),
         actions: [
           if (kayitsiz) TextButton(onPressed: () => Navigator.pop(ctx, 'sil'), child: Text('$son sezonunu kaldır')),
@@ -2853,7 +2854,7 @@ class _CksState extends State<_Cks> {
               "'ÇKS'de bildirildi' olarak görünür. KVKK: belgedeki kimlik, ad ve iletişim bilgileri uygulamaya alınmaz; "
               "yalnızca mevki, ada/parsel, ürün ve alan işlenir."),
       const SizedBox(height: 10),
-      Row(children: [
+      if (!_yalnizGor) Row(children: [
         Expanded(
           child: FilledButton.icon(
             onPressed: _yukleniyor ? null : () => _yukle(_kamera),

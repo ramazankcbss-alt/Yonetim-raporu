@@ -417,6 +417,8 @@ function anaEkran(l) {
       ex > 0 ? 'Excel: ' + sayi(ex) + ' da' : 'Excel kaydı yok'].concat(cks ? ['ÇKS: ' + cks + ' kayıt'] : []).join(' · ');
     h += menu(x.giris ? '✎' : '▦', x.sezon + ' sezonu', alt, "git('sezon',{sezon:'" + x.sezon + "',sekme:'harita'})");
   });
+  if (S.yetki === 'duzenle' && l.length) h += menu('⊕', 'Yeni sezon ekle', sonrakiSezon(l[l.length - 1].sezon) +
+    ' sezonunu açın; parseller güncel harita çizimleriyle gelir, ürünleri haritaya dokunarak girersiniz', 'yeniSezon()');
   h += menu('⇄', 'Yıllara göre ekim karşılaştırması', l.map(function (x) { return x.sezon; }).join(' · ') + ' — çiftlik ve ürün alanları, parsel geçmişi', "git('yil')");
   return h;
 }
@@ -504,6 +506,14 @@ function karsiSekmesi(s) {
 }
 function cksSekmesi(s) {
   var h = '<div class="bilgi">ÇKS (Çiftçi Kayıt Sistemi) beyanları: ' + esc(s.sezon) + ' sezonu.</div>';
+  if (S.yetki === 'duzenle') h += '<div class="kart"><b>ÇKS belgesi ekle</b><div class="ipucu">Belgenin fotoğrafını çekin ya da PDF / JPG / PNG dosyası seçin (en fazla 15 MB). ' +
+    'Belge, harita sahibinin Drive\'ındaki kapalı \'ÇKS Belgeleri\' klasörüne kaydedilir; parseller işlendikten sonra burada görünür. ' +
+    'KVKK: belgedeki kimlik, ad ve iletişim bilgileri sisteme alınmaz; yalnızca mevki, ada/parsel, ürün ve alan işlenir.</div>' +
+    '<div class="dugmeler"><button class="ana" onclick="document.getElementById(\'cksKamera\').click()">Fotoğraf çek</button>' +
+    '<button class="ikinci" onclick="document.getElementById(\'cksDosya\').click()">Dosya seç</button></div>' +
+    '<input type="file" id="cksKamera" accept="image/*" capture="environment" style="display:none" onchange="cksYukle(this,' + js(s.sezon) + ')">' +
+    '<input type="file" id="cksDosya" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" style="display:none" onchange="cksYukle(this,' + js(s.sezon) + ')">' +
+    '<div id="cksDurum" class="ipucu"></div></div>';
   s.ciftlikler.forEach(function (c) {
     var l = sezonCks(s, c.ad); if (!l.length) return;
     var top = l.reduce(function (a, x) { return a + (x.alan || 0); }, 0);
@@ -513,6 +523,28 @@ function cksSekmesi(s) {
   });
   if (h.indexOf('<h3>') < 0) h += '<div class="kart">Bu sezon için ÇKS kaydı yok.</div>';
   return h;
+}
+function cksYukle(inp, sezon) {
+  var f = inp.files && inp.files[0]; inp.value = '';
+  if (!f) return;
+  var ad = f.name.toLowerCase(), mime = f.type;
+  if (!mime) mime = /\.pdf$/.test(ad) ? 'application/pdf' : /\.png$/.test(ad) ? 'image/png' : 'image/jpeg';
+  if (mime === 'image/jpg') mime = 'image/jpeg';
+  if (['application/pdf', 'image/jpeg', 'image/png'].indexOf(mime) < 0) return durum('Yalnızca PDF, JPG ya da PNG yüklenebilir.');
+  if (f.size > 15 * 1024 * 1024) return durum('Dosya 15 MB\'tan büyük.');
+  var d = document.getElementById('cksDurum'); if (d) d.textContent = 'Yükleniyor…';
+  var o = new FileReader();
+  o.onload = function () {
+    var veri = String(o.result).split(',')[1] || '';
+    google.script.run.withSuccessHandler(function (r) {
+      if (d) d.textContent = '';
+      if (!r || !r.ok) return hataGoster(r);
+      if (d) d.textContent = r.mesaj; durum('ÇKS belgesi kaydedildi.');
+    }).withFailureHandler(function (e) { if (d) d.textContent = ''; durum('Yüklenemedi: ' + e.message); })
+      .tarlaPanelKaydet(ANAHTAR, { tur: 'cksYukle', veri: veri, mime: mime, sezon: sezon });
+  };
+  o.onerror = function () { if (d) d.textContent = ''; durum('Dosya okunamadı.'); };
+  o.readAsDataURL(f);
 }
 function yilEkrani(l) {
   var cfler = {}; l.forEach(function (s) { s.ciftlikler.forEach(function (c) { cfler[c.ad] = 1; }); });
@@ -1207,11 +1239,30 @@ function kayit(ops, sonra) {
     C.kaydediliyor = false;
     document.querySelectorAll('#sayfa button').forEach(function (b) { b.disabled = false; });
     if (!r || !r.ok) { cizimPaneli(); return hataGoster(r); }
-    S.sezonParsel = r.sezonParsel || S.sezonParsel; S.parselSinir = r.parselSinir || S.parselSinir;
+    S.sezonParsel = r.sezonParsel || S.sezonParsel; S.parselSinir = r.parselSinir || S.parselSinir; S.tarlaSezonlari = r.tarlaSezonlari || S.tarlaSezonlari;
     if (sonra) sonra();
     kapat(); ciz(); durum(r.mesaj || 'Kaydedildi.');
   }).withFailureHandler(function (e) { C.kaydediliyor = false; cizimPaneli(); document.querySelectorAll('#sayfa button').forEach(function (b) { b.disabled = false; }); durum('Kaydedilemedi: ' + e.message); })
     .tarlaPanelKaydet(ANAHTAR, { coklu: ops });
+}
+function yeniSezon() {
+  var l = sezonlar(); if (!l.length) return;
+  var son = l[l.length - 1].sezon, yeni = sonrakiSezon(son);
+  sayfaAc('<h2>' + esc(yeni) + ' sezonu açılsın mı?</h2><p style="font-size:14px">Yeni sezon ' + esc(son) + ' sezonunun ardından eklenir. ' +
+    'Parseller güncel harita çizimleriyle açılır; ürün ve dekarları haritada parsele dokunarak girersiniz. Açılan sezonu yalnızca harita sahibi kaldırabilir.</p>' +
+    '<div class="dugmeler"><button class="ikinci" onclick="kapat()">Vazgeç</button><button class="ana" onclick="yeniSezonAc(' + js(yeni) + ')">Sezonu aç</button></div>');
+}
+function yeniSezonAc(sezon) {
+  if (S.yetki !== 'duzenle') return durum('Yalnızca görüntüleme yetkiniz var.');
+  document.querySelectorAll('#sayfa button').forEach(function (b) { b.disabled = true; });
+  google.script.run.withSuccessHandler(function (r) {
+    document.querySelectorAll('#sayfa button').forEach(function (b) { b.disabled = false; });
+    if (!r || !r.ok) return hataGoster(r);
+    S.tarlaSezonlari = r.tarlaSezonlari || S.tarlaSezonlari;
+    S.sezonParsel = r.sezonParsel || S.sezonParsel; S.parselSinir = r.parselSinir || S.parselSinir;
+    kapat(); ciz(); durum(r.mesaj || 'Sezon açıldı.');
+  }).withFailureHandler(function (e) { document.querySelectorAll('#sayfa button').forEach(function (b) { b.disabled = false; }); durum('Sezon açılamadı: ' + e.message); })
+    .tarlaPanelKaydet(ANAHTAR, { tur: 'tarlaSezonEkle', sezon: sezon });
 }
 function hataGoster(r) {
   if (r && r.kapali) { document.querySelector('main').innerHTML = '<div class="kart" style="margin-top:20px">Bu paylaşım kapatıldı.</div>'; kapat(); return; }
