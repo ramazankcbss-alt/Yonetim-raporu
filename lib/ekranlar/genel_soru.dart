@@ -7,6 +7,7 @@ import '../veri/ciftlik_soru.dart';
 import '../veri/genel_soru.dart';
 import '../veri/hastalik.dart';
 import '../veri/model.dart';
+import '../veri/sureme.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 
@@ -82,8 +83,9 @@ class _GenelSoruEkranState extends State<GenelSoruEkran> {
   List<GenelYanit> _cevaplar() {
     final l = <GenelYanit>[];
     SoruBaglami? b;
+    final sureme = SuremeArsiv.yukle();
     for (final q in _sorular) {
-      final y = genelCevapla(widget.veri, q, rapor: _rapor, hastalik: _hastalik, onceki: b);
+      final y = genelCevapla(widget.veri, q, rapor: _rapor, hastalik: _hastalik, sureme: sureme, onceki: b);
       l.add(y);
       b = y.baglam;
     }
@@ -111,7 +113,9 @@ class _GenelSoruEkranState extends State<GenelSoruEkran> {
               children: [
                 if (_sorular.isEmpty) ...[
                   const BilgiKutusu(
-                      yazi: 'Sorunuzu yazın; cevap uygulamadaki tüm bölümlerin verisinden hesaplanır ve kaynağı belirtilir. '
+                      yazi: 'Sorunuzu yazın; cevap uygulamadaki tüm bölümlerin verisinden (süt ve sürü, sürü sağlığı ve üreme, tarım faaliyetleri, '
+                          'ekim, ÇKS, hasat, ürün takibi, ESK, hastalık, araç, bakım onarım, Mali Raporlar gelir/gider, veteriner, geçmiş yıllar, '
+                          'Çiftlikler Rapor) hesaplanır ve kaynağı belirtilir. '
                           'Cevabın altından devam sorusu sorabilirsiniz (ör. “Peki Pan-Gev’de?”, “Geçen ay?”, “Neden?”); '
                           'çiftlik, ürün ve dönem önceki sorudan devralınır. Kayıt yoksa tahmin yapılmaz. '
                           'Hesaplama bu cihazda yapılır, veri dışarıya gönderilmez; konuşma yalnızca bu cihazda saklanır.'),

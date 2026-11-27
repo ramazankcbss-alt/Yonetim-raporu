@@ -4,12 +4,14 @@
 //
 // KVKK: personel, kişi, paylaşım ve veteriner erişim kodu verileri
 // kullanılmaz; arıza ve bakım kayıtlarında bildiren kişi, mali kayıtlarda
-// tedarikçi adı cevaba yazılmaz.
+// tedarikçi adı cevaba yazılmaz; faaliyet metinlerinden görevli adları temizlenir.
 import '../bicim.dart';
 import 'ciftlik_rapor.dart';
 import 'ciftlik_soru.dart';
+import 'faaliyet_ozet.dart' show kurumsalFaaliyet;
 import 'hastalik.dart';
 import 'model.dart';
+import 'sureme.dart';
 import 'tarla.dart' show ParselIcerik;
 
 /// Cevabın bir bölümü: başlık, paragraflar ve verinin alındığı kaynak.
@@ -112,6 +114,11 @@ const _konular = <String, List<String>>{
   'vet': ['veteriner'],
   'bulgu': ['bulgu', 'uyarı', 'sorun', 'tutarsız', 'eksik', 'hata'],
   'besi': ['besi', 'dana', 'düve', 'erkek hayvan'],
+  'gelirgider': ['gelir', 'gider', 'harcama', 'masraf', 'ciro', 'kâr', 'zarar', 'satış geliri', 'yem gideri', 'akaryakıt', 'mazot', 'motorin',
+    'gübre', 'zirai ilaç', 'canlı hayvan alım', 'fatura bazlı'],
+  'sureme': ['tohumlama', 'gebelik', 'gebe ', 'senkron', 'aşı', 'ikiz', 'ölü doğum', 'süt analizi', 'somatik', 'yağ oranı', 'protein', 'boğa',
+    'sperma', 'abort', 'gelen hayvan', 'satılan hayvan', 'hayvan satış', 'sürü sağlığı', 'üreme', 'doğum'],
+  'cks': ['çks', 'beyan', 'mevki', ' ada ', 'resmi parsel', 'tapu'],
   'finans': ['kâr', 'kar ', 'zarar', 'maliyet', 'birim', 'ebitda', 'favök', 'teşvik', 'senaryo', 'piyasa', 'gelir tablosu', 'konsolide'],
 };
 
@@ -245,7 +252,7 @@ bool _ciftlikEslesir(Set<String> secili, String kayit) {
 
 /// Soruyu uygulamadaki verilerle cevaplar.
 GenelYanit genelCevapla(RaporVerisi v, String soru,
-    {CiftlikRaporu? rapor, List<HastalikKaydi> hastalik = const [], DateTime? bugun, SoruBaglami? onceki}) {
+    {CiftlikRaporu? rapor, List<HastalikKaydi> hastalik = const [], SuremeArsiv? sureme, DateTime? bugun, SoruBaglami? onceki}) {
   final q = _Soru(soru, bugun ?? DateTime.now(), onceki);
   final b = <CevapBolumu>[];
   var bulgular = <Bulgu>[];
@@ -273,6 +280,9 @@ GenelYanit genelCevapla(RaporVerisi v, String soru,
   if (q.var_('arac')) _arac(v, q, b);
   if (q.var_('bakim')) _bakim(v, q, b);
   if (q.var_('mali')) _mali(v, q, b);
+  if (q.var_('gelirgider') || q.var_('finans') || q.var_('mali')) _gelirGider(v, q, b);
+  if (sureme != null && q.var_('sureme')) _sureme(sureme, q, b);
+  if (q.var_('cks')) _cks(v, q, b);
   if (q.var_('vet')) _vet(v, q, b);
   if (q.var_('gecmis')) _gecmis(v, q, b);
   if (q.var_('bulgu') || ciftlikOzeti) _bulgu(v, q, b);
@@ -300,8 +310,8 @@ GenelYanit genelCevapla(RaporVerisi v, String soru,
           'Veri bulunamadı',
           [
             'Bu soruyla ilgili uygulamadaki verilerde kayıt bulunamadı; tahmini bir cevap verilmez.',
-            'Soruyu süt, hayvan sayısı, doğum/ölüm, tarım faaliyeti, ekim, hasat, ürün teslimatı, ESK, hastalık, araç, bakım onarım, '
-                'fatura, veteriner, geçmiş yıllar veya kâr/zarar konularından biriyle, gerekirse çiftlik ve dönem belirterek sorabilirsiniz. '
+            'Soruyu süt, hayvan sayısı, doğum/ölüm, tohumlama ve gebelik, tarım faaliyeti, ekim, ÇKS, hasat, ürün teslimatı, ESK, hastalık, '
+                'araç, bakım onarım, fatura, gelir/gider, veteriner, geçmiş yıllar veya kâr/zarar konularından biriyle, gerekirse çiftlik ve dönem belirterek sorabilirsiniz. '
                 'Örn. “Geçen hafta Şekersüt’te günlük süt ne kadar?”',
           ],
           ''),
@@ -438,7 +448,7 @@ void _faaliyet(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
     }
     par.add('${d.ad}: ${l.length} faaliyet kaydı (${say.entries.map((e) => '${e.key} ${e.value}').join(', ')}).');
     for (final x in l.take(15)) {
-      par.add('${tarihKisa(x.tarih)} · ${x.ciftlik}: ${x.faaliyet}');
+      par.add('${tarihKisa(x.tarih)} · ${x.ciftlik}: ${kurumsalFaaliyet(x.faaliyet)}');
     }
     if (l.length > 15) par.add('… ve ${l.length - 15} kayıt daha (tamamı Tarım ekranında).');
   }
@@ -739,6 +749,145 @@ void _bulgu(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
   ));
 }
 
+// ----------------------------------------------------------------- gelir / gider (Mali Raporlar)
+
+/// Gider türleri için sorudaki ifadeler.
+const _giderTurleri = <String, List<String>>{
+  'Yem': ['yem', 'silaj', 'saman', 'balya', 'küspe', 'arpa'],
+  'Akaryakıt': ['akaryakıt', 'mazot', 'motorin', 'yakıt'],
+  'Gübre': ['gübre', 'zirai ilaç', 'tohum'],
+  'Veteriner': ['veteriner', 'ilaç', 'aşı', 'tohumlama'],
+  'Canlı hayvan': ['canlı hayvan', 'hayvan alım', 'dana alım'],
+  'Bakım': ['bakım', 'onarım', 'yedek parça', 'tamir'],
+  'Elektrik': ['elektrik', 'enerji', 'su '],
+};
+
+void _gelirGider(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
+  final g = v.mali.gelirGider;
+  if (g.bos) return;
+  final aylar = g.aylar;
+  bool donemde(int y, int a) => !q.donem.acik || (!DateTime(y, a, 1).isAfter(q.donem.son) && !DateTime(y, a + 1, 0).isBefore(q.donem.bas));
+  bool cf(String c) => q.ciftlikler.isEmpty || q.ciftlikler.any((x) => trKucuk(c).contains(trKucuk(x)) || (x == 'Taşağıl' && c.contains('Taşağıl')));
+  final gi = [for (final x in g.gider) if (donemde(x.yil, x.ay) && cf(x.ciftlik)) x];
+  final ge = [for (final x in g.gelir) if (donemde(x.yil, x.ay) && cf(x.ciftlik)) x];
+  if (gi.isEmpty && ge.isEmpty) {
+    b.add(CevapBolumu('Gelir ve gider (fatura bazlı)', ['${q.donem.acik ? q.donem.ad : g.donem} için kayıt yok. Veri dönemi: ${g.donem}.'],
+        'Mali Raporlar (${g.kaynakGelir}, ${g.kaynakGider})'));
+    return;
+  }
+  final ilk = [...gi.map((x) => (x.yil, x.ay)), ...ge.map((x) => (x.yil, x.ay))]..sort((a, b) => a.$1 * 100 + a.$2 - b.$1 * 100 - b.$2);
+  final donem = q.donem.acik ? q.donem.ad : g.donem;
+  final gider = gi.fold(0.0, (t, x) => t + x.net), gelir = ge.fold(0.0, (t, x) => t + x.net);
+  final canli = gi.where((x) => x.kategori == kCanliHayvanAlimi).fold(0.0, (t, x) => t + x.net);
+  String mn(double x) => '${sayi(x / 1e6, ondalik: 2)} mn ₺';
+  final par = <String>[];
+  // Belirli gider türü sorulduysa
+  final turler = [for (final e in _giderTurleri.entries) if (e.value.any(q.s.contains)) e.key];
+  final kat = GelirGider.grupla(gi, (x) => x.kategori, (x) => x.net);
+  final secili = [for (final e in kat) if (turler.any((t) => trKucuk(e.key).contains(trKucuk(t)))) e];
+  final urunSoru = q.urunler.isNotEmpty || RegExp(r'süt|esk|bakım hizmeti').hasMatch(q.s);
+  final urun = GelirGider.grupla(ge, (x) => x.urun, (x) => x.net);
+  final seciliUrun = [
+    for (final e in urun)
+      if (q.urunler.any((u) => trKucuk(e.key).contains(u)) || (q.s.contains('süt') && e.key == 'Çiğ süt') || (q.s.contains('esk') && e.key.startsWith('ESK'))) e,
+  ];
+  par.add('$donem${q.ciftlikler.isEmpty ? '' : ' · ${q.ciftlikler.join(', ')}'}: gelir ${mn(gelir)}, gider ${mn(gider)}, '
+      'fark ${gelir - gider >= 0 ? '+' : '−'}${mn((gelir - gider).abs())}; canlı hayvan alımı hariç fark '
+      '${gelir - gider + canli >= 0 ? '+' : '−'}${mn((gelir - gider + canli).abs())} (KDV hariç).');
+  final ozet = par.first;
+  if (secili.isNotEmpty) {
+    par.add('Sorulan gider türü: ${secili.map((e) => '${e.key} ${mn(e.value)} (%${sayi(e.value / gider * 100, ondalik: 1)})').join(', ')}.');
+  } else if (kat.isNotEmpty) {
+    par.add('En büyük gider türleri: ${kat.take(5).map((e) => '${e.key} ${mn(e.value)}').join(', ')}.');
+  }
+  if (urunSoru && seciliUrun.isNotEmpty) {
+    par.add('Sorulan gelir: ${seciliUrun.map((e) => '${e.key} ${mn(e.value)}').join(', ')}.');
+  } else if (urun.isNotEmpty) {
+    par.add('En büyük gelir kalemleri: ${urun.take(5).map((e) => '${e.key} ${mn(e.value)}').join(', ')}.');
+  }
+  if (!q.donem.acik && aylar.length > 1) {
+    final son = aylar.last;
+    final sg = g.gelirToplam((ciftlik: null, yil: son.$1, ay: son.$2)), sd = g.giderToplam((ciftlik: null, yil: son.$1, ay: son.$2));
+    if (q.ciftlikler.isEmpty) par.add('Son ay (${_ayAdlari[son.$2 - 1]} ${son.$1}): gelir ${mn(sg)}, gider ${mn(sd)}.');
+  }
+  par.add('Bu sonuç fatura bazlıdır; personel, amortisman ve stok değişimi dahil değildir. Ayrıntı: Mali Raporlar › Gider / Gelir / Kâr-Zarar.');
+  if (ilk.isEmpty) return;
+  b.add(CevapBolumu('Gelir ve gider (fatura bazlı)', par, 'Mali Raporlar (“${g.kaynakGelir}”, “${g.kaynakGider}”)', ozet: secili.isNotEmpty ? '$ozet ${par[1]}' : ozet));
+}
+
+// ----------------------------------------------------------------- sürü sağlığı ve üreme
+
+void _sureme(SuremeArsiv a, _Soru q, List<CevapBolumu> b) {
+  if (a.bosMu) return;
+  final tum = [...a.dogum, ...a.tohumlama, ...a.gebelik, ...a.asi, ...a.gelen, ...a.satis, ...a.senk];
+  if (tum.isEmpty) return;
+  final son = tum.map((x) => x.t).reduce((x, y) => x.isAfter(y) ? x : y);
+  final d = q.donem.acik ? q.donem : Donem(son.subtract(const Duration(days: 29)), son, 'son 30 gün (${tarihKisa(son)} itibarıyla)');
+  List<SuremeSatir> sz(List<SuremeSatir> l) => [for (final x in l) if (d.icinde(x.t) && _ciftlikEslesir(q.ciftlikler, x.ciftlik)) x];
+  double top(List<SuremeSatir> l, String k) => l.fold(0.0, (t, x) => t + x.v(k));
+  final par = <String>[];
+  final dg = sz(a.dogum);
+  if (dg.isNotEmpty) {
+    par.add('Doğum: ${sayi(top(dg, 'dogum'))} (dişi ${sayi(top(dg, 'disi'))}, erkek ${sayi(top(dg, 'erkek'))}, ikiz ${sayi(top(dg, 'ikiz'))}, '
+        'ölü doğum ${sayi(top(dg, 'olu'))}).');
+  }
+  final th = sz(a.tohumlama);
+  if (th.isNotEmpty) {
+    final y = GelirGider.grupla(th, (x) => x.tur, (x) => x.v('adet'));
+    par.add('Tohumlama: ${sayi(top(th, 'adet'))} (${y.map((e) => '${e.key} ${sayi(e.value)}').join(', ')}).');
+  }
+  final gb = sz(a.gebelik);
+  if (gb.isNotEmpty) {
+    final y = GelirGider.grupla(gb, (x) => x.tur, (x) => x.v('adet'));
+    final topl = top(gb, 'adet');
+    par.add('Gebelik muayenesi: ${sayi(topl)} baş — ${y.map((e) => '${e.key} ${sayi(e.value)} (%${sayi(topl == 0 ? 0 : e.value / topl * 100, ondalik: 0)})').join(', ')}.');
+  }
+  final sk = sz(a.senk);
+  if (sk.isNotEmpty) par.add('Senkronizasyon: ${sk.length} program, ${sayi(top(sk, 'hayvan'))} hayvan.');
+  final asi = sz(a.asi);
+  if (asi.isNotEmpty) {
+    final y = GelirGider.grupla(asi, (x) => x.tur, (x) => x.v('kayit'));
+    par.add('Aşı: ${y.take(6).map((e) => '${e.key} ${sayi(e.value)}').join(', ')}.');
+  }
+  final ge = sz(a.gelen), sa = sz(a.satis);
+  if (ge.isNotEmpty) par.add('Gelen hayvan: ${sayi(top(ge, 'adet'))} baş${top(ge, 'kg') > 0 ? ', ${sayi(top(ge, 'kg'))} kg' : ''}.');
+  if (sa.isNotEmpty) {
+    par.add('Satılan hayvan: ${sayi(top(sa, 'adet'))} baş${top(sa, 'kg') > 0 ? ', ${sayi(top(sa, 'kg'))} kg' : ''}'
+        '${top(sa, 'tutar') > 0 ? ', ${sayi(top(sa, 'tutar'))} ₺' : ''}.');
+  }
+  final sut = sz(a.sut);
+  if (sut.isNotEmpty && RegExp(r'analiz|somatik|yağ|protein|kalite').hasMatch(q.s)) {
+    final k = {for (final x in sut) ...x.d.keys};
+    par.add('Süt analizi (${sut.length} ölçüm, ortalama): ${k.map((e) => '$e ${sayi(sut.fold(0.0, (t, x) => t + x.v(e)) / sut.length, ondalik: 2)}').join(', ')}.');
+  }
+  if (par.isEmpty) {
+    par.add('${d.ad} için sürü sağlığı ve üreme kaydı yok.');
+  } else {
+    par.insert(0, '${d.ad}${q.ciftlikler.isEmpty ? '' : ' · ${q.ciftlikler.join(', ')}'}:');
+  }
+  b.add(CevapBolumu('Sürü sağlığı ve üreme', par, 'Sürü Sağlığı ve Üreme arşivi (sürü yönetim programı kayıtları)',
+      ozet: par.length > 1 ? '${par[0]} ${par[1]}' : par.first));
+}
+
+// ----------------------------------------------------------------- ÇKS
+
+void _cks(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
+  final l = [
+    for (final x in v.cks)
+      if (_ciftlikEslesir(q.ciftlikler, x.ciftlik) && (q.urunler.isEmpty || q.urunler.any(trKucuk(x.urun).contains))) x,
+  ];
+  if (l.isEmpty) return;
+  final par = <String>[];
+  final sezonlar = {for (final x in l) x.sezon}.toList()..sort();
+  for (final s in sezonlar.reversed.take(2)) {
+    final ls = [for (final x in l) if (x.sezon == s) x];
+    final m = GelirGider.grupla(ls, (x) => x.urun.isEmpty ? 'Belirtilmemiş' : x.urun, (x) => x.alan ?? 0);
+    final top = m.fold(0.0, (t, e) => t + e.value);
+    par.add('$s ÇKS beyanı: ${ls.length} parsel, ${sayi(top)} da — ${m.take(8).map((e) => '${e.key} ${sayi(e.value)} da').join(', ')}.');
+  }
+  b.add(CevapBolumu('ÇKS kayıtları', par, 'ÇKS_Parseller sayfası'));
+}
+
 // ----------------------------------------------------------------- serbest metin araması
 
 void _metinArama(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
@@ -751,7 +900,7 @@ void _metinArama(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
 
   final l = <(DateTime?, String, String)>[
     for (final x in v.tarim)
-      if (es(x.faaliyet) && _ciftlikEslesir(q.ciftlikler, x.ciftlik)) (x.tarih, 'Tarım', '${x.ciftlik}: ${x.faaliyet}'),
+      if (es(x.faaliyet) && _ciftlikEslesir(q.ciftlikler, x.ciftlik)) (x.tarih, 'Tarım', '${x.ciftlik}: ${kurumsalFaaliyet(x.faaliyet)}'),
     for (final x in v.bulgular)
       if (es('${x.konu} ${x.bulgu}') && _ciftlikEslesir(q.ciftlikler, x.ciftlik)) (x.gun, 'Drive bulgusu', '${x.konu}: ${x.bulgu}'),
     for (final x in v.gecmis)
@@ -785,4 +934,7 @@ const genelOrnekSorular = [
   'Açık arızalar',
   'Kasım ayı faturaları',
   'Şekersüt süt maliyeti neden arttı?',
+  'Ekim ayı yem gideri ne kadar?',
+  'Bu ay kaç tohumlama yapıldı?',
+  '2026 gelir gider farkı',
 ];

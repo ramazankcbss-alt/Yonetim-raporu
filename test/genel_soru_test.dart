@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yonetim_raporu/veri/genel_soru.dart';
 import 'package:yonetim_raporu/veri/model.dart';
+import 'package:yonetim_raporu/veri/sureme.dart';
 
 // Yalnızca test için yapay örnek veri; gerçek şirket rakamı içermez.
 void main() {
@@ -66,5 +67,55 @@ void main() {
     expect(y.baglam.ciftlikler, {'Şekersüt'});
     final t = genelCevapla(v, 'Tüm çiftlikler', bugun: bugun, onceki: y.baglam);
     expect(t.baglam.ciftlikler, isEmpty);
+  });
+
+  test('gelir/gider sorusu Mali Raporlar verisinden, gider türüne göre cevaplanır', () {
+    final m = RaporVerisi(
+      ozet: const [],
+      gunluk: const [],
+      tarim: const [],
+      mali: MaliVeri.json({
+        'gelirGider': {
+          'donem': 'Ocak 2030',
+          'kaynakGider': 'aylık gider tablosu',
+          'kaynakGelir': 'aylık gelir satış tablosu',
+          'gider': [
+            [2030, 1, 'Şekersüt', 'Yem ve kaba yem', 'Grup dışı', 100, 110],
+            [2030, 1, 'Şekersüt', 'Canlı hayvan alımı', 'Grup dışı', 50, 55],
+          ],
+          'gelir': [
+            [2030, 1, 'Şekersüt', 'Çiğ süt', 'Grup içi', 'L', 10, 200, 220],
+          ],
+        },
+      }),
+    );
+    final y = genelCevapla(m, 'Ocak 2030 yem gideri ne kadar?', bugun: bugun);
+    final b = y.bolumler.firstWhere((x) => x.baslik.startsWith('Gelir ve gider'));
+    final t = b.paragraflar.join(' ');
+    expect(t, contains('Yem ve kaba yem'));
+    expect(t, contains('fatura bazlı'));
+    expect(b.kaynak, contains('aylık gider tablosu'));
+  });
+
+  test('tohumlama sorusu Sürü Sağlığı arşivinden cevaplanır', () {
+    SuremeSatir r(String tur, Map<String, double> d) => SuremeSatir(DateTime(2030, 1, 10), 'Şekersüt', tur, d);
+    final a = SuremeArsiv(
+      dogum: [r('Normal', {'dogum': 3, 'disi': 2, 'erkek': 1})],
+      tohumlama: [r('Suni tohumlama', {'adet': 7})],
+      boga: const [],
+      senk: const [],
+      gebelik: [r('Gebe', {'adet': 6}), r('Boş', {'adet': 4})],
+      asi: const [],
+      gelen: const [],
+      satis: const [],
+      sut: const [],
+      diger: const [],
+      suru: const [],
+      olusturma: '',
+    );
+    final y = genelCevapla(v, 'Bu ay kaç tohumlama yapıldı?', bugun: bugun, sureme: a);
+    final t = y.bolumler.firstWhere((x) => x.baslik == 'Sürü sağlığı ve üreme').paragraflar.join(' ');
+    expect(t, contains('Tohumlama: 7'));
+    expect(t, contains('Gebe 6 (%60)'));
   });
 }
