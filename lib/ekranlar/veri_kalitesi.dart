@@ -1,0 +1,248 @@
+import 'package:flutter/material.dart';
+
+import '../bicim.dart';
+import '../servis/veri_servisi.dart';
+import '../tema.dart';
+import '../veri/ciftlik_rapor.dart';
+import '../veri/havuz.dart';
+import '../veri/model.dart';
+import '../veri/urun_karlilik.dart';
+import 'bilesenler.dart';
+import 'gonder.dart';
+import 'net_sonuc.dart' show mtKgMaliyetleri;
+import 'urun_karlilik.dart' show maliyetTakipVerisi;
+
+String _tarih(DateTime? d) => d == null ? '—' : zamanBicim(d);
+String _mn(double v) => '${v < 0 ? '−' : ''}${sayi(v.abs() / 1e6, ondalik: 2)} mn ₺';
+
+/// Açık konu: dosyalar arası tutarsızlık ya da eksik veri, sorumlusuyla.
+class AcikKonu {
+  const AcikKonu(this.baslik, this.aciklama, this.sorumlu);
+  final String baslik, aciklama, sorumlu;
+}
+
+/// Veri kalitesi denetimi: kaynak tarihleri, eksik aylar ve açık konular (veriden üretilir).
+class VeriKalitesi {
+  VeriKalitesi._(this.kaynaklar, this.eksikAylar, this.konular);
+  final List<(KaynakTarihi?, String, String)> kaynaklar;
+  final List<String> eksikAylar;
+  final List<AcikKonu> konular;
+
+  int get eskiSayisi => kaynaklar.where((k) => k.$1?.eski ?? false).length;
+  int get uyariSayisi => eskiSayisi + eksikAylar.length + konular.length;
+
+  static VeriKalitesi hesapla(RaporVerisi v, CiftlikRaporu? muhasebe, {DateTime? bugun}) {
+    final simdi = bugun ?? DateTime.now();
+    final mt = maliyetTakipVerisi();
+    final gg = v.mali.gelirGider;
+    final h = GelirGiderHavuzu.hesapla(faturalar: gg, muhasebe: muhasebe, mtKgMaliyet: mtKgMaliyetleri(v));
+    KaynakTarihi? t(String ad) => v.kaynakTarihleri.where((k) => k.ad == ad).firstOrNull;
+
+    String mtKapsam() {
+      if (mt == null) return 'Veri yok';
+      final aylar = <String>{for (final e in mt.ekilis) ...e.aylik.keys}.toList()..sort();
+      if (aylar.isEmpty) return '';
+      String ay(String a) {
+        final p = a.split('-');
+        return '${raporAylari[int.parse(p[1]) - 1]} ${p[0]}';
+      }
+
+      return '${ay(aylar.first)} – ${ay(aylar.last)}';
+    }
+
+    final kaynaklar = <(KaynakTarihi?, String, String)>[
+      (t('Çiftlik Raporları (muhasebe)'), 'Çiftlik Raporları (muhasebe)', muhasebe?.donem ?? 'Veri yok'),
+      (t('Maliyet Takip'), 'Maliyet Takip', mtKapsam()),
+      (t('Aylık gelir satış ve gider tabloları'), 'Aylık gelir satış ve gider tabloları', gg.bos ? 'Veri yok' : gg.donem),
+      (t('Stok sayımları'), 'Stok sayımları', 'Uygulamaya bağlanacak (piramit 4. adım)'),
+      (t('Sürü hareketleri'), 'Sürü hareketleri', 'Uygulamaya bağlanacak (piramit 4. adım)'),
+      (t('Tarımsal Faaliyet'), 'Tarımsal Faaliyet',
+          v.tarimsalUretim.bos ? 'Veri yok' : '${v.tarimsalUretim.yilBasligi} hasadı'.trim()),
+    ];
+
+    // Eksik aylar: bu yıl için tamamlanmış son ay.
+    final sonTam = simdi.month - 1;
+    final eksik = <String>[];
+    if (h.yil == simdi.year && sonTam >= 1) {
+      if (h.sonMuhasebeAyi < sonTam) {
+        final bas = h.sonMuhasebeAyi + 1;
+        eksik.add('Muhasebe (Çiftlik Raporları): ${bas == sonTam ? raporAylari[sonTam - 1] : '${raporAylari[bas - 1]}–${raporAylari[sonTam - 1]}'} '
+            'kapanışı bekleniyor; bu aylar Net Sonuç\'ta tahmin olarak gösteriliyor.');
+      }
+      if (h.sonFaturaAyi < sonTam) {
+        final bas = h.sonFaturaAyi + 1;
+        eksik.add('Gelir satış ve gider tabloları: ${bas == sonTam ? raporAylari[sonTam - 1] : '${raporAylari[bas - 1]}–${raporAylari[sonTam - 1]}'} '
+            'faturaları henüz yok.');
+      }
+    }
+
+    final konular = <AcikKonu>[];
+    if (h.konsolideFark != null && h.konsolideFark!.abs() >= 1000) {
+      konular.add(AcikKonu('Havuz ile muhasebe konsolide net kârı farklı',
+          'Fark ${_mn(h.konsolideFark!)}. Çiftlik gelir tabloları ile konsolide sayfası birbirini tutmuyor.', 'Muhasebe'));
+    }
+    if (mt != null) {
+      final ref = <String, int>{};
+      for (final r in mt.refHatalari) {
+        ref['${r.sayfa} · ${r.bolum}'] = (ref['${r.sayfa} · ${r.bolum}'] ?? 0) + r.adet;
+      }
+      for (final e in ref.entries) {
+        konular.add(AcikKonu('Maliyet Takip: #REF! hatası', '${e.key}: ${e.value} hücre kayıp sayfaya başvuruyor.', 'Maliyet Takip sorumlusu'));
+      }
+      if (mt.ortakYazili != null && (mt.ortakToplam - mt.ortakYazili!).abs() >= 1) {
+        konular.add(AcikKonu(
+            'Maliyet Takip: tarım ortak gider TOPLAM hücresi',
+            'Dosyada ${_mn(mt.ortakYazili!)}, kalemlerin toplamı ${_mn(mt.ortakToplam)} (fark ${_mn(mt.ortakToplam - mt.ortakYazili!)}).',
+            'Maliyet Takip sorumlusu'));
+      }
+      if (!v.tarimsalUretim.bos) {
+        final k = UrunKarlilik.hesapla(plan: v.tarimsalUretim, mt: mt);
+        for (final (u, c, tf, m) in k.alanFarklari) {
+          konular.add(AcikKonu('Ekiliş alanı iki dosyada farklı', '$u – $c: Tarımsal Faaliyet ${sayi(tf)} da, Maliyet Takip ${sayi(m)} da.',
+              'Maliyet Takip sorumlusu'));
+        }
+        for (final u in k.urunler) {
+          final yok = [for (final c in u.ciftlikler.values) if (!c.mtVar) c.ciftlik];
+          if (yok.isNotEmpty) {
+            konular.add(AcikKonu('Maliyet Takip\'te olmayan ekiliş', '${u.urun}: ${yok.join(', ')} (tahmini maliyet kullanılıyor).',
+                'Maliyet Takip sorumlusu'));
+          }
+        }
+      }
+    }
+    for (final s in muhasebe?.senaryo?.kontrol ?? const []) {
+      if (s.tur == 'tutarsizlik') konular.add(AcikKonu(s.baslik, s.aciklama, 'Muhasebe'));
+    }
+    return VeriKalitesi._(kaynaklar, eksik, konular);
+  }
+}
+
+/// Asistan › Veri Kalitesi.
+class VeriKalitesiEkran extends StatefulWidget {
+  const VeriKalitesiEkran({super.key, required this.veri});
+  final RaporVerisi veri;
+
+  @override
+  State<VeriKalitesiEkran> createState() => _VeriKalitesiEkranState();
+}
+
+class _VeriKalitesiEkranState extends State<VeriKalitesiEkran> {
+  late final Future<CiftlikRaporu?> _muhasebe =
+      CiftlikRaporu.yukle().then<CiftlikRaporu?>((r) => r).catchError((Object _) => null);
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Veri Kalitesi'), actions: const [TabloGuncelleButonu()]),
+        body: ListenableBuilder(
+          listenable: VeriDeposu.ben,
+          builder: (context, _) => FutureBuilder<CiftlikRaporu?>(
+            future: _muhasebe,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+              final v = VeriDeposu.ben.veri ?? widget.veri;
+              final q = VeriKalitesi.hesapla(v, snap.data);
+              return GonderAlani(konu: 'Veri Kalitesi', child: _Icerik(q: q, tarihVar: v.kaynakTarihleri.isNotEmpty));
+            },
+          ),
+        ),
+      );
+}
+
+class _Icerik extends StatelessWidget {
+  const _Icerik({required this.q, required this.tarihVar});
+  final VeriKalitesi q;
+  final bool tarihVar;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+          Panel(
+            baslik: 'Özet',
+            child: Text(
+              q.uyariSayisi == 0
+                  ? 'Bütün kaynaklar güncel; açık konu yok.'
+                  : '${q.eskiSayisi} kaynakta veri eski · ${q.eksikAylar.length} eksik dönem · ${q.konular.length} açık konu',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: q.uyariSayisi == 0 ? Renk.yesil : Renk.amber),
+            ),
+          ),
+          if (!tarihVar)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: BilgiKutusu(yazi: 'Kaynak dosyaların değişiklik tarihleri, Apps Script güncellendiğinde görünür.'),
+            ),
+          Panel(
+            baslik: 'Kaynaklar',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final (t, ad, kapsam) in q.kaynaklar) _KaynakSatiri(t: t, ad: ad, kapsam: kapsam),
+            ]),
+          ),
+          if (q.eksikAylar.isNotEmpty)
+            Panel(
+              baslik: 'Eksik dönemler',
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                for (final x in q.eksikAylar)
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Text('• $x', style: const TextStyle(fontSize: 13, height: 1.4))),
+              ]),
+            ),
+          Panel(
+            baslik: 'Açık konular (${q.konular.length})',
+            child: q.konular.isEmpty
+                ? const Text('Dosyalar arası tutarsızlık bulunmadı.', style: TextStyle(fontSize: 13))
+                : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    for (final k in q.konular)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(k.baslik, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                          const SizedBox(height: 2),
+                          Text(k.aciklama, style: const TextStyle(fontSize: 13, height: 1.4)),
+                          Text('Sorumlu: ${k.sorumlu}', style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+                        ]),
+                      ),
+                  ]),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'Açık konular dosyalar okunduğunda yeniden hesaplanır; personel düzeltme yaptığında kendiliğinden kapanır. '
+              'Yalnızca dosya tarihleri ve toplam tutarlar kullanılır; kişisel veri okunmaz.',
+              style: TextStyle(fontSize: 12, color: Renk.soluk, height: 1.4),
+            ),
+          ),
+        ],
+      );
+}
+
+class _KaynakSatiri extends StatelessWidget {
+  const _KaynakSatiri({required this.t, required this.ad, required this.kapsam});
+  final KaynakTarihi? t;
+  final String ad, kapsam;
+
+  @override
+  Widget build(BuildContext context) {
+    final (durum, renk) = t == null
+        ? ('Tarih bilinmiyor', Renk.soluk)
+        : t!.canli
+            ? ('Doğrudan okunuyor', Renk.yesil)
+            : t!.eski
+                ? ('Veri eski – kopya yenilenmeli', Renk.kirmizi)
+                : ('Güncel', Renk.yesil);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text(ad, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+          Text(durum, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: renk)),
+        ]),
+        if (kapsam.isNotEmpty) Text('Kapsanan dönem: $kapsam', style: const TextStyle(fontSize: 12.5)),
+        if (t != null)
+          Text(
+              t!.canli
+                  ? 'Kaynak son değişiklik: ${_tarih(t!.kaynak)}'
+                  : 'Kaynak son değişiklik: ${_tarih(t!.kaynak)} · Uygulamadaki kopya: ${_tarih(t!.kopya)}',
+              style: const TextStyle(fontSize: 12, color: Renk.soluk)),
+      ]),
+    );
+  }
+}

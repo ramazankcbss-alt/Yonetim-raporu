@@ -1144,6 +1144,7 @@ class RaporVerisi {
     this.mali = const MaliVeri(),
     this.tarimsalUretim = const TarimsalUretim(),
     this.urunTeslimat = const UrunTeslimat(),
+    this.kaynakTarihleri = const [],
     this.vetBildirimleri = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
@@ -1218,6 +1219,9 @@ class RaporVerisi {
 
   /// Ürün teslimat / satış hareketleri (günlük toplamlar).
   final UrunTeslimat urunTeslimat;
+
+  /// Veri kalitesi: kaynak dosyaların ve uygulamadaki kopyaların son değişiklik tarihleri.
+  final List<KaynakTarihi> kaynakTarihleri;
   final List<VetBildirim> vetBildirimleri;
 
   /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
@@ -1238,6 +1242,10 @@ class RaporVerisi {
       mali: MaliVeri.json(j['mali']),
       tarimsalUretim: TarimsalUretim.json(j['tarimsalUretim']),
       urunTeslimat: UrunTeslimat.json(j['urunTeslimat']),
+      kaynakTarihleri: (j['veriKalitesi'] is List ? j['veriKalitesi'] as List : const [])
+          .map(KaynakTarihi.oku)
+          .whereType<KaynakTarihi>()
+          .toList(),
       vetPanelAcik: j['veteriner'] is Map && (j['veteriner'] as Map)['acik'] == true,
       vetKodlari: _liste(j['veteriner'] is Map ? (j['veteriner'] as Map)['kodlar'] : null)
           .map(VetKod.oku)
@@ -1668,3 +1676,23 @@ Gostergeler haftalikGostergeler(RaporVerisi v, DateTime bas) {
       ekim.fold(0.0, (a, e) => a + (e.plan ?? 0)),
       ekim.fold(0.0, (a, e) => a + (e.ekilen ?? 0)),
     );
+
+
+/// Bir kaynak dosyanın (ve varsa uygulamadaki kopyasının) son değişiklik zamanı. Yalnızca tarih; içerik yok.
+class KaynakTarihi {
+  const KaynakTarihi(this.ad, this.kaynak, this.kopya, {this.canli = false});
+  final String ad;
+  final DateTime? kaynak, kopya;
+
+  /// Uygulama kaynağı doğrudan okuyor (kopya yok).
+  final bool canli;
+
+  /// Kaynak, uygulamadaki kopyadan sonra değişmiş.
+  bool get eski => !canli && kaynak != null && kopya != null && kaynak!.isAfter(kopya!.add(const Duration(minutes: 5)));
+
+  static KaynakTarihi? oku(Object? x) {
+    if (x is! Map) return null;
+    DateTime? t(Object? v) => v is String && v.isNotEmpty ? DateTime.tryParse(v) : null;
+    return KaynakTarihi('${x['ad'] ?? ''}', t(x['kaynak']), t(x['kopya']), canli: x['canli'] == true);
+  }
+}

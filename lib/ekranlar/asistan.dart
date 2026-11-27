@@ -10,6 +10,7 @@ import 'ciftlik_rapor.dart';
 import 'esk.dart';
 import 'gecmis.dart';
 import 'genel_soru.dart';
+import 'veri_kalitesi.dart';
 import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
@@ -50,6 +51,16 @@ class AsistanEkran extends StatelessWidget {
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => GenelSoruEkran(veri: veri))),
         ),
+        if (VeriDeposu.ben.paylasim == null)
+          _Bolum(
+            ikon: Icons.fact_check_outlined,
+            baslik: 'Veri Kalitesi',
+            aciklama: veri.kaynakTarihleri.any((k) => k.eski)
+                ? '${veri.kaynakTarihleri.where((k) => k.eski).length} kaynakta veri eski · eksik dönemler ve dosyalar arası açık konular'
+                : 'Kaynakların güncelliği, eksik dönemler ve personelde bekleyen düzeltmeler',
+            renk: Renk.turuncu,
+            ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => VeriKalitesiEkran(veri: veri))),
+          ),
         // Paylaşımla açılan uygulamada paylaşım yönetimi gösterilmez.
         if (VeriDeposu.ben.paylasim == null)
           _Bolum(
