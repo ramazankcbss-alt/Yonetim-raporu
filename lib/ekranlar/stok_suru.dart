@@ -6,6 +6,7 @@ import '../tema.dart';
 import '../veri/ciftlik_rapor.dart' show raporAylari;
 import '../veri/model.dart';
 import '../veri/stok_suru.dart';
+import 'kaynak_kapsami.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 
@@ -27,7 +28,7 @@ class StokSuruEkran extends StatelessWidget {
             child: Scaffold(
               appBar: AppBar(
                 title: const Text('Stok ve Sürü'),
-                actions: const [TabloGuncelleButonu()],
+                actions: const [KaynakTablolariButonu(menuler: ['stokSuru'], baslik: 'Stok ve Sürü – kaynak tabloları'), TabloGuncelleButonu()],
                 bottom: const TabBar(
                   labelColor: Colors.white,
                   unselectedLabelColor: Color(0xCCFFFFFF),

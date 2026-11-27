@@ -5,6 +5,7 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/esk_rapor.dart';
 import '../veri/model.dart';
+import 'kaynak_kapsami.dart';
 import 'bilesenler.dart';
 import 'esk_kaynak.dart';
 import 'gonder.dart';
@@ -172,6 +173,13 @@ class _Menu extends StatelessWidget {
               : '${veri.eskKaynak.aylar.length} ay · ${veri.eskKaynak.partiler.length} parti · ${eskFarkSayisi(veri)} fark',
           renk: eskFarkSayisi(veri) > 0 ? Renk.amber : null,
           ac: () => ac('Kaynak tablolar ve mutabakat', (v) => EskKaynakGovde(veri: v)),
+        ),
+        _MenuSatiri(
+          ikon: Icons.table_chart_outlined,
+          baslik: 'ESK çalışma dosyası',
+          alt: 'Maliyet, gider kalemleri, kesim-sakatat-bakım-nakliye, rasyon ve özet sayfaları — bütün hücreleriyle',
+          ac: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => const KaynakTablolariEkran(menuler: ['esk'], baslik: 'ESK – kaynak tabloları'))),
         ),
         _MenuSatiri(
           ikon: Icons.agriculture_outlined,

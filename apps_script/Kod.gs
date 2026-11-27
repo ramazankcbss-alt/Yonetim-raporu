@@ -332,6 +332,8 @@ function veriTopla_(gun) {
     maliyetTakipDetay: (function () { try { return maliyetTakipDetay_(); } catch (err) { return null; } })(),
     // Kaynak envanteri özeti: kullanılmayan sayfalar, KVKK hariç tutulanlar, okunamayanlar
     kaynakEnvanteri: (function () { try { return kaynakEnvanterOzet_(); } catch (err) { return null; } })(),
+    // Ayrı analize bağlanmamış kaynak sayfaları (bütün hücreleriyle, menü bazında)
+    kaynakTablolari: (function () { try { return kaynakTablolari_(); } catch (err) { return null; } })(),
     // Araç masrafları: muhasebe xlsx'i doğrudan okunur (araç adı × ay × iş alanı; plaka/satıcı/belge no yok)
     aracMasraf: (function () { try { return aracMasrafOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
@@ -2080,6 +2082,11 @@ function tarlaVeri_(pay) {
   if (acik('urun')) al(['tarimsalUretim', 'urunTeslimat']);
   if (acik('gecmis', 'hastalik')) al(['gecmis', 'dersler']);
   if (acik('gecmis')) al(['gecmisOzet']);
+  if (v.kaynakTablolari && v.kaynakTablolari.menuler) {
+    var kt = {};
+    Object.keys(v.kaynakTablolari.menuler).forEach(function (mn) { if (acik(mn)) kt[mn] = v.kaynakTablolari.menuler[mn]; });
+    o.kaynakTablolari = { menuler: kt, hatalar: [] };
+  }
   if (acik('mali')) o.mali = paylasimMali_(v.mali, pay.maliDetay === true);
   // Ürün Takibi › Ürün Kârlılığı fatura gelirlerini (çiftlik × ürün toplamları, tedarikçi yok) kullanır.
   else if (acik('urun') && v.mali) o.mali = { gelirGider: v.mali.gelirGider };
@@ -3789,7 +3796,7 @@ function kvkkSutunMu_(dosyaAdi, baslik) {
   if (KVKK_SUTUN_.test(baslik)) return true;
   return KVKK_DOSYA_SUTUN_.some(function (k) { return k[0].test(dosyaAdi || '') && k[1].test(baslik); });
 }
-var KVKK_SAYFA_ = /personel|organizasyon|şoför|sürücü|kişiler|kisiler|kişi olay|mesaj|iletişim|telefon/i;
+var KVKK_SAYFA_ = /personel|organizasyon|şoför|sürücü|kişiler|kisiler|kişi olay|mesaj|iletişim|telefon|ekipler|görevlendirme|roller|cihazlar|bildirimler|^mutabakat$/i;
 var KVKK_SUTUN_ = /tedarikçi|tedarikci|cari|müşteri|musteri|alıcı|alici|satıcı|unvan|ünvan|firma adı|kullanıcı|kullanici|ad[ıi]?\s*[-\/]?\s*soyad|^ad[ıi]?$|^soyad|isim|personel|çalışan|şoför|sürücü|operatör|operator|^tc\b|t\.c\.|kimlik|telefon|^tel\b|gsm|cep no|iban|plaka|adres|e-?posta|mail|imza|bildiren|onaylayan|teslim alan|teslim eden|kişi/i;
 
 function kvkkHucre_(x) {
@@ -3808,6 +3815,16 @@ function kaynakKullanim_() {
   return [
     [MALIYET_TAKIP_ID_, /^(MALİYET ÖZET HAYVANCILIK|MALİYET ÖZET TARIM 2026|YEM|SÜT MALİYETİ|KARKAS MALİYETİ|KAYAR ORTALAMA|ÖZET)$/, 'Çiftlik Sonuçları › maliyet (dönüştürücü)'],
     [MALIYET_TAKIP_ID_, /^(İLAÇ AŞI|DİĞER MALZEMELER)$/, 'Çiftlik Sonuçları › İlaç ve Malzeme'],
+    [GECMIS_OZET_.degerlendirme, /./, 'Geçmiş Yıllar › Kaynak tabloları'],
+    [GECMIS_OZET_.kesim, /^(ALIM ÖZET|Sayfa6|Sayfa7|GENEL MALİYETLER)$/, 'Geçmiş Yıllar › Kaynak tabloları'],
+    [BILGI_BANKASI_ID, /^(Envanter|Aylık_Sürü)$/, 'Geçmiş Yıllar › Kaynak tabloları'],
+    [ESK_EK_.calisma, /./, 'ESK › Kaynak tabloları'],
+    [SURU_HAREKETLERI_ID, /^ÖZET/, 'Stok ve Sürü › Kaynak tabloları'],
+    [/Stok Sayımları/, /ARASI NAKİL/, 'Stok ve Sürü › Kaynak tabloları'],
+    [TARIM_FAALIYET_ID, /./, 'Ziraat › Kaynak tabloları'],
+    [TARIM_ICMAL_ID, /^(ÖZE|ÖZET 2027)$/, 'Ziraat › Kaynak tabloları'],
+    [EKIM_PLANI_ID, /./, 'Ziraat › Kaynak tabloları'],
+    [PATATES_FIRE_ID, /./, 'Ürün teslimatı › Kaynak tabloları'],
     [/Çiftlik Raporları/, /^(Çiftlikler Gider Raporu Detay|Besi-Düve Yem Tüketimi|Duran Varlık Yem Tüketimi|Tarımsal Alan Tüketim Raporu)$/, 'Çiftlik Sonuçları › Gider / Yem ve Tüketim'],
     [/Çiftlik Raporları/, /^(Çiftlikler Konsolide( \(2\))?|16\d\d - .+)$/, 'Çiftlik Sonuçları › gelir tabloları (iki senaryo)'],
     [/Çiftlik Raporları/, /^(Satış|SMM Detay)$/, 'Çiftlik Sonuçları › birim maliyet, tarım ürünleri, teşvikler'],
@@ -3923,6 +3940,7 @@ function kaynakSayfaIncele_(sh, dosyaAdi) {
     if (m > en) { en = m; bs = r; }
   }
   o.baslikSatiri = bs + 1;
+  if (o.satir <= bs + 1) { o.durum = 'bos'; o.bosNedeni = 'yalnızca başlık satırı var, kayıt yok'; }
   var gizliSut = {};
   for (var c0 = 0; c0 < o.sutun; c0++) if (kvkkSutunMu_(dosyaAdi, d[bs][c0])) gizliSut[c0] = true;
   for (var c = 0; c < o.sutun; c++) {
@@ -3996,7 +4014,7 @@ function kaynakEnvanteriHazirla() {
           if (bitmedi || Date.now() - bas > 240000) { bitmedi = true; kayit.yarim = true; return; }
           var s;
           try { s = kaynakSayfaIncele_(sh, kayit.ad); } catch (e) { s = { ad: sh.getName(), durum: 'hata', hataMetni: String(e) }; }
-          if (!s.durum) { s.kullanim = kaynakKullanimBul_(kayit, s.ad); s.durum = s.kullanim ? 'kullaniliyor' : 'kullanilmiyor'; }
+          if (!s.durum || s.durum === 'bos') { s.kullanim = kaynakKullanimBul_(kayit, s.ad); if (!s.durum) s.durum = s.kullanim ? 'kullaniliyor' : 'kullanilmiyor'; }
           kayit.sayfalar.push(s);
         });
       } catch (e) { kayit.hata = 'açılamadı: ' + e; }
@@ -4368,4 +4386,72 @@ function ciftlikRaporUret_(tablo) {
   DriveApp.getFileById(UYGULAMA_DOSYALARI_.ciftlik_rapor_2026).setContent(JSON.stringify(o));
   try { CacheService.getScriptCache().remove('dosya_ciftlik_rapor_2026_' + UYGULAMA_DOSYALARI_.ciftlik_rapor_2026 + '_n'); } catch (e) {}
   return { donem: o.donem, gelir: o.gelir.length, birim: o.birim.length, tarim: o.tarim.length, satis: o.satisDetay.length, smm: o.smmDetay.length, hatalar: o.hatalar };
+}
+
+
+// ---------------------------------------------------------------------------
+// KAYNAK TABLOLARI: piramidin hesaplarında henüz ayrı bir analize bağlanmamış sayfalar, bütün hücreleriyle
+// tablo blokları hâlinde ilgili menüye taşınır (boş satırlarla ayrılan her blok ayrı tablo). Böylece kaynak
+// dosyalarda okunmayan sayfa kalmaz. KVKK: kişi bilgisi sayfaları alınmaz, kişi bilgisi sütunları ve kalıpları maskelenir.
+function kaynakTabloTanimlari_() {
+  return [
+    ['gecmis', 'Değerlendirme Raporu (31.12.2025)', GECMIS_OZET_.degerlendirme, /./],
+    ['gecmis', 'Kesim özeti 2021–2026', GECMIS_OZET_.kesim, /^(ALIM ÖZET|Sayfa6|Sayfa7|GENEL MALİYETLER)$/],
+    ['gecmis', 'Bilgi Bankası', BILGI_BANKASI_ID, /^(Envanter|Aylık_Sürü)$/],
+    ['esk', 'ESK çalışma dosyası', ESK_EK_.calisma, /^(?!Gelir Tablosuna Göre\.$)/],
+    ['stokSuru', 'Sürü hareketleri – özet sayfaları', SURU_HAREKETLERI_ID, /^ÖZET/],
+    ['stokSuru', 'Stok sayımları – çiftlikler arası nakil', 'ara:' + "title contains 'Stok Sayımları' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false", /ARASI NAKİL/],
+    ['ziraat', 'Tarımsal Faaliyet – diğer sayfalar', TARIM_FAALIYET_ID, /^(?!(ÇİFTLİK BAZINDA|ÜRÜN BAZINDA|PARSEL)$)/],
+    ['ziraat', 'Tarım günlük icmali – özet sayfaları', TARIM_ICMAL_ID, /^(ÖZE|ÖZET 2027)$/],
+    ['ziraat', 'Ekim planı – aylık raporlar', EKIM_PLANI_ID, /^(OCAK|ŞUBAT|MART|NİSAN|MAYIS|HAZİRAN|TEMMUZ|AĞUSTOS|EYLÜL|EKİM|KASIM|ARALIK)$/],
+    ['urun', 'Patates fire listesi – fatura ve özet', PATATES_FIRE_ID, /^(fatura edilecek miktar|Pivot Tablo 1)$/]
+  ];
+}
+
+/** 2B görüntü değerleri → boş satırlarla ayrılmış bloklar [{satirlar: [[...]]}] (boş sütunlar kırpılır). */
+function kaynakBloklar_(d, maske) {
+  var bloklar = [], cur = [];
+  function bitir() {
+    if (!cur.length) return;
+    var w = 0, dolu = {};
+    cur.forEach(function (r) { r.forEach(function (x, j) { if (x !== '') { dolu[j] = true; if (j + 1 > w) w = j + 1; } }); });
+    var sut = []; for (var j = 0; j < w; j++) if (dolu[j]) sut.push(j);
+    bloklar.push({ satirlar: cur.map(function (r) { return sut.map(function (j) { return maske[j] && r[j] && r !== cur[0] ? '•••' : kvkkHucre_(r[j] == null ? '' : String(r[j]).trim()); }); }) });
+    cur = [];
+  }
+  d.forEach(function (r) {
+    if (r.every(function (x) { return String(x).trim() === ''; })) bitir(); else cur.push(r.map(function (x) { return String(x).trim(); }));
+  });
+  bitir();
+  return bloklar;
+}
+
+function kaynakTablolari_() {
+  var c = CacheService.getScriptCache(), m = parcaliOku_(c, 'kaynakTablolari_v1');
+  if (m) { try { return JSON.parse(m); } catch (e) {} }
+  var o = { menuler: {}, hatalar: [] };
+  kaynakTabloTanimlari_().forEach(function (t) {
+    try {
+      var ids = [];
+      if (String(t[2]).indexOf('ara:') === 0) {
+        var it = DriveApp.searchFiles(String(t[2]).slice(4)), en = null;
+        while (it.hasNext()) { var f = it.next(); if (!en || f.getLastUpdated() > en.getLastUpdated()) en = f; }
+        if (en) ids.push(en.getId());
+      } else ids.push(t[2]);
+      ids.forEach(function (id) {
+        var ss = SpreadsheetApp.openById(id), ad = ss.getName();
+        ss.getSheets().forEach(function (sh) {
+          var sa = sh.getName();
+          if (!t[3].test(sa) || KVKK_SAYFA_.test(sa) || !sh.getLastRow() || !sh.getLastColumn()) return;
+          var d = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getDisplayValues();
+          var bas = d.find(function (r) { return r.some(function (x) { return x !== ''; }); }) || [];
+          var maske = {};
+          d.slice(0, 40).forEach(function (r) { r.forEach(function (x, j) { if (kvkkSutunMu_(ad, x)) maske[j] = true; }); });
+          (o.menuler[t[0]] = o.menuler[t[0]] || []).push({ grup: t[1], dosya: ad, sayfa: sa.trim(), bloklar: kaynakBloklar_(d, maske) });
+        });
+      });
+    } catch (e) { o.hatalar.push(t[1] + ': ' + e); }
+  });
+  parcaliYaz_(c, 'kaynakTablolari_v1', JSON.stringify(o));
+  return o;
 }

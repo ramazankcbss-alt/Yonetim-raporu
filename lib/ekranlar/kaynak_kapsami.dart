@@ -240,3 +240,78 @@ String _harf(int n) {
   }
   return s;
 }
+
+/// Bir menünün kaynak tabloları (ayrı analize bağlanmamış sayfalar, bütün hücreleriyle).
+class KaynakTablolariEkran extends StatelessWidget {
+  const KaynakTablolariEkran({super.key, required this.menuler, required this.baslik});
+  final List<String> menuler;
+  final String baslik;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(baslik)),
+        body: ListenableBuilder(
+          listenable: VeriDeposu.ben,
+          builder: (context, _) {
+            final kt = VeriDeposu.ben.veri?.kaynakTablolari ?? const KaynakTablolari();
+            final l = [for (final m in menuler) ...kt.menu(m)];
+            if (l.isEmpty) {
+              return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: BilgiKutusu(yazi: 'Kaynak tabloları henüz gelmedi. Apps Script güncel olmalı.'));
+            }
+            final gruplar = <String, List<KaynakTablo>>{};
+            for (final t in l) {
+              (gruplar[t.grup] ??= []).add(t);
+            }
+            return ListView(padding: const EdgeInsets.fromLTRB(14, 10, 14, 30), children: [
+              const BilgiKutusu(
+                  yazi: 'Bu sayfalar piramidin hesaplarına henüz ayrı bir analizle bağlanmadı; kaynak dosyadaki bütün hücreleriyle '
+                      'burada gösterilir. KVKK: kişi bilgisi sütunları maskelidir.'),
+              for (final g in gruplar.entries) ...[
+                BolumBasligi(g.key, ikon: Icons.table_chart_outlined),
+                for (final t in g.value)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ExpansionTile(
+                      title: Text(t.sayfa, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      subtitle: Text('${t.bloklar.length} tablo · ${t.bloklar.fold(0, (a, b) => a + b.length)} satır',
+                          style: const TextStyle(fontSize: 12)),
+                      childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+                      children: [
+                        for (final b in t.bloklar)
+                          if (b.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: VeriTablosu(
+                                basliklar: b.first,
+                                metinSutunlari: {for (var j = 0; j < b.first.length; j++) j},
+                                ilkSutunGenislik: 170,
+                                satirlar: [
+                                  for (final r in b.skip(1)) [for (var j = 0; j < b.first.length; j++) j < r.length ? r[j] : ''],
+                                ],
+                              ),
+                            ),
+                      ],
+                    ),
+                  ),
+              ],
+            ]);
+          },
+        ),
+      );
+}
+
+/// Menü ekranlarının üst çubuğuna eklenen "Kaynak tabloları" düğmesi.
+class KaynakTablolariButonu extends StatelessWidget {
+  const KaynakTablolariButonu({super.key, required this.menuler, required this.baslik});
+  final List<String> menuler;
+  final String baslik;
+  @override
+  Widget build(BuildContext context) => IconButton(
+        tooltip: 'Kaynak tabloları',
+        icon: const Icon(Icons.table_chart_outlined),
+        onPressed: () => Navigator.of(context)
+            .push(MaterialPageRoute<void>(builder: (_) => KaynakTablolariEkran(menuler: menuler, baslik: baslik))),
+      );
+}

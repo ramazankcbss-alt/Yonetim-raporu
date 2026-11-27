@@ -6,6 +6,7 @@ import '../tema.dart';
 import '../veri/hasat_durumu.dart';
 import '../veri/model.dart';
 import '../veri/urun_takip.dart';
+import 'kaynak_kapsami.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 import 'urun_karlilik.dart';
@@ -44,6 +45,7 @@ class UretimKarlilikEkran extends StatelessWidget {
             appBar: AppBar(
               title: Text(baslik),
               actions: [
+                const KaynakTablolariButonu(menuler: ['ziraat', 'urun'], baslik: 'Ziraat – kaynak tabloları'),
                 if (!VeriDeposu.ben.paylasimLinki && !v.tarimsalUretim.bos)
                   IconButton(
                     tooltip: 'Hasat durumu',

@@ -193,3 +193,43 @@ class KaynakEnvanteri {
     return m;
   }
 }
+
+/// Ayrı bir analize bağlanmamış kaynak sayfaları, bütün hücreleriyle (Apps Script › kaynakTablolari_).
+class KaynakTablo {
+  const KaynakTablo(this.grup, this.dosya, this.sayfa, this.bloklar);
+  final String grup, dosya, sayfa;
+
+  /// Boş satırlarla ayrılmış tablo blokları; her blok satırların listesi.
+  final List<List<List<String>>> bloklar;
+}
+
+class KaynakTablolari {
+  const KaynakTablolari({this.menuler = const {}, this.hatalar = const []});
+  final Map<String, List<KaynakTablo>> menuler;
+  final List<String> hatalar;
+
+  List<KaynakTablo> menu(String m) => menuler[m] ?? const [];
+
+  static KaynakTablolari json(Object? j) {
+    if (j is! Map) return const KaynakTablolari();
+    final m = <String, List<KaynakTablo>>{};
+    final mj = j['menuler'];
+    if (mj is Map) {
+      mj.forEach((k, v) {
+        m['$k'] = [
+          for (final t in (v is List ? v : const []))
+            if (t is Map)
+              KaynakTablo('${t['grup'] ?? ''}', '${t['dosya'] ?? ''}', '${t['sayfa'] ?? ''}', [
+                for (final b in (t['bloklar'] is List ? t['bloklar'] as List : const []))
+                  if (b is Map)
+                    [
+                      for (final r in (b['satirlar'] is List ? b['satirlar'] as List : const []))
+                        if (r is List) [for (final x in r) '$x'],
+                    ],
+              ]),
+        ];
+      });
+    }
+    return KaynakTablolari(menuler: m, hatalar: [for (final h in (j['hatalar'] is List ? j['hatalar'] as List : const [])) '$h']);
+  }
+}

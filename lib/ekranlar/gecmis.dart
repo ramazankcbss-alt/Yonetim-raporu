@@ -6,6 +6,7 @@ import '../tema.dart';
 import '../veri/gecmis_sinif.dart';
 import '../veri/kategori.dart';
 import '../veri/model.dart';
+import 'kaynak_kapsami.dart';
 import 'bilesenler.dart';
 import 'gecmis_ozet.dart';
 import 'gonder.dart';
@@ -231,6 +232,13 @@ class _GecmisMenu extends StatelessWidget {
                   body: ListenableBuilder(
                       listenable: VeriDeposu.ben,
                       builder: (context, _) => GecmisOzetGovde(veri: VeriDeposu.ben.veri ?? ilk))))),
+        ),
+        _GMenuSatiri(
+          ikon: Icons.table_chart_outlined,
+          baslik: 'Kaynak tabloları',
+          alt: 'Değerlendirme Raporu (31.12.2025), kesim özeti ve Bilgi Bankası sayfaları — bütün hücreleriyle',
+          ac: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => const KaynakTablolariEkran(menuler: ['gecmis'], baslik: 'Geçmiş Yıllar – kaynak tabloları'))),
         ),
         const _GMenuBaslik('Sınıflandırma'),
         _GMenuSatiri(

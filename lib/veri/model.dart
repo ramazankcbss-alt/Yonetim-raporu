@@ -1162,6 +1162,7 @@ class RaporVerisi {
     this.ciftlikRaporTam = const CiftlikRaporTam(),
     this.maliyetTakipDetay = const MaliyetTakipDetay(),
     this.kaynakEnvanteri = const KaynakEnvanterOzet(),
+    this.kaynakTablolari = const KaynakTablolari(),
     this.aracMasraf = const AracMasraflari(),
     this.vetBildirimleri = const [],
     this.olusturma,
@@ -1269,6 +1270,9 @@ class RaporVerisi {
   /// Kaynak envanteri özeti (kullanılmayan / KVKK hariç / okunamayan sayfalar).
   final KaynakEnvanterOzet kaynakEnvanteri;
 
+  /// Ayrı analize bağlanmamış kaynak sayfaları (menü bazında, bütün hücreleriyle).
+  final KaynakTablolari kaynakTablolari;
+
   /// Araç masrafları (muhasebe listesi; araç adı × ay × iş alanı).
   final AracMasraflari aracMasraf;
   final List<VetBildirim> vetBildirimleri;
@@ -1300,6 +1304,7 @@ class RaporVerisi {
       ciftlikRaporTam: CiftlikRaporTam.json(j['ciftlikRaporTam']),
       maliyetTakipDetay: MaliyetTakipDetay.json(j['maliyetTakipDetay']),
       kaynakEnvanteri: KaynakEnvanterOzet.json(j['kaynakEnvanteri']),
+      kaynakTablolari: KaynakTablolari.json(j['kaynakTablolari']),
       aracMasraf: AracMasraflari.json(j['aracMasraf']),
       gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
           .map(GelenDosya.oku)
