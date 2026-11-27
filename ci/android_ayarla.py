@@ -97,6 +97,8 @@ else:
 
 g = oku(p)
 g = re.sub(r"minSdk(Version)?\s*=?\s*flutter\.minSdkVersion", "minSdk = 24", g)
+# flutter_local_notifications 23 → androidx.core 1.19 en az compileSdk 37 ister.
+g = re.sub(r"compileSdk(Version)?\s*=?\s*flutter\.compileSdkVersion", "compileSdk = 37", g)
 g = g.replace("VERSION_1_8", "VERSION_17").replace("VERSION_11", "VERSION_17")
 g = g.replace("JVM_1_8", "JVM_17").replace("JVM_11", "JVM_17")
 g = re.sub(r"jvmTarget\s*=\s*['\"](1\.8|11)['\"]", 'jvmTarget = "17"', g)
@@ -167,15 +169,15 @@ yaz(p, g)
 print("Android ayarları uygulandı:", p)
 
 # --- Eklentilerin compileSdk değeri ------------------------------------------
-# Bazı eklentiler (file_picker) eski compileSdk ile derlenir; bağımlılıkları 36 ister.
+# Bazı eklentiler (file_picker) eski compileSdk ile derlenir; bağımlılıkları 36–37 ister (androidx.core 1.19 → 37).
 kok_g = os.path.join(KOK, "android", "build.gradle.kts")
 if os.path.exists(kok_g):
     k = oku(kok_g)
-    if "compileSdkVersion(36)" not in k:
+    if "compileSdkVersion(37)" not in k:
         blok = """subprojects {
     afterEvaluate {
         val a = extensions.findByName("android")
-        if (a is com.android.build.gradle.BaseExtension) a.compileSdkVersion(36)
+        if (a is com.android.build.gradle.BaseExtension) a.compileSdkVersion(37)
     }
 }
 
