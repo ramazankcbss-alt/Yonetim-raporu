@@ -807,7 +807,8 @@ void _gelirGider(RaporVerisi v, _Soru q, List<CevapBolumu> b) {
   }
   if (!q.donem.acik && aylar.length > 1) {
     final son = aylar.last;
-    final sg = g.gelirToplam((ciftlik: null, yil: son.$1, ay: son.$2)), sd = g.giderToplam((ciftlik: null, yil: son.$1, ay: son.$2));
+    final ay = (ciftlik: null, bas: DateTime(son.$1, son.$2, 1), bit: DateTime(son.$1, son.$2 + 1, 1));
+    final sg = g.gelirToplam(ay), sd = g.giderToplam(ay);
     if (q.ciftlikler.isEmpty) par.add('Son ay (${_ayAdlari[son.$2 - 1]} ${son.$1}): gelir ${mn(sg)}, gider ${mn(sd)}.');
   }
   par.add('Bu sonuç fatura bazlıdır; personel, amortisman ve stok değişimi dahil değildir. Ayrıntı: Mali Raporlar › Gider / Gelir / Kâr-Zarar.');
