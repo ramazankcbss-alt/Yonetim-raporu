@@ -7,6 +7,8 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'araclar.dart';
+import 'arac_masraf.dart';
+import 'stok_suru.dart';
 import 'bakim_onarim.dart';
 import 'bilesenler.dart';
 import 'ciftlik_rapor.dart';
@@ -121,16 +123,18 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
             body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 90), children: [
               const BilgiKutusu(
                   yazi: 'Paylaşım linki tarayıcıda "Tarım ve Hayvancılık" web panelini açar (uygulama kurmak gerekmez); '
-                      'panel yalnızca şirket Google hesabıyla (@panagro.com.tr) açılır, veri tarayıcıda saklanmaz. '
-                      'Her paylaşımın son erişim zamanı görünür; süre dolunca link kendiliğinden kapanır; "Linki yenile" eski linki geçersiz kılar. '
-                      'Her paylaşımda hangi menülerin görüneceğini işaretleyin; işareti kaldırdığınız menü ve verisi o kişiye hemen '
-                      'kapanır. Tarla Haritaları dışındaki menüler yalnızca görüntülenir. KVKK: personel/taşeron sayıları, araç ve bakım '
-                      'kayıtlarındaki kişi adları gönderilmez; Mali Raporlar "Özet"te tedarikçi bilgisi olmadan yalnızca toplamlar gider. '
-                      'Günlük, Toplantı Notları, Veteriner Paneli ve Soru Sor paylaşılmaz. "Düzenleme" yetkisinde Tarla Haritası\'nda sizin yapabildiğiniz her işlem '
-                      '(ürün/dekar/tohum, bölme, birleştirme, çizgi ve şekille bölge, sınır düzenleme, yeni parsel) yapılabilir; '
-                      '"Görüntüleme" yetkisinde hiçbir şey değiştirilemez. Girişler tabloda paylaşım adıyla '
-                      'işaretlenir. Paylaşımı kapattığınızda link hemen çalışmaz olur. KVKK: paylaşım adına kişi adı değil '
-                      'görev/birim yazın.'),
+                      'panel yalnızca şirket Google hesabıyla (@panagro.com.tr) açılır ve veri tarayıcıda saklanmaz. '
+                      'Her paylaşımda görünecek menüleri ana menüdeki gruplara göre işaretleyin; işareti kaldırılan menü ve verisi '
+                      'hemen kapanır. Süre dolunca link kendiliğinden kapanır, "Linki yenile" eski linki geçersiz kılar.\n\n'
+                      'Yetki: Düzenleme yalnızca Tarla Haritası\'nda geçerlidir (ürün/dekar/tohum, bölme, birleştirme, bölge, sınır, '
+                      'yeni parsel); diğer menüler yalnızca görüntülenir. Girişler tabloda paylaşım adıyla işaretlenir.\n\n'
+                      'Paylaşılmayan bölümler: Yönetim Özeti, Bildirimler, Duyarlılık Analizi, Veri Kalitesi, Soru Sor, '
+                      'Veteriner Kontrol Paneli, Toplantı Notları ve Günlük.\n\n'
+                      'Mali Raporlar ve Ürün Takibi açıldığında net sonuç ve kârlılık hesabı için çiftlik bazında muhasebe ve '
+                      'maliyet toplamları da gider (ticari gizli bilgi; yalnızca ilgili göreve açın).\n\n'
+                      'KVKK: personel/taşeron sayıları; araç, bakım ve arıza kayıtlarındaki kişi adları; plaka, sürücü ve '
+                      'tedarikçi bilgisi gönderilmez. Mali Raporlar "Özet"te yalnızca toplamlar gider. Paylaşım adına kişi adı '
+                      'değil görev/birim yazın.'),
               if (_mesgul) const LinearProgressIndicator(),
               if (l.isNotEmpty) _GorunumOzeti(l: l),
               if (l.isEmpty)
@@ -175,25 +179,15 @@ class _PaylasimEkraniState extends State<PaylasimEkrani> {
                       const SizedBox(height: 6),
                       const Text('Görebileceği menüler (dokunarak açın / kapatın; yeşil ✓ = görüyor)',
                           style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
-                      Wrap(spacing: 6, children: [
-                        for (final m in paylasimMenuAdlari.entries)
-                          FilterChip(
-                            label: Text(m.value),
-                            showCheckmark: true,
-                            checkmarkColor: Colors.white,
-                            selectedColor: Renk.ana,
-                            labelStyle: TextStyle(
-                                color: p.menuler.contains(m.key) ? Colors.white : Renk.soluk,
-                                fontWeight: p.menuler.contains(m.key) ? FontWeight.w700 : FontWeight.w500),
-                            selected: p.menuler.contains(m.key),
-                            onSelected: _mesgul
-                                ? null
-                                : (x) => _yap('paylasimMenu', id: p.id, menuler: [
-                                      for (final k in paylasimMenuAdlari.keys)
-                                        if (k == m.key ? x : p.menuler.contains(k)) k
-                                    ]),
-                          ),
-                      ]),
+                      _MenuSecimi(
+                        secili: p.menuler.toSet(),
+                        degis: _mesgul
+                            ? null
+                            : (k, x) => _yap('paylasimMenu', id: p.id, menuler: [
+                                  for (final m in paylasimMenuAdlari.keys)
+                                    if (m == k ? x : p.menuler.contains(m)) m
+                                ]),
+                      ),
                       if (p.menuler.contains('mali')) ...[
                         const SizedBox(height: 6),
                         const Text('Mali Raporlar görünümü', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
@@ -268,14 +262,19 @@ class _GorunumOzeti extends StatelessWidget {
           const Text('Yalnızca açık ve süresi dolmamış paylaşımlar sayılır. Düzenleme yetkisi yalnızca Tarla Haritaları\'nda geçerlidir; '
               'diğer menüler yalnızca görüntülenir.',
               style: TextStyle(fontSize: 12, color: Renk.soluk)),
-          for (final m in paylasimMenuAdlari.entries) ...[
-            const SizedBox(height: 10),
-            Text(m.value, style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.ana)),
-            Builder(builder: (_) {
-              final x = [for (final p in l) if (p.calisiyor && p.menuler.contains(m.key)) kim(p, m.key)];
-              return Text(x.isEmpty ? 'Kimse görmüyor' : x.join(' · '),
-                  style: TextStyle(fontSize: 13.5, color: x.isEmpty ? Renk.soluk : Renk.yazi));
-            }),
+          for (final g in paylasimMenuGruplari) ...[
+            const SizedBox(height: 12),
+            Text(g.$1.toUpperCase(),
+                style: const TextStyle(fontSize: 11.5, letterSpacing: 0.6, fontWeight: FontWeight.w700, color: Renk.soluk)),
+            for (final k in g.$2) ...[
+              const SizedBox(height: 6),
+              Text(paylasimMenuAdlari[k]!, style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.ana)),
+              Builder(builder: (_) {
+                final x = [for (final p in l) if (p.calisiyor && p.menuler.contains(k)) kim(p, k)];
+                return Text(x.isEmpty ? 'Kimse görmüyor' : x.join(' · '),
+                    style: TextStyle(fontSize: 13.5, color: x.isEmpty ? Renk.soluk : Renk.yazi));
+              }),
+            ],
           ],
           if (l.any((p) => !p.calisiyor)) ...[
             const SizedBox(height: 10),
@@ -297,41 +296,85 @@ String _gun(String s) {
   return p.length == 3 ? '${p[2]}.${p[1]}.${p[0]}' : s;
 }
 
-/// Paylaşımda seçilebilen menüler (web panelindeki adlarıyla).
+/// Paylaşımda seçilebilen menüler, ana menüdeki gruplarla aynı sırada (web panelindeki adlarıyla).
+const paylasimMenuGruplari = <(String, List<String>)>[
+  ('Panolar', ['gunluk', 'haftalik']),
+  ('Mali', ['mali']),
+  ('Ziraat', ['ziraat', 'urun', 'tarla']),
+  ('Hayvancılık', ['hayvan', 'ciftlikRapor', 'stokSuru', 'sureme', 'hastalik', 'esk']),
+  ('Ortak – Makine ve Bakım', ['arac', 'bakim', 'aracMasraf']),
+  ('Arşiv', ['gecmis']),
+];
+
 const paylasimMenuAdlari = {
   'gunluk': 'Günlük Pano',
   'haftalik': 'Haftalık Pano',
-  'ziraat': 'Ziraat',
-  'hayvan': 'Hayvancılık',
-  'tarla': 'Tarla Haritaları',
-  'esk': 'ESK – Et ve Süt Kurumu',
   'mali': 'Mali Raporlar',
-  'ciftlikRapor': 'Çiftlik Sonuçları',
+  'ziraat': 'Ziraat Faaliyetleri',
   'urun': 'Ürün Takibi',
-  'gecmis': 'Geçmiş Yıllar',
-  'hastalik': 'Hastalık Dağılımı',
+  'tarla': 'Tarla Haritası',
+  'hayvan': 'Hayvancılık Faaliyetleri',
+  'ciftlikRapor': 'Çiftlik Sonuçları',
+  'stokSuru': 'Stok ve Sürü',
   'sureme': 'Sürü Sağlığı ve Üreme',
+  'hastalik': 'Hastalık Dağılımı',
+  'esk': 'ESK – Et ve Süt Kurumu',
   'arac': 'Araçlar',
   'bakim': 'Bakım Onarım',
+  'aracMasraf': 'Araç Masrafları',
+  'gecmis': 'Geçmiş Yıllar',
 };
 
 /// Paylaşılan kişinin ana ekranındaki menü kartları: başlık, açıklama, simge.
 const _menuBilgi = <String, (String, IconData)>{
   'gunluk': ('Günün canlı hayvan, süt ve faaliyet özeti', Icons.today_outlined),
   'haftalik': ('Haftalık canlı hayvan, süt ve faaliyet özeti', Icons.date_range_outlined),
+  'mali': ('Net sonuç, gelir, gider, kâr/zarar ve açık bakiyeler', Icons.account_balance_outlined),
   'ziraat': ('Ekim alanları, hasat ve verim, ziraat faaliyetleri', Icons.grass),
-  'hayvan': ('Hayvan sayıları, süt, doğum ve kayıplar, işletme raporları', Icons.pets),
+  'urun': ('Teslimat, satış, maliyet ve ürün kârlılığı', Icons.auto_graph),
   'tarla': ('Sezonlar, parseller, karşılaştırma ve ÇKS', Icons.map_outlined),
-  'esk': ('ESK–Taşağıl besi: hafta, ay ve yıl sonuçları', Icons.agriculture_outlined),
-  'mali': ('Gelen faturalar, açık bakiyeler', Icons.account_balance_outlined),
+  'hayvan': ('Hayvan sayıları, süt, doğum ve kayıplar, işletme raporları', Icons.pets),
   'ciftlikRapor': ('Kâr/zarar ile süt, et ve tarım birim maliyetleri', Icons.query_stats),
-  'urun': ('Teslimat, satış, maliyet ve net kazanç', Icons.auto_graph),
-  'gecmis': ('Geçmiş yılların kayıtları ve çıkarılan dersler', Icons.history_edu_outlined),
-  'hastalik': ('Aylara göre hastalıklar ve önleme tedbirleri', Icons.vaccines_outlined),
+  'stokSuru': ('Aylık sürü hareketleri ve yem/malzeme stok sayımı', Icons.inventory_2_outlined),
   'sureme': ('Doğum, tohumlama, gebelik, aşı, satış ve süt analizi', Icons.child_friendly_outlined),
+  'hastalik': ('Aylara göre hastalıklar ve önleme tedbirleri', Icons.vaccines_outlined),
+  'esk': ('ESK–Taşağıl besi: hafta, ay ve yıl sonuçları, kaynak tablolar', Icons.agriculture_outlined),
   'arac': ('Araç kullanımı, bakım ve arıza', Icons.agriculture),
   'bakim': ('Bakım onarım kayıtları', Icons.build_outlined),
+  'aracMasraf': ('Araç bazında muhasebe giderleri (tamir, akaryakıt, kira)', Icons.local_gas_station_outlined),
+  'gecmis': ('Geçmiş yılların kayıtları ve çıkarılan dersler', Icons.history_edu_outlined),
 };
+
+/// Menü seçim çipleri, gruplu.
+class _MenuSecimi extends StatelessWidget {
+  const _MenuSecimi({required this.secili, required this.degis});
+  final Set<String> secili;
+  final void Function(String, bool)? degis;
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (final g in paylasimMenuGruplari) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 6, bottom: 2),
+            child: Text(g.$1, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Renk.anaKoyu)),
+          ),
+          Wrap(spacing: 6, children: [
+            for (final k in g.$2)
+              FilterChip(
+                label: Text(paylasimMenuAdlari[k]!),
+                showCheckmark: true,
+                checkmarkColor: Colors.white,
+                selectedColor: Renk.ana,
+                labelStyle: TextStyle(
+                    color: secili.contains(k) ? Colors.white : Renk.soluk,
+                    fontWeight: secili.contains(k) ? FontWeight.w700 : FontWeight.w500),
+                selected: secili.contains(k),
+                onSelected: degis == null ? null : (x) => degis!(k, x),
+              ),
+          ]),
+        ],
+      ]);
+}
 
 class _PaylasimEkle extends StatefulWidget {
   const _PaylasimEkle();
@@ -374,20 +417,8 @@ class _PaylasimEkleState extends State<_PaylasimEkle> {
           const SizedBox(height: 10),
           const Text('Görebileceği menüler (dokunarak açın / kapatın; yeşil ✓ = görüyor)',
                           style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
-          Wrap(spacing: 6, children: [
-            for (final m in paylasimMenuAdlari.entries)
-              FilterChip(
-                label: Text(m.value),
-                showCheckmark: true,
-                checkmarkColor: Colors.white,
-                selectedColor: Renk.ana,
-                labelStyle: TextStyle(
-                    color: _menuler.contains(m.key) ? Colors.white : Renk.soluk,
-                    fontWeight: _menuler.contains(m.key) ? FontWeight.w700 : FontWeight.w500),
-                selected: _menuler.contains(m.key),
-                onSelected: (x) => setState(() => x ? _menuler.add(m.key) : _menuler.remove(m.key)),
-              ),
-          ]),
+          _MenuSecimi(
+              secili: _menuler, degis: (k, x) => setState(() => x ? _menuler.add(k) : _menuler.remove(k))),
           const SizedBox(height: 10),
           const Text('Paylaşım süresi (dolunca link kendiliğinden kapanır)', style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
           Wrap(spacing: 6, children: [
@@ -491,8 +522,8 @@ class _PaylasimAna extends StatelessWidget {
     return switch (m) {
       'gunluk' => sarili('Günlük Pano', GunlukEkran(veri: v)),
       'haftalik' => sarili('Haftalık Pano', HaftalikEkran(veri: v)),
-      'ziraat' => sarili('Ziraat', TarimEkran(veri: v, sabitTur: false, tarlaGoster: tarla)),
-      'hayvan' => sarili('Hayvancılık', TarimEkran(veri: v, sabitTur: true, tarlaGoster: false)),
+      'ziraat' => sarili('Ziraat Faaliyetleri', TarimEkran(veri: v, sabitTur: false, tarlaGoster: tarla)),
+      'hayvan' => sarili('Hayvancılık Faaliyetleri', TarimEkran(veri: v, sabitTur: true, tarlaGoster: false)),
       'esk' => EskEkran(veri: v),
       'mali' => MaliEkran(veri: v),
       'ciftlikRapor' => const CiftlikRaporEkran(),
@@ -502,6 +533,8 @@ class _PaylasimAna extends StatelessWidget {
       'sureme' => const SuremeEkran(),
       'arac' => AraclarEkran(veri: v),
       'bakim' => BakimOnarimEkran(veri: v),
+      'stokSuru' => StokSuruEkran(veri: v),
+      'aracMasraf' => AracMasrafEkran(veri: v),
       _ => TarlaEkran(veri: v),
     };
   }

@@ -1779,7 +1779,7 @@ function bitisGunu_(sure) {
 }
 
 /** Paylaşımda görünen menüler. Eski paylaşımlarda (seçim yapılmamış) üç menü de açıktır. */
-var PAYLASIM_MENULERI_ = ['gunluk', 'haftalik', 'ziraat', 'hayvan', 'tarla', 'esk', 'mali', 'ciftlikRapor', 'urun', 'gecmis', 'hastalik', 'sureme', 'arac', 'bakim'];
+var PAYLASIM_MENULERI_ = ['gunluk', 'haftalik', 'ziraat', 'hayvan', 'tarla', 'esk', 'mali', 'ciftlikRapor', 'urun', 'gecmis', 'hastalik', 'sureme', 'arac', 'bakim', 'stokSuru', 'aracMasraf'];
 function paylasimMenuleri_(p) {
   return Array.isArray(p.menuler) ? p.menuler.filter(function (m) { return PAYLASIM_MENULERI_.indexOf(m) >= 0; }) : ['ziraat', 'hayvan', 'tarla'];
 }
@@ -2054,10 +2054,13 @@ function tarlaVeri_(pay) {
   }
   if (acik('ziraat', 'tarla')) al(['ekim', 'hasat']);
   if (acik('tarla')) al(['cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel', 'tarlaSezonlari']);
-  if (acik('esk')) al(['eskAylik', 'eskBilgi']);
+  if (acik('esk')) al(['eskAylik', 'eskBilgi', 'eskKaynak']);  // eskKaynak: yalnızca toplamlar (plaka/şoför yok)
+  if (acik('stokSuru')) al(['suruHareketleri', 'stokSayimi']);  // sayılar; not sütunları zaten okunmaz
   if (acik('urun')) al(['tarimsalUretim', 'urunTeslimat']);
   if (acik('gecmis', 'hastalik')) al(['gecmis', 'dersler']);
   if (acik('mali')) o.mali = paylasimMali_(v.mali, pay.maliDetay === true);
+  // Ürün Takibi › Ürün Kârlılığı fatura gelirlerini (çiftlik × ürün toplamları, tedarikçi yok) kullanır.
+  else if (acik('urun') && v.mali) o.mali = { gelirGider: v.mali.gelirGider };
   if (acik('arac')) {
     al(['aracListe', 'aracPlan']);
     function sil(l, sut) { return (l || []).map(function (r) { r = r.slice(); sut.forEach(function (i) { if (i < r.length) r[i] = ''; }); return r; }); }
@@ -2068,7 +2071,9 @@ function tarlaVeri_(pay) {
   }
   var dos = [];
   if (acik('tarla')) dos = dos.concat(TARLA_DOSYALARI_);
-  if (acik('ciftlikRapor')) dos = dos.concat(['ciftlik_rapor_2026', 'maliyet_takip_2026']);
+  // Net Sonuç (Mali) ve Ürün Kârlılığı muhasebe ve maliyet toplamlarına dayanır.
+  if (acik('ciftlikRapor', 'mali', 'urun')) dos = dos.concat(['ciftlik_rapor_2026', 'maliyet_takip_2026']);
+  if (acik('aracMasraf')) dos.push('arac_masraf_2026');
   if (acik('hastalik')) dos.push('hastalik');
   if (acik('sureme')) dos.push('uygulamalar');
   o.dosyalar = uygulamaDosyalari_(dos);
