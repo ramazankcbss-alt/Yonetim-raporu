@@ -291,7 +291,7 @@ function veriTopla_(gun) {
     bakimOnarim: bakimOnarimOku_(tz),
     // Mali Raporlar: "Mali Raporlar" klasöründeki en yeni mali_veri.json
     // (fatura özetleri; şahıs tedarikçi adı, fatura no ve plaka içermez)
-    mali: maliVeri_(),
+    mali: (function () { try { maliGuncelle_(); } catch (e) {} return maliVeri_(); })(),
     // ÇKS'de bildirilen parseller (Sezon, Çiftlik, Mevki, Ada, Parsel, Ürün,
     // Alan, Eşleşen tarla parseli, Belge, İşlenme tarihi)
     cks: basitOku_('ÇKS_Parseller', 10, tz),

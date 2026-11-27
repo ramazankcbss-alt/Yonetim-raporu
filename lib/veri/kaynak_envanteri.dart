@@ -90,6 +90,7 @@ class KaynakSayfa {
         'kullaniliyor' => 'Piramitte kullanılıyor',
         'kullanilmiyor' => 'Okundu, piramitte henüz kullanılmıyor',
         'kvkk' => 'KVKK nedeniyle okunmuyor',
+        'haric' => 'Kurum kararıyla kullanılmıyor',
         'bos' => 'Boş sayfa',
         'hata' => 'Okunamadı',
         _ => durum,

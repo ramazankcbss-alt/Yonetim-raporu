@@ -11,6 +11,7 @@ Color _renk(String d) => switch (d) {
       'kullaniliyor' => Renk.yesil,
       'kullanilmiyor' => Renk.amber,
       'kvkk' => Colors.blueGrey,
+      'haric' => Colors.brown,
       'hata' => Colors.red,
       _ => Colors.grey,
     };
@@ -56,6 +57,7 @@ class _KaynakKapsamiEkranState extends State<KaynakKapsamiEkran> {
                   ('kullanilmiyor', 'Kullanılmayan'),
                   ('kullaniliyor', 'Kullanılan'),
                   ('kvkk', 'KVKK hariç'),
+                  ('haric', 'Kararla hariç'),
                   ('hata', 'Okunamayan'),
                 ])
                   ChoiceChip(

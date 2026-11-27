@@ -1,5 +1,5 @@
 // Envanter.gs — Kaynak envanteri, Kaynak Gezgini ve kaynak tabloları
-// Bu proje birden çok .gs dosyasından oluşur; hepsi birlikte çalışır (Kod.gs, Kayitlar.gs, Paylasim.gs,
+// Bu proje birden çok .gs dosyasından oluşur; hepsi birlikte çalışır (Kod.gs, Kayitlar.gs, Paylasim.gs, Mali.gs,
 // Isletme.gs, Kaynaklar.gs, Muhasebe.gs, Envanter.gs, TarlaPaneli.gs).
 
 // ---------------------------------------------------------------------------
@@ -73,11 +73,15 @@ function kaynakKullanim_() {
     [BILGI_BANKASI_ID, /^(Veriler|Dersler)$/, 'Bilgi Bankası'],
     [FORM_TABLO_ID, /./, 'Günlük tarım bildirimi'],
     [CANLI_HAYVAN_VARSAYILAN_ID, /^(ozet|isletme)$/, 'Hayvan özeti'],
-    [/Mali|gelir|gider|GELİR|GİDER|FATURA/, /./, 'Mali Raporlar (dönüştürücü)'],
+    [/aylık (gider|gelir satış) tablosu/i, /./, 'Mali Raporlar (sunucuda, otomatik)'],
     [/Haftalik_Yonetim_Raporu/, /^(Hayvan_Özet|Hayvan_Günlük|Hayvan_Detay|Tarım_Veri|Ekim_Alanları|Hasat_Verim|Besi_Plan|ESK_Aylık|ESK_Bilgi|Hasat Durumu|Sezon_Parselleri|Parsel_Sınırları|ÇKS_Parseller|Veteriner_Kodları|Yönetici Özeti)$/, 'Uygulamanın ana tablosu (rapor verileri)'],
     [/Haftalik_Yonetim_Raporu/, /^Hafta /, 'Haftalık rapor arşivi (uygulamanın ürettiği)']
   ];
 }
+
+// Kurum kararıyla bilerek kullanılmayan kaynaklar: [/dosya adı/, açıklama]
+var KARAR_HARIC_ = [[/GELEN FATURA RAPOR/i, 'Kurum kararı (26.11.2026): Mali Raporlar yalnızca muhasebenin 2026 Fatura listesinden beslenir; birim gelen fatura raporu kullanılmaz.']];
+function kararHaric_(dosyaAdi) { for (var i = 0; i < KARAR_HARIC_.length; i++) if (KARAR_HARIC_[i][0].test(dosyaAdi || '')) return KARAR_HARIC_[i][1]; return ''; }
 
 function kaynakKullanimBul_(dosya, sayfa) {
   var l = kaynakKullanim_(), ad = dosya.ad || '', o = [];
@@ -207,6 +211,7 @@ function kaynakEnvanterDosyasi_() {
  *  Değişmeyen dosyalar (aynı güncelleme zamanı) yeniden okunmaz. Günlük otomatik çalışma da kurulur. */
 function kaynakEnvanteriHazirla() {
   try { maliyetTakipGuncelle_(); } catch (e) { Logger.log('Maliyet Takip güncellenemedi: ' + e); }
+  try { maliGuncelle_(); } catch (e) { Logger.log('Mali Raporlar güncellenemedi: ' + e); }
   try { ciftlikRaporTam_(false); } catch (e) { Logger.log('Çiftlik Raporları güncellenemedi: ' + e); }
   var bas = Date.now(), f = kaynakEnvanterDosyasi_(), eski = {};
   try { if (f) (JSON.parse(f.getBlob().getDataAsString()).kaynaklar || []).forEach(function (k) { (k.dosyalar || []).forEach(function (x) { eski[x.id] = x; }); }); } catch (e) {}
@@ -229,6 +234,7 @@ function kaynakEnvanteriHazirla() {
             s0.kullanim = kaynakKullanimBul_(e0, s0.ad);
             if (s0.durum !== 'bos') s0.durum = s0.kullanim ? 'kullaniliyor' : 'kullanilmiyor';
           }
+          if ((s0.durum === 'kullanilmiyor' || s0.durum === 'haric') && kararHaric_(e0.ad)) { s0.durum = 'haric'; s0.kullanim = kararHaric_(e0.ad); }
         });
         if (e0.okunanId && okunan[e0.okunanId] && okunan[e0.okunanId] !== e0.ad) { e0.ayni = okunan[e0.okunanId]; e0.sayfalar = []; }
         else if (e0.okunanId) okunan[e0.okunanId] = e0.ad;
@@ -255,6 +261,7 @@ function kaynakEnvanteriHazirla() {
           var s;
           try { s = kaynakSayfaIncele_(sh, kayit.ad); } catch (e) { s = { ad: sh.getName(), durum: 'hata', hataMetni: String(e) }; }
           if (!s.durum || s.durum === 'bos') { s.kullanim = kaynakKullanimBul_(kayit, s.ad); if (!s.durum) s.durum = s.kullanim ? 'kullaniliyor' : 'kullanilmiyor'; }
+          if (s.durum === 'kullanilmiyor' && kararHaric_(kayit.ad)) { s.durum = 'haric'; s.kullanim = kararHaric_(kayit.ad); }
           kayit.sayfalar.push(s);
         });
       } catch (e) { kayit.hata = 'açılamadı: ' + e; }
@@ -273,7 +280,7 @@ function kaynakEnvanteriHazirla() {
     ScriptApp.newTrigger('kaynakEnvanteriHazirla').timeBased().everyDays(1).atHour(5).create();
   }
   var oz = kaynakEnvanterOzetHesapla_(o);
-  Logger.log('Kaynak envanteri: ' + oz.dosya + ' dosya, ' + oz.sayfa + ' sayfa; kullanılmayan ' + oz.kullanilmayan +
+  Logger.log('Kaynak envanteri: ' + oz.dosya + ' dosya, ' + oz.sayfa + ' sayfa; kullanılmayan ' + oz.kullanilmayan + ', kararla hariç ' + (oz.haric || 0) +
     ', KVKK nedeniyle hariç ' + oz.kvkk + ', hata ' + oz.hata + (bitmedi ? ' — süre doldu, 1 dakika sonra kendiliğinden devam edecek.' : ' — tamamlandı.'));
   return oz;
 }
@@ -291,6 +298,7 @@ function kaynakEnvanterOzetHesapla_(o) {
         if (s.durum === 'kullaniliyor') z.kullanilan++;
         else if (s.durum === 'kullanilmiyor') { z.kullanilmayan++; z.liste.push([k.ad, d.ad, s.ad, 'kullanilmiyor', (s.satir || 0) + ' satır × ' + (s.sutun || 0) + ' sütun']); }
         else if (s.durum === 'kvkk') z.kvkk++;
+        else if (s.durum === 'haric') z.haric = (z.haric || 0) + 1;
         else if (s.durum === 'bos') z.bos++;
         else if (s.durum === 'hata') { z.hata++; z.liste.push([k.ad, d.ad, s.ad, 'hata', s.hataMetni || '']); }
         z.not += (s.notlar || []).length; z.formulHatasi += s.hata || 0;
