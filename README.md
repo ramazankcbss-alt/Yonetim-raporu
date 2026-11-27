@@ -16,8 +16,10 @@ WhatsApp ile paylaşılır.
 
 ## Kurulum
 
-1. **Veri bağlantısı:** `apps_script/Kod.gs` dosyasındaki adımları izleyin
-   (E-Tablo → Uzantılar → Apps Script). Bağlantı linki e-postanıza gelir.
+1. **Veri bağlantısı:** `apps_script/` klasöründeki bütün `.gs` dosyalarını (Kod, Kayitlar, Paylasim,
+   Isletme, Kaynaklar, Muhasebe, Envanter, TarlaPaneli) aynı adlarla Apps Script projesine ekleyin
+   (E-Tablo → Uzantılar → Apps Script) ve `Kod.gs` dosyasındaki kurulum adımlarını izleyin.
+   Bağlantı linki e-postanıza gelir.
 2. **Uygulama:** Releases bölümündeki `yonetim-raporu.apk` dosyasını telefona
    kurun, ilk açılışta bağlantı linkini yapıştırın.
 
