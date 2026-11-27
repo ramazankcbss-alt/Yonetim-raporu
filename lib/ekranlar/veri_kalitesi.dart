@@ -1,3 +1,4 @@
+import '../veri/kaynak_baglanti.dart';
 import '../veri/esk_plan.dart';
 import '../veri/kaynak_envanteri.dart';
 import 'kaynak_kapsami.dart';
@@ -200,10 +201,25 @@ class VeriKalitesi {
         konular.add(AcikKonu('Kaynak okunamadı: ${r[1]}${r[2].isEmpty ? '' : ' › ${r[2]}'}', r[4], 'Uygulama sahibi'));
       }
     }
+    // Kaynak tablolarından bağlanan kontroller
+    for (final f in [
+      ...suruOzetMutabakat(v.kaynakTablolari, v.suruHareketleri),
+      ...patatesFaturaMutabakat(v.kaynakTablolari, v.mali.gelirGider, DateTime.now().year),
+      ...ekimPlaniDegisimleri(v.kaynakTablolari),
+    ]) {
+      konular.add(AcikKonu(f.baslik, f.aciklama, f.sorumlu));
+    }
+    // Kaynak sayfalardaki formül hataları (#REF!, #N/A …)
+    for (final r in v.kaynakEnvanteri.liste) {
+      if (r.length >= 5 && r[3] == 'formul') {
+        konular.add(AcikKonu('Formül hatası: ${r[1]} › ${r[2]}', '${r[4]} hata veren hücre (#REF!, #N/A vb.). Kaynak Kapsamı › sayfa ayrıntısında görülebilir.',
+            'Dosya sorumlusu'));
+      }
+    }
     // ESK çalışma › ÖZET sayfası ile ESK_Aylık
     for (final f in eskOzetMutabakat(EskPlan.coz(v.kaynakTablolari), v.eskAylik)) {
-      konular.add(AcikKonu('ESK çalışma › ÖZET ile ESK_Aylık farklı (${raporAylari[f.ay - 1]} ${f.yil})',
-          '${f.kalem}: ÖZET sayfasında ${sayi(f.ozet)}, ESK_Aylık\'ta ${sayi(f.aylik)}.', 'ESK sorumlusu'));
+      konular.add(AcikKonu('ESK çalışma › ${f.kaynak} ile ESK_Aylık farklı (${raporAylari[f.ay - 1]} ${f.yil})',
+          '${f.kalem}: ${f.kaynak} sayfasında ${sayi(f.ozet)}, ESK_Aylık\'ta ${sayi(f.aylik)}.', 'ESK sorumlusu'));
     }
     // Değerlendirme raporu: oranlar sayılarla tutarlı mı
     for (final k in v.gecmisOzet.kontroller) {

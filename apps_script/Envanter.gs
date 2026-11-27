@@ -289,7 +289,7 @@ function kaynakEnvanteriHazirla() {
   o.tamam = !bitmedi;
   var metin = JSON.stringify(o);
   if (f) f.setContent(metin); else DriveApp.getFolderById(UYGULAMA_VERI_KLASOR_).createFile(KAYNAK_ENVANTER_DOSYA_, metin, 'application/json');
-  CacheService.getScriptCache().remove('kaynakEnvOzet_n');
+  CacheService.getScriptCache().remove('kaynakEnvOzet2_n');
   var tetik = ScriptApp.getProjectTriggers().filter(function (t) { return t.getHandlerFunction() === 'kaynakEnvanteriDevam_'; });
   tetik.forEach(function (t) { ScriptApp.deleteTrigger(t); });
   if (bitmedi) {
@@ -321,6 +321,7 @@ function kaynakEnvanterOzetHesapla_(o) {
         else if (s.durum === 'bos') z.bos++;
         else if (s.durum === 'hata') { z.hata++; z.liste.push([k.ad, d.ad, s.ad, 'hata', s.hataMetni || '']); }
         z.not += (s.notlar || []).length; z.formulHatasi += s.hata || 0;
+        if (s.hata > 0 && s.durum !== 'kvkk') z.liste.push([k.ad, d.ad, s.ad, 'formul', s.hata + ' hücre']);
       });
     });
   });
@@ -329,12 +330,12 @@ function kaynakEnvanterOzetHesapla_(o) {
 
 /** Ana veri paketine giden kısa özet (ayrıntı kaynakEnvanteri isteğiyle gelir). */
 function kaynakEnvanterOzet_() {
-  var c = CacheService.getScriptCache(), m = parcaliOku_(c, 'kaynakEnvOzet');
+  var c = CacheService.getScriptCache(), m = parcaliOku_(c, 'kaynakEnvOzet2');
   if (m) { try { return JSON.parse(m); } catch (e) {} }
   var f = kaynakEnvanterDosyasi_();
   if (!f) return null;
   var oz = kaynakEnvanterOzetHesapla_(JSON.parse(f.getBlob().getDataAsString()));
-  parcaliYaz_(c, 'kaynakEnvOzet', JSON.stringify(oz));
+  parcaliYaz_(c, 'kaynakEnvOzet2', JSON.stringify(oz));
   return oz;
 }
 

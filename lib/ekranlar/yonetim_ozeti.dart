@@ -6,6 +6,7 @@ import '../pdf/rapor_pdf.dart';
 import '../servis/bildirim_servisi.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
+import '../veri/kaynak_baglanti.dart';
 import '../veri/esk_plan.dart';
 import '../veri/ciftlik_rapor.dart';
 import '../veri/duyarlilik.dart';
@@ -81,11 +82,12 @@ class _Icerik extends StatelessWidget {
         ? const <KarneBolumu>[]
         : verimlilikKarnesi(
             muhasebe: r!, suru: v.suruHareketleri, yil: h1.yil, ay: h1.sonMuhasebeAyi, tarim: tarim, hasat: v.hasatDurumu, gecmis: v.gecmisOzet,
-            eskAylik: v.eskAylik, eskKaynak: v.eskKaynak, eskPlan: EskPlan.coz(v.kaynakTablolari));
+            eskAylik: v.eskAylik, eskKaynak: v.eskKaynak, eskPlan: EskPlan.coz(v.kaynakTablolari), eskFiyat: eskSozlesmeFiyatlari(v.kaynakTablolari));
     final sap = r == null || h1.sonMuhasebeAyi == 0
         ? const <Sapma>[]
         : sapmalar(muhasebe: r!, suru: v.suruHareketleri, faturalar: v.mali.gelirGider, yil: h1.yil, sonAy: h1.sonMuhasebeAyi, mt: mt);
     final kalite = VeriKalitesi.hesapla(v, r);
+    final gundem = yonetimGundemi(v.kaynakTablolari);
     final alarmlar = [for (final s in sap) if (s.alarm && s.ay == h1.sonMuhasebeAyi && s.yil == h1.yil) s];
     final digerSap = [for (final s in sap) if (!s.alarm) s];
 
@@ -109,6 +111,19 @@ class _Icerik extends StatelessWidget {
                   if (k.kol == kol) _KarneKarti(k: k),
               ]),
             ),
+        if (gundem.isNotEmpty)
+          Panel(
+            baslik: 'Karar bekleyen konular ve yatırımlar',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              const Text('Kaynak: Çiftlikler Değerlendirme Raporu 31.12.2025', style: TextStyle(fontSize: 11.5, color: Renk.soluk)),
+              for (final (b, l) in gundem) ...[
+                Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 2),
+                    child: Text(b, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5))),
+                for (final x in l) Text('• $x', style: const TextStyle(fontSize: 13, height: 1.35)),
+              ],
+            ]),
+          ),
         Panel(
           baslik: 'Sapmalar ve nedenleri (son 3 kesin ay)',
           child: digerSap.isEmpty

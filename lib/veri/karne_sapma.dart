@@ -130,6 +130,7 @@ List<KarneBolumu> verimlilikKarnesi({
   List<EskAy> eskAylik = const [],
   EskKaynak? eskKaynak,
   EskPlan? eskPlan,
+  Map<String, double> eskFiyat = const {},
 }) {
   final out = <KarneBolumu>[];
   final donem = '${raporAylari[ay - 1]} $yil · geçen yılın aynı ayıyla';
@@ -211,6 +212,8 @@ List<KarneBolumu> verimlilikKarnesi({
                     '${eskPlan.rasyonTl == null ? '' : ', ${eskPlan.rasyonTl!.toStringAsFixed(2).replaceAll('.', ',')} ₺/baş/gün (güncel fiyat)'}'),
         KarneGostergesi('İşletme gideri', '₺/ay', a.gider, yuksekIyi: false, ondalik: 0,
             gecmis: plan == null ? null : 'Maliyet planı: ${f(plan)} ₺ (sabit ${f(eskPlan!.sabitGider!)} ₺ + kesim ${f(eskPlan.kesimBirim ?? 0)} ₺/baş)'),
+        KarneGostergesi('Bakım geliri', '₺/baş/gün', a.bakim == null ? null : a.bakim! / a.hayvanGun!, ondalik: 2,
+            gecmis: eskFiyat['Bakım'] == null ? null : 'Sözleşme: ${eskFiyat['Bakım']!.toStringAsFixed(2).replaceAll('.', ',')} ₺/baş/gün'),
         KarneGostergesi('Ölüm (ay)', 'baş', a.olen, yuksekIyi: false, ondalik: 0),
       ]));
     }

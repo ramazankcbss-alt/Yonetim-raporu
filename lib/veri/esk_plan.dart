@@ -31,7 +31,10 @@ class EskOzetAyi {
 }
 
 class EskPlan {
-  const EskPlan({this.rasyonKg, this.rasyonTl, this.sabitGider, this.kesimBirim, this.ozet = const []});
+  const EskPlan({this.rasyonKg, this.rasyonTl, this.sabitGider, this.kesimBirim, this.ozet = const [], this.maliyetAylari = const []});
+
+  /// "ESK MALİYET" sayfasındaki aylık bakım besleme blokları (gelen, bakım yapılan hayvan-gün, ölen).
+  final List<EskOzetAyi> maliyetAylari;
 
   /// İthal rasyon: baş başına günlük tüketim (kg) ve günlük maliyet (₺), güncel fiyatla.
   final double? rasyonKg, rasyonTl;
@@ -106,21 +109,57 @@ class EskPlan {
         }
       }
     }
-    return EskPlan(rasyonKg: rKg, rasyonTl: rTl, sabitGider: sabit, kesimBirim: kesim, ozet: ozet);
+    // ESK MALİYET: yan yana aylık bloklar ("ESK EYLÜL BAKIM BESLEME"), altında etiket – değer çiftleri.
+    final maliyet = <EskOzetAyi>[];
+    for (final t in kt.menu('esk')) {
+      if (_ust(t.sayfa) != 'ESK MALİYET') continue;
+      for (final b in t.bloklar) {
+        final sut = <int, (int, int)>{};
+        var yil = 0, son = 0;
+        for (final r in b) {
+          for (var j = 0; j < r.length; j++) {
+            final m = RegExp(r'^ESK (\S+) BAKIM BESLEME').firstMatch(_ust(r[j]));
+            if (m == null) continue;
+            final a = _aylar.indexOf(m[1]!) + 1;
+            if (a == 0) continue;
+            if (yil == 0) {
+              yil = a >= 8 ? 2025 : 2026;
+            } else if (a < son) {
+              yil++;
+            }
+            son = a;
+            sut[j] = (yil, a);
+          }
+          if (sut.isNotEmpty) break;
+        }
+        for (final e in sut.entries) {
+          double? v(String etiket) {
+            for (final r in b) {
+              if (e.key + 1 < r.length && _ust(r[e.key]) == etiket) return sayiOku(r[e.key + 1]);
+            }
+            return null;
+          }
+
+          maliyet.add(EskOzetAyi(e.value.$1, e.value.$2, v('GELEN HAYVAN SAYISI'), v('BAKIM YAPILAN HAYVAN SAYISI'), null, null, null,
+              v('ÖLEN HAYVAN SAYISI')));
+        }
+      }
+    }
+    return EskPlan(rasyonKg: rKg, rasyonTl: rTl, sabitGider: sabit, kesimBirim: kesim, ozet: ozet, maliyetAylari: maliyet);
   }
 }
 
 class EskOzetFarki {
-  const EskOzetFarki(this.yil, this.ay, this.kalem, this.ozet, this.aylik);
+  const EskOzetFarki(this.yil, this.ay, this.kalem, this.ozet, this.aylik, [this.kaynak = 'ÖZET']);
   final int yil, ay;
-  final String kalem;
+  final String kalem, kaynak;
   final double ozet, aylik;
 }
 
 /// ESK çalışma › ÖZET sayfası ile ESK_Aylık (uygulama tablosu) arasındaki aylık farklar.
 List<EskOzetFarki> eskOzetMutabakat(EskPlan p, List<EskAy> aylik) {
   final out = <EskOzetFarki>[];
-  for (final o in p.ozet) {
+  for (final (kaynak, o) in [for (final x in p.ozet) ('ÖZET', x), for (final x in p.maliyetAylari) ('ESK MALİYET', x)]) {
     final a = aylik.where((x) {
       final c = eskAyCoz(x.ay);
       return c != null && c.$1 == o.yil && c.$2 == o.ay;
@@ -128,7 +167,7 @@ List<EskOzetFarki> eskOzetMutabakat(EskPlan p, List<EskAy> aylik) {
     if (a == null) continue;
     void k(String ad, double? x, double? y) {
       if (x == null || y == null) return;
-      if ((x - y).abs() > 0.5) out.add(EskOzetFarki(o.yil, o.ay, ad, x, y));
+      if ((x - y).abs() > 0.5) out.add(EskOzetFarki(o.yil, o.ay, ad, x, y, kaynak));
     }
 
     k('Gelen hayvan', o.gelen, a.gelen);
