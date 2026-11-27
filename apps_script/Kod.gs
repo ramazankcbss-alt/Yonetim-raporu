@@ -141,7 +141,7 @@ function uygulamaDosyalari_(adlar) {
 }
 
 /** Haftalık faaliyet raporu PDF'lerinin kaydedildiği Drive klasörü (paylaşılmaz). */
-var RAPOR_KLASOR_ID = '1cZ7Hh5QEyEn52zflngLl6vZJsijU8PxG';
+var RAPOR_KLASOR_ID = '1fcEVsCnfocV9_PGbpjiLcLQ6emjjKwYY';  // 01 – Günlük ve Haftalık Raporlar
 var OZEL_DOSYA_ID = '1-XtWC5sj1RydL01_Exf3Dh8EQDkBqPj3wl1NM9HzX6o';
 var OZEL_SAYFALAR = {
   ozelNotlar: { ad: 'Notlar', sutun: 5 },
@@ -2760,17 +2760,26 @@ function vetUygulamaVerisi_() {
 // MALİ RAPORLAR: "Mali Raporlar" klasöründeki fatura dosyalarından hazırlanan
 // özet (mali_veri.json). Fatura, açık bakiye ve kontrol satırları; şahıs
 // tedarikçi adları, fatura numaraları, plaka ve personel ücret ayrıntısı yoktur.
-var MALI_KLASOR_ID = '1mJBz8lhL7AETl_8SpSv8rjtsZm8cWIs5';
+var MALI_KLASOR_ID = '1vd-AFH6KXpqdFKMDCk9Of1PcrUIgpA6b';  // 05 – Mali Raporlar
+
+/** En yeni mali_veri.json: önce Mali Raporlar klasörü, klasör taşınmış/silinmişse Drive genelinde ada göre. */
+function maliDosyasi_() {
+  var en = null;
+  function bak(it) {
+    while (it.hasNext()) {
+      var f = it.next();
+      if (f.getName().indexOf('mali_veri.json') !== 0 || f.isTrashed()) continue;
+      if (!en || f.getLastUpdated() > en.getLastUpdated()) en = f;
+    }
+  }
+  try { bak(DriveApp.getFolderById(MALI_KLASOR_ID).getFiles()); } catch (e) {}
+  if (!en) { try { bak(DriveApp.getFilesByName('mali_veri.json')); } catch (e) {} }
+  return en;
+}
 
 function maliVeri_() {
   try {
-    var it = DriveApp.getFolderById(MALI_KLASOR_ID).getFiles();
-    var en = null;
-    while (it.hasNext()) {
-      var f = it.next();
-      if (f.getName().indexOf('mali_veri.json') !== 0) continue;
-      if (!en || f.getLastUpdated() > en.getLastUpdated()) en = f;
-    }
+    var en = maliDosyasi_();
     return en ? JSON.parse(en.getBlob().getDataAsString('UTF-8')) : null;
   } catch (err) {
     return null;
@@ -2798,17 +2807,7 @@ function veriKalitesi_() {
   return onbellekli_('veriKalitesi_v1', 600, function () {
     function tarih(d) { return d ? Utilities.formatDate(d, 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss") : ''; }
     function dosya(id) { try { return DriveApp.getFileById(id).getLastUpdated(); } catch (e) { return null; } }
-    function maliKopya() {
-      try {
-        var it = DriveApp.getFolderById(MALI_KLASOR_ID).getFiles(), en = null;
-        while (it.hasNext()) {
-          var f = it.next();
-          if (f.getName().indexOf('mali_veri.json') !== 0) continue;
-          if (!en || f.getLastUpdated() > en) en = f.getLastUpdated();
-        }
-        return en;
-      } catch (e) { return null; }
-    }
+    function maliKopya() { var f = maliDosyasi_(); return f ? f.getLastUpdated() : null; }
     return VERI_KAYNAKLARI_.map(function (k) {
       var son = null;
       k.kaynak.forEach(function (id) { var d = dosya(id); if (d && (!son || d > son)) son = d; });
