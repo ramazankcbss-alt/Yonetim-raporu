@@ -3796,7 +3796,7 @@ function kvkkSutunMu_(dosyaAdi, baslik) {
   if (KVKK_SUTUN_.test(baslik)) return true;
   return KVKK_DOSYA_SUTUN_.some(function (k) { return k[0].test(dosyaAdi || '') && k[1].test(baslik); });
 }
-var KVKK_SAYFA_ = /personel|organizasyon|şoför|sürücü|kişiler|kisiler|kişi olay|mesaj|iletişim|telefon|ekipler|görevlendirme|roller|cihazlar|bildirimler|^mutabakat$/i;
+var KVKK_SAYFA_ = /personel|organizasyon|şoför|sürücü|kişiler|kisiler|kişi olay|mesaj|iletişim|telefon|ekipler|görevlendirme|roller|cihazlar|bildirimler|^mutabakat$|veteriner_bildirim/i;
 var KVKK_SUTUN_ = /tedarikçi|tedarikci|cari|müşteri|musteri|alıcı|alici|satıcı|unvan|ünvan|firma adı|kullanıcı|kullanici|ad[ıi]?\s*[-\/]?\s*soyad|^ad[ıi]?$|^soyad|isim|personel|çalışan|şoför|sürücü|operatör|operator|^tc\b|t\.c\.|kimlik|telefon|^tel\b|gsm|cep no|iban|plaka|adres|e-?posta|mail|imza|bildiren|onaylayan|teslim alan|teslim eden|kişi/i;
 
 function kvkkHucre_(x) {
@@ -3850,7 +3850,9 @@ function kaynakKullanim_() {
     [BILGI_BANKASI_ID, /^(Veriler|Dersler)$/, 'Bilgi Bankası'],
     [FORM_TABLO_ID, /./, 'Günlük tarım bildirimi'],
     [CANLI_HAYVAN_VARSAYILAN_ID, /^(ozet|isletme)$/, 'Hayvan özeti'],
-    [/Mali|gelir|gider|GELİR|GİDER/, /./, 'Mali Raporlar (dönüştürücü)']
+    [/Mali|gelir|gider|GELİR|GİDER|FATURA/, /./, 'Mali Raporlar (dönüştürücü)'],
+    [/Haftalik_Yonetim_Raporu/, /^(Hayvan_Özet|Hayvan_Günlük|Hayvan_Detay|Tarım_Veri|Ekim_Alanları|Hasat_Verim|Besi_Plan|ESK_Aylık|ESK_Bilgi|Hasat Durumu|Sezon_Parselleri|Parsel_Sınırları|ÇKS_Parseller|Veteriner_Kodları|Yönetici Özeti)$/, 'Uygulamanın ana tablosu (rapor verileri)'],
+    [/Haftalik_Yonetim_Raporu/, /^Hafta /, 'Haftalık rapor arşivi (uygulamanın ürettiği)']
   ];
 }
 
@@ -3996,6 +3998,8 @@ function kaynakEnvanteriHazirla() {
       if (e0 && e0.imza === imza && !e0.yarim) {
         // Dosya değişmedi: sayfalar yeniden okunmaz, yalnızca piramitteki kullanım durumu güncel kurallara göre yenilenir.
         (e0.sayfalar || []).forEach(function (s0) {
+          if (KVKK_SAYFA_.test(s0.ad)) { s0.durum = 'kvkk'; s0.sutunlar = []; s0.notlar = []; return; }
+          if (s0.durum === 'kullanilmiyor' && s0.baslikSatiri && s0.satir <= s0.baslikSatiri) { s0.durum = 'bos'; s0.bosNedeni = 'yalnızca başlık satırı var, kayıt yok'; }
           if (s0.durum === 'kullaniliyor' || s0.durum === 'kullanilmiyor' || s0.durum === 'bos') {
             s0.kullanim = kaynakKullanimBul_(e0, s0.ad);
             if (s0.durum !== 'bos') s0.durum = s0.kullanim ? 'kullaniliyor' : 'kullanilmiyor';
