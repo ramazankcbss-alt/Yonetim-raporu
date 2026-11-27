@@ -176,6 +176,15 @@ class VeriKalitesi {
         }
       }
     }
+    // Çiftlik Raporları otomatik dönüştürme
+    final dn = v.ciftlikRaporTam.donusum;
+    if (dn.contains('Drive API') || dn.contains('hata')) {
+      konular.add(AcikKonu('Çiftlik Raporları otomatik dönüştürülemiyor',
+          '$dn. Apps Script › Hizmetler › Drive API eklenmeli; o zamana kadar yeni xlsx elle E-Tabloya çevrilmeli.', 'Uygulama sahibi'));
+    }
+    for (final h in v.ciftlikRaporTam.hatalar) {
+      konular.add(AcikKonu('Çiftlik Raporları sayfası okunamadı', h, 'Uygulama sahibi'));
+    }
     // Araç masrafları
     final am = v.aracMasraf;
     if (!am.bos) {

@@ -27,13 +27,16 @@ class CrSayfa {
 
 class CiftlikRaporTam {
   const CiftlikRaporTam({this.dosya = '', this.guncelleme, this.sayfalar = const [], this.gider = const [], this.yem = const [],
-      this.duranVarlik = const [], this.tarim = const [], this.hatalar = const []});
+      this.duranVarlik = const [], this.tarim = const [], this.hatalar = const [], this.donusum = ''});
   final String dosya;
   final DateTime? guncelleme;
   final List<CrSayfa> sayfalar;
   final List<CrGider> gider;
   final List<CrTuketim> yem, duranVarlik, tarim;
   final List<String> hatalar;
+
+  /// Otomatik xlsx → E-Tablo dönüştürmenin durumu (güncel, dönüştürüldü, Drive API hizmeti ekli değil…).
+  final String donusum;
 
   bool get bos => sayfalar.isEmpty;
 
@@ -59,6 +62,7 @@ class CiftlikRaporTam {
       duranVarlik: t('duranVarlik'),
       tarim: t('tarim'),
       hatalar: [for (final h in l('hatalar')) '$h'],
+      donusum: j['donusum'] is Map ? '${(j['donusum'] as Map)['durum'] ?? ''}' : '',
     );
   }
 

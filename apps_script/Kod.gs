@@ -3460,6 +3460,36 @@ function ciftlikRaporTabloBul_() {
   return en;
 }
 
+
+/**
+ * Otomatik dönüştürme: muhasebenin gönderdiği en yeni "Çiftlik Raporları" xlsx dosyası, klasördeki E-Tablo
+ * kopyasından daha yeniyse Google'a E-Tablo olarak dönüştürtülür ve "06 – Çiftlikler Rapor 2026" klasörüne konur.
+ * Gereken: Apps Script › Hizmetler › Drive API (bir kez eklenir). Eski kopyalar silinmez; en yenisi kullanılır.
+ */
+function ciftlikRaporDonustur_() {
+  var xlsx = null, it = DriveApp.searchFiles("title contains 'Çiftlik Raporları' and trashed = false");
+  while (it.hasNext()) {
+    var f = it.next();
+    if (!/\.xlsx$/i.test(f.getName()) || f.getMimeType() === 'application/vnd.google-apps.shortcut') continue;
+    if (!xlsx || f.getLastUpdated() > xlsx.getLastUpdated()) xlsx = f;
+  }
+  if (!xlsx) return { durum: 'xlsx yok' };
+  var imza = xlsx.getId() + '@' + xlsx.getLastUpdated().getTime(), pr = PropertiesService.getScriptProperties();
+  if (pr.getProperty('crDonusum') === imza) return { durum: 'güncel' };
+  // Klasörde xlsx'ten sonra oluşturulmuş bir E-Tablo kopyası varsa (ör. elle kaydedilen) yeniden dönüştürülmez.
+  var tablo = ciftlikRaporTabloBul_();
+  if (tablo && tablo.getDateCreated() > xlsx.getLastUpdated()) { pr.setProperty('crDonusum', imza); return { durum: 'güncel (mevcut kopya)' }; }
+  if (typeof Drive === 'undefined') return { durum: 'Drive API hizmeti ekli değil' };
+  var ad = xlsx.getName().replace(/\.xlsx$/i, ''), yeni;
+  try {
+    yeni = Drive.Files.copy({ name: ad, mimeType: MimeType.GOOGLE_SHEETS, parents: [CIFTLIK_RAPOR_KLASOR_] }, xlsx.getId());  // Drive API v3
+  } catch (e) {
+    yeni = Drive.Files.copy({ title: ad, mimeType: MimeType.GOOGLE_SHEETS, parents: [{ id: CIFTLIK_RAPOR_KLASOR_ }] }, xlsx.getId(), { convert: true });  // v2
+  }
+  pr.setProperty('crDonusum', imza);
+  return { durum: 'dönüştürüldü', id: yeni && yeni.id };
+}
+
 function ciftlikRaporTamHesapla_(dosya) {
   var ss = SpreadsheetApp.open(dosya), o = { dosya: dosya.getName(), sayfalar: [], gider: [], yem: [], duranVarlik: [], tarim: [], hatalar: [] };
   ss.getSheets().forEach(function (s) { o.sayfalar.push({ ad: s.getName(), satir: s.getLastRow(), sutun: s.getLastColumn() }); });
@@ -3527,16 +3557,18 @@ function ciftlikRaporTamHesapla_(dosya) {
 
 /** Kaynak değişmedikçe kayıtlı sonucu döndürür; değiştiyse yeniden hesaplar ve kaydeder. */
 function ciftlikRaporTam_(zorla) {
+  var donusum = null;
+  try { donusum = ciftlikRaporDonustur_(); } catch (e) { donusum = { durum: 'dönüştürme hatası: ' + e }; }
   var kaynak = ciftlikRaporTabloBul_();
   if (!kaynak) return null;
   var imza = kaynak.getId() + '@' + kaynak.getLastUpdated().getTime(), ad = 'ciftlik_rapor_tam.json', cache = CacheService.getScriptCache();
   var k = 'crTam_' + imza, m = zorla ? null : parcaliOku_(cache, k);
-  if (m) { try { return JSON.parse(m); } catch (e) {} }
+  if (m) { try { var o0 = JSON.parse(m); o0.donusum = donusum; return o0; } catch (e) {} }
   var klasor = DriveApp.getFolderById(UYGULAMA_VERI_KLASOR_), it = klasor.getFilesByName(ad), f = it.hasNext() ? it.next() : null;
   if (f && !zorla) {
     try {
       var kayit = JSON.parse(f.getBlob().getDataAsString('UTF-8'));
-      if (kayit.imza === imza) { parcaliYaz_(cache, k, JSON.stringify(kayit)); return kayit; }
+      if (kayit.imza === imza) { parcaliYaz_(cache, k, JSON.stringify(kayit)); kayit.donusum = donusum; return kayit; }
     } catch (e) {}
   }
   var o = ciftlikRaporTamHesapla_(kaynak);
@@ -3545,12 +3577,14 @@ function ciftlikRaporTam_(zorla) {
   var metin = JSON.stringify(o);
   if (f) f.setContent(metin); else klasor.createFile(ad, metin, 'application/json');
   parcaliYaz_(cache, k, metin);
+  o.donusum = donusum;
   return o;
 }
 
 /** Düzenleyiciden bir kez çalıştırın: Çiftlik Raporları E-Tablosunun tamamını okuyup kaydeder. */
 function ciftlikRaporHazirla() {
   var o = ciftlikRaporTam_(true);
+  Logger.log('Dönüştürme: ' + JSON.stringify(o && o.donusum));
   Logger.log(o ? (o.dosya + ': ' + o.sayfalar.length + ' sayfa, gider ' + o.gider.length + ', besi-düve yem ' + o.yem.length +
     ', duran varlık ' + o.duranVarlik.length + ', tarım ' + o.tarim.length + ' satır; hata: ' + (o.hatalar.join(' | ') || 'yok'))
     : 'Çiftlik Raporları E-Tablosu bulunamadı.');
