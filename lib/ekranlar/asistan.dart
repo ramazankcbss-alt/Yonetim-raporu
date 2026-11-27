@@ -5,6 +5,7 @@ import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/model.dart';
 import 'araclar.dart';
+import 'arac_masraf.dart';
 import 'bakim_onarim.dart';
 import 'ciftlik_rapor.dart';
 import 'esk.dart';
@@ -484,6 +485,19 @@ class _MakineBakim extends StatelessWidget {
               renk: Renk.turuncu,
               ac: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => BakimOnarimEkran(veri: veri))),
+            ),
+            _Bolum(
+              ikon: Icons.local_gas_station_outlined,
+              baslik: 'Araç Masrafları',
+              aciklama: () {
+                final d = aracMasrafVerisi();
+                return d == null || d.bos
+                    ? 'Muhasebe araç gider listesi: araç, üretim yeri ve ay kırılımı'
+                    : '${d.donem} · ${d.araclar.length} araç · ${tl(d.araclarToplami)}';
+              }(),
+              renk: Renk.anaKoyu,
+              ac: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => AracMasrafEkran(veri: veri))),
             ),
         ]),
       );

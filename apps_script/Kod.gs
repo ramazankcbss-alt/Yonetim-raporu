@@ -67,6 +67,7 @@ var BAKIM_TABLO_ID = '1S-2ziLyY2UdjOk6SM7A8Da2D_nPEhCa5R8yFMs5daaI';
 var UYGULAMA_DOSYALARI_ = {
   ciftlik_rapor_2026: '1HGVDbd3sbAdlcBliKdRpITvmG5k2Wrmn',
   maliyet_takip_2026: '15fr-ol9R-oCJcrENyKMY0yDGFYTawpby',
+  arac_masraf_2026: '1JxJTPqwDBPF_sPD6vJmSdw8t5TTwy-WD',
   tarla_2025_2026: '1KKoDN_3OmhiDmCvANwifLMn1PHCce4za',
   tarla_2024_2025: '1OyrP5jygO-Ha0kp9SVpIbjfvDE3lt2g5',
   tarla_2026_2027: '12_B-3yYYrzM-pEP_nvBLNE6mL2uwMjVm'
@@ -219,7 +220,7 @@ function veriTopla_(gun) {
     surum: 1,
     olusturma: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ss"),
     // Uygulama veri dosyaları (çiftlik raporu, maliyet takip, hastalık arşivi, tarla haritası)
-    dosyalar: uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'hastalik', 'uygulamalar'].concat(TARLA_DOSYALARI_)),
+    dosyalar: uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'arac_masraf_2026', 'hastalik', 'uygulamalar'].concat(TARLA_DOSYALARI_)),
     // Tarih, İşletme, Personel, Taşeron, Hayvan, Sağılan, Süt, Doğan Buzağı,
     // İnek/Düve Kesim-Satış, Buzağı Ölümü, Kesilen Dana, İnek Ölüm,
     // Genç Kesim/Satış, Genç Ölüm, Yavru Atma/Ölü Doğum, Ölen Dana,
@@ -314,6 +315,10 @@ function veriTopla_(gun) {
     // Sürü hareketleri (çiftlik × ay sayılar) ve en yeni stok sayımı (not sütunları okunmaz)
     suruHareketleri: (function () { try { return suruHareketleriOku_(); } catch (err) { return null; } })(),
     stokSayimi: (function () { try { return stokSayimiOku_(); } catch (err) { return null; } })(),
+    // "Yönetim Raporu – Gelen Dosyalar" klasöründe işlenmeyi bekleyen dosyaların adı ve tarihi (içerik okunmaz)
+    gelenDosyalar: (function () { try { return gelenDosyalar_(); } catch (err) { return []; } })(),
+    // ESK kaynak dosyaları: aylık bakım hizmet tablosu toplamları, parti listesi, aylık yem girişi (plaka/şoför yok)
+    eskKaynak: (function () { try { return eskKaynak_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
     veriKalitesi: (function () { try { return veriKalitesi_(); } catch (err) { return []; } })(),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
@@ -2860,5 +2865,119 @@ function stokSayimiOku_() {
       });
     });
     return { dosya: en.getName(), guncelleme: Utilities.formatDate(en.getLastUpdated(), 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss"), sayfalar: sayfalar };
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// GELEN DOSYALAR: uygulamaya bağlanacak yeni dosyalar bu klasöre (dosya ya da kısayol olarak) konur.
+// Klasörün doğrudan içindekiler "işlenmeyi bekleyen" sayılır; işlenen dosyalar "İşlenenler" alt klasörüne taşınır.
+// Yalnızca ad, tür ve tarih okunur; içerik okunmaz.
+var GELEN_DOSYALAR_KLASOR_ID = '1hiu45DOKB8rvzAWmqeWWyJ0DVGTwtrqH';
+
+function gelenDosyalar_() {
+  return onbellekli_('gelenDosyalar_v1', 600, function () {
+    var it = DriveApp.getFolderById(GELEN_DOSYALAR_KLASOR_ID).getFiles(), out = [];
+    function t(d) { return d ? Utilities.formatDate(d, 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss") : ''; }
+    while (it.hasNext()) {
+      var f = it.next(), ad = f.getName(), tur = f.getMimeType(), guncelleme = f.getLastUpdated();
+      if (tur === 'application/vnd.google-apps.shortcut') {
+        try {
+          var h = DriveApp.getFileById(f.getTargetId());
+          ad = h.getName(); tur = h.getMimeType(); guncelleme = h.getLastUpdated();
+        } catch (e) { tur = 'kısayol (erişim yok)'; }
+      }
+      out.push({ ad: ad, tur: String(tur).split('.').pop().split('/').pop(), eklenme: t(f.getDateCreated()), guncelleme: t(guncelleme) });
+    }
+    return out.sort(function (a, b) { return a.eklenme < b.eklenme ? 1 : -1; });
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// ESK KAYNAK DOSYALARI (Taşağıl): bakım hizmet alım tablosu (aylık), ithal dana parti listesi, gelen yemler.
+// KVKK: yem dosyasından yalnızca tarih, ürün ve Taşağıl tonajı okunur; plaka, şoför, kartela ve irsaliye no okunmaz.
+var ESK_KAYNAK_ = {
+  maliyet: '1Es9f4xiwQaarxb7Rkup2gkbBszrAO4RLMFGWCG4pNOA',
+  parti: '1atuPz1wqi42bUzeCzcgZanEtxmRQYdmrIFC9HLsfTOU',
+  yem: '1d7Zvj6SoRKXN71q_bDqF6zVqBG2ehsvSL9yAf8f10WA'
+};
+var ESK_AYLAR_ = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+
+function eskTrSayi_(v) {
+  if (typeof v === 'number') return v;
+  var s = String(v == null ? '' : v).replace(/[₺\s]/g, '');
+  if (!s) return null;
+  s = s.replace(/\./g, '').replace(',', '.');
+  var n = Number(s);
+  return isNaN(n) ? null : n;
+}
+
+/** {aylar:[{yil, ay, gelen, birimFiyat, kesilen, sehirKesim, olen, basGun, bakimGideri}], partiler:[...], yem:[{yil, ay, urun, kg}]} */
+function eskKaynak_() {
+  return onbellekli_('eskKaynak_v1', 1800, function () {
+    var o = { aylar: [], partiler: [], yem: [] };
+    try {
+      SpreadsheetApp.openById(ESK_KAYNAK_.maliyet).getSheets().forEach(function (sh) {
+        var m = sh.getName().trim().match(/^(\S+)\s+(\d{4})$/);
+        if (!m) return;
+        var ay = ESK_AYLAR_.indexOf(m[1].toLocaleUpperCase('tr')) + 1;
+        if (!ay) return;
+        var d = sh.getDataRange().getDisplayValues();
+        var bas = -1;
+        for (var i = 0; i < Math.min(d.length, 10); i++) if (String(d[i][0]).trim() === 'GÜN') { bas = i; break; }
+        if (bas < 0) return;
+        var h = d[bas].map(function (x) { return String(x).toLocaleUpperCase('tr'); });
+        var top = null;
+        for (var j = bas + 1; j < d.length; j++) if (/GENEL TOPLAM/.test(String(d[j][0]))) { top = d[j]; break; }
+        if (!top) return;
+        var r = { yil: Number(m[2]), ay: ay, gelen: eskTrSayi_(d[1] && d[1][1]), birimFiyat: null,
+          kesilen: 0, sehirKesim: 0, olen: 0, basGun: null, bakimGideri: null };
+        (d[1] || []).forEach(function (x) { var n = eskTrSayi_(x); if (/₺/.test(String(x)) && n) r.birimFiyat = n; });
+        h.forEach(function (b, k) {
+          var n = eskTrSayi_(top[k]) || 0;
+          if (/ÖLEN/.test(b)) r.olen += n;
+          else if (/KESİLEN/.test(b) && /PANAGRO/.test(b)) r.kesilen += n;
+          else if (/KESİLEN/.test(b)) r.sehirKesim += n;
+          else if (/AHIRDA KALAN/.test(b)) r.basGun = n;
+          else if (/BAKIM GİDERİ/.test(b)) r.bakimGideri = n;
+        });
+        o.aylar.push(r);
+      });
+      o.aylar.sort(function (a, b) { return a.yil * 12 + a.ay - (b.yil * 12 + b.ay); });
+    } catch (e) { o.maliyetHata = String(e); }
+    try {
+      var p = SpreadsheetApp.openById(ESK_KAYNAK_.parti).getSheets()[0].getDataRange().getDisplayValues();
+      var ph = (p[1] || []).map(function (x) { return String(x).toLocaleUpperCase('tr'); });
+      function s(ad) { for (var k = 0; k < ph.length; k++) if (ph[k].indexOf(ad) >= 0) return k; return -1; }
+      var cT = s('TARİH'), cC = s('TAŞAĞIL'), cL = s('ESK LİMAN'), cO = s('ÖLEN');
+      for (var i = 2; i < p.length; i++) {
+        if (!/PART/i.test(String(p[i][0]))) continue;
+        o.partiler.push({ parti: String(p[i][0]).trim(), gelis: cT >= 0 ? String(p[i][cT]).trim() : '',
+          ciftlik: eskTrSayi_(p[i][cC]), liman: cL >= 0 ? eskTrSayi_(p[i][cL]) : null, nakliyeOlen: cO >= 0 ? eskTrSayi_(p[i][cO]) : null });
+      }
+    } catch (e) { o.partiHata = String(e); }
+    try {
+      var top2 = {};
+      SpreadsheetApp.openById(ESK_KAYNAK_.yem).getSheets().forEach(function (sh) {
+        var y = sh.getDataRange().getDisplayValues();
+        if (!y.length) return;
+        var yh = y[0].map(function (x) { return String(x).toLocaleUpperCase('tr').trim(); });
+        var cT = yh.indexOf('TARİH'), cU = yh.indexOf('ÜRÜN'), cK = -1;
+        yh.forEach(function (b, k) { if (cK < 0 && /TAŞAĞIL\s+TONAJ/.test(b)) cK = k; });
+        if (cT < 0 || cU < 0 || cK < 0) return;
+        for (var i = 1; i < y.length; i++) {
+          var t = String(y[i][cT]).match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/), kg = eskTrSayi_(y[i][cK]), u = String(y[i][cU]).trim();
+          if (!t || !kg || !u) continue;
+          var k2 = t[3] + '|' + Number(t[2]) + '|' + u;
+          top2[k2] = (top2[k2] || 0) + kg;
+        }
+      });
+      Object.keys(top2).sort().forEach(function (k) {
+        var a = k.split('|');
+        o.yem.push({ yil: Number(a[0]), ay: Number(a[1]), urun: a[2], kg: top2[k] });
+      });
+    } catch (e) { o.yemHata = String(e); }
+    return o;
   });
 }

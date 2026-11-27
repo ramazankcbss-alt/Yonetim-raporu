@@ -6,6 +6,7 @@ import '../tema.dart';
 import '../veri/esk_rapor.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
+import 'esk_kaynak.dart';
 import 'gonder.dart';
 
 /// ESK (Et ve Süt Kurumu) – Taşağıl bakım besleme. Ana ekran bir menüdür:
@@ -163,6 +164,16 @@ class _Menu extends StatelessWidget {
           ac: () => ac('Faturalar', (v) => grup(v, 'Fatura', 'Faturalar')),
         ),
         const _MenuBaslik('Operasyon'),
+        _MenuSatiri(
+          ikon: Icons.rule,
+          baslik: 'Kaynak tablolar ve mutabakat',
+          alt: veri.eskKaynak.bos
+              ? 'Bakım hizmet tablosu, parti listesi, gelen yem'
+              : '${veri.eskKaynak.aylar.length} ay · ${veri.eskKaynak.partiler.length} parti · '
+                  '${veri.eskKaynak.mutabakat(veri.eskAylik).length} fark',
+          renk: veri.eskKaynak.mutabakat(veri.eskAylik).isNotEmpty ? Renk.amber : null,
+          ac: () => ac('Kaynak tablolar ve mutabakat', (v) => EskKaynakGovde(veri: v)),
+        ),
         _MenuSatiri(
           ikon: Icons.agriculture_outlined,
           baslik: 'Yem, sap ve alımlar',

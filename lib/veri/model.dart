@@ -16,6 +16,7 @@ import 'bakim_onarim.dart';
 import 'uretim_karlilik.dart';
 import 'urun_takip.dart';
 import 'stok_suru.dart';
+import 'esk_kaynak.dart';
 
 export 'arac.dart';
 export 'bakim_onarim.dart';
@@ -1148,6 +1149,8 @@ class RaporVerisi {
     this.kaynakTarihleri = const [],
     this.suruHareketleri = const SuruHareketleri(),
     this.stokSayimi = const StokSayimi(),
+    this.gelenDosyalar = const [],
+    this.eskKaynak = const EskKaynak(),
     this.vetBildirimleri = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
@@ -1229,6 +1232,12 @@ class RaporVerisi {
   /// Sürü hareketleri (hayvan sayısının asıl kaynağı) ve en yeni stok sayımı.
   final SuruHareketleri suruHareketleri;
   final StokSayimi stokSayimi;
+
+  /// "Gelen Dosyalar" klasöründe işlenmeyi bekleyen dosyalar (ad, tür, tarih).
+  final List<GelenDosya> gelenDosyalar;
+
+  /// ESK kaynak tabloları (bakım hizmet tablosu, parti listesi, yem girişi) – yalnızca toplamlar.
+  final EskKaynak eskKaynak;
   final List<VetBildirim> vetBildirimleri;
 
   /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
@@ -1251,6 +1260,11 @@ class RaporVerisi {
       urunTeslimat: UrunTeslimat.json(j['urunTeslimat']),
       suruHareketleri: SuruHareketleri.json(j['suruHareketleri']),
       stokSayimi: StokSayimi.json(j['stokSayimi']),
+      eskKaynak: EskKaynak.json(j['eskKaynak']),
+      gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
+          .map(GelenDosya.oku)
+          .whereType<GelenDosya>()
+          .toList(),
       kaynakTarihleri: (j['veriKalitesi'] is List ? j['veriKalitesi'] as List : const [])
           .map(KaynakTarihi.oku)
           .whereType<KaynakTarihi>()
@@ -1703,5 +1717,19 @@ class KaynakTarihi {
     if (x is! Map) return null;
     DateTime? t(Object? v) => v is String && v.isNotEmpty ? DateTime.tryParse(v) : null;
     return KaynakTarihi('${x['ad'] ?? ''}', t(x['kaynak']), t(x['kopya']), canli: x['canli'] == true);
+  }
+}
+
+
+/// Gelen Dosyalar klasöründeki bir dosya (yalnızca ad, tür ve tarih).
+class GelenDosya {
+  const GelenDosya(this.ad, this.tur, this.eklenme, this.guncelleme);
+  final String ad, tur;
+  final DateTime? eklenme, guncelleme;
+
+  static GelenDosya? oku(Object? x) {
+    if (x is! Map) return null;
+    DateTime? t(Object? v) => v is String && v.isNotEmpty ? DateTime.tryParse(v) : null;
+    return GelenDosya('${x['ad'] ?? ''}', '${x['tur'] ?? ''}', t(x['eklenme']), t(x['guncelleme']));
   }
 }

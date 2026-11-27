@@ -182,7 +182,7 @@ class _VeriKalitesiEkranState extends State<VeriKalitesiEkran> {
               if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
               final v = VeriDeposu.ben.veri ?? widget.veri;
               final q = VeriKalitesi.hesapla(v, snap.data);
-              return GonderAlani(konu: 'Veri Kalitesi', child: _Icerik(q: q, tarihVar: v.kaynakTarihleri.isNotEmpty));
+              return GonderAlani(konu: 'Veri Kalitesi', child: _Icerik(q: q, tarihVar: v.kaynakTarihleri.isNotEmpty, gelen: v.gelenDosyalar));
             },
           ),
         ),
@@ -190,9 +190,10 @@ class _VeriKalitesiEkranState extends State<VeriKalitesiEkran> {
 }
 
 class _Icerik extends StatelessWidget {
-  const _Icerik({required this.q, required this.tarihVar});
+  const _Icerik({required this.q, required this.tarihVar, this.gelen = const []});
   final VeriKalitesi q;
   final bool tarihVar;
+  final List<GelenDosya> gelen;
 
   @override
   Widget build(BuildContext context) => ListView(
@@ -216,6 +217,25 @@ class _Icerik extends StatelessWidget {
             baslik: 'Kaynaklar',
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               for (final (t, ad, kapsam) in q.kaynaklar) _KaynakSatiri(t: t, ad: ad, kapsam: kapsam),
+            ]),
+          ),
+          Panel(
+            baslik: 'Gelen Dosyalar (${gelen.length} işlenmeyi bekliyor)',
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (gelen.isEmpty)
+                const Text('Bekleyen dosya yok.', style: TextStyle(fontSize: 13))
+              else
+                for (final d in gelen)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Text('• ${d.ad} (${d.tur}${d.eklenme == null ? '' : ', eklendi ${tarihKisa(d.eklenme!)}'})',
+                        style: const TextStyle(fontSize: 13, height: 1.4)),
+                  ),
+              const SizedBox(height: 4),
+              const Text(
+                  "Uygulamaya bağlanacak yeni dosyayı Drive'daki \"Yönetim Raporu – Gelen Dosyalar\" klasörüne (dosya ya da kısayol olarak) "
+                  "koyun. Dosya incelenip uygulamaya bağlandığında klasördeki \"İşlenenler\" alt klasörüne taşınır. Yalnızca dosya adı ve tarihi okunur.",
+                  style: TextStyle(fontSize: 12, color: Renk.soluk, height: 1.4)),
             ]),
           ),
           if (q.eksikAylar.isNotEmpty)
