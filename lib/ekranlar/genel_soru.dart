@@ -115,7 +115,7 @@ class _GenelSoruEkranState extends State<GenelSoruEkran> {
                   const BilgiKutusu(
                       yazi: 'Sorunuzu yazın; cevap uygulamadaki tüm bölümlerin verisinden (süt ve sürü, sürü sağlığı ve üreme, tarım faaliyetleri, '
                           'ekim, ÇKS, hasat, ürün takibi, ESK, hastalık, araç, bakım onarım, Mali Raporlar gelir/gider, veteriner, geçmiş yıllar, '
-                          'Çiftlikler Rapor) hesaplanır ve kaynağı belirtilir. '
+                          'Çiftlik Sonuçları) hesaplanır ve kaynağı belirtilir. '
                           'Cevabın altından devam sorusu sorabilirsiniz (ör. “Peki Pan-Gev’de?”, “Geçen ay?”, “Neden?”); '
                           'çiftlik, ürün ve dönem önceki sorudan devralınır. Kayıt yoksa tahmin yapılmaz. '
                           'Hesaplama bu cihazda yapılır, veri dışarıya gönderilmez; konuşma yalnızca bu cihazda saklanır.'),

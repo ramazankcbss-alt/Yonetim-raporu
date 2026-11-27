@@ -291,7 +291,7 @@ GenelYanit genelCevapla(RaporVerisi v, String soru,
     final metin = [...q.ciftlikler, ...q.urunler, soru, if (q.oncekiMetin.isNotEmpty) q.oncekiMetin].join(' ');
     final y = cevapla(rapor, metin);
     if (y.anlasildi) {
-      b.insert(0, CevapBolumu('Kâr / zarar ve maliyet', y.paragraflar, 'Çiftlikler Rapor (${rapor.kaynak}; Maliyet Takip)'));
+      b.insert(0, CevapBolumu('Kâr / zarar ve maliyet', y.paragraflar, 'Çiftlik Sonuçları (${rapor.kaynak}; Maliyet Takip)'));
       bulgular = y.bulgular;
     }
   }

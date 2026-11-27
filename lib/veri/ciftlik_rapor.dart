@@ -216,7 +216,7 @@ class CiftlikRaporu {
   /// Sunucudan gelen dosyadan okunur (aynı dosya için bir kez çözülür).
   static Future<CiftlikRaporu> yukle() {
     final m = UygulamaDosyalari.metin('ciftlik_rapor_2026');
-    if (m == null) return Future.error(StateError('Çiftlikler Rapor verisi henüz alınmadı.'));
+    if (m == null) return Future.error(StateError('Çiftlik Sonuçları verisi henüz alınmadı.'));
     if (m == _sonMetin && _son != null) return _son!;
     _sonMetin = m;
     return _son = Future(() => coz(m, maliyetTakip: UygulamaDosyalari.metin('maliyet_takip_2026')));

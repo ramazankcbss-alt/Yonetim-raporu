@@ -11,6 +11,7 @@ import 'esk.dart';
 import 'gecmis.dart';
 import 'genel_soru.dart';
 import 'veri_kalitesi.dart';
+import 'yonetim_ozeti.dart';
 import 'stok_suru.dart';
 import 'hastalik.dart';
 import 'gunce.dart';
@@ -45,6 +46,13 @@ class AsistanEkran extends StatelessWidget {
         ),
         const _AnlikGuncelle(),
         _Bolum(
+          ikon: Icons.dashboard_outlined,
+          baslik: 'Yönetim Özeti',
+          aciklama: 'Konsolide net sonuç, ziraat ve hayvancılık, verimlilik karnesi, sapmalar ve alarmlar — tek ekranda',
+          renk: Renk.anaKoyu,
+          ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => YonetimOzetiEkran(veri: veri))),
+        ),
+        _Bolum(
           ikon: Icons.question_answer_outlined,
           baslik: 'Soru Sor',
           aciklama: 'Merak ettiğiniz konuyu sorun; cevap uygulamadaki tüm verilerden, kaynağıyla birlikte hazırlanır',
@@ -72,14 +80,7 @@ class AsistanEkran extends StatelessWidget {
             renk: Renk.ana,
             ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const PaylasimEkrani())),
           ),
-        _Bolum(
-          ikon: Icons.agriculture_outlined,
-          baslik: 'ESK – Et ve Süt Kurumu',
-          aciklama: _eskOzet(veri),
-          renk: Renk.kirmizi,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => EskEkran(veri: veri))),
-        ),
+        const _Grup('Mali'),
         _Bolum(
           ikon: Icons.account_balance_outlined,
           baslik: 'Mali Raporlar',
@@ -88,9 +89,29 @@ class AsistanEkran extends StatelessWidget {
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => MaliEkran(veri: veri))),
         ),
+        const _Grup('Ziraat'),
+        _Bolum(
+          ikon: Icons.insights_outlined,
+          baslik: 'Ürün Takibi',
+          aciklama: veri.tarimsalUretim.bos
+              ? 'Ekim alanı, maliyet, teslimat, satış ve net kazanç — ürün ve çiftlik bazında'
+              : '${sayi(veri.tarimsalUretim.genelToplam.dekar)} da · teslimat, satış, maliyet, net kazanç',
+          renk: Renk.yesil,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => UretimKarlilikEkran(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.map_outlined,
+          baslik: 'Tarla Haritası',
+          aciklama: '2025-2026 sezonu parseller, ekiliş ve tarım icmaliyle karşılaştırma',
+          renk: Renk.yesil,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => TarlaEkran(veri: veri))),
+        ),
+        const _Grup('Hayvancılık'),
         _Bolum(
           ikon: Icons.query_stats_outlined,
-          baslik: 'Çiftlikler Rapor',
+          baslik: 'Çiftlik Sonuçları',
           aciklama: '2025, 2026 ve 2027 yılları: kâr/zarar ile süt, et ve tarım birim maliyetleri — artış ve azalış nedenleriyle',
           renk: Renk.mavi,
           ac: () => Navigator.of(context).push(
@@ -106,15 +127,37 @@ class AsistanEkran extends StatelessWidget {
           ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StokSuruEkran(veri: veri))),
         ),
         _Bolum(
-          ikon: Icons.insights_outlined,
-          baslik: 'Ürün Takibi',
-          aciklama: veri.tarimsalUretim.bos
-              ? 'Ekim alanı, maliyet, teslimat, satış ve net kazanç — ürün ve çiftlik bazında'
-              : '${sayi(veri.tarimsalUretim.genelToplam.dekar)} da · teslimat, satış, maliyet, net kazanç',
+          ikon: Icons.child_friendly_outlined,
+          baslik: 'Sürü Sağlığı ve Üreme',
+          aciklama: 'Doğum, tohumlama, gebelik muayenesi, senkronizasyon, sürü durumu, aşı, gelen hayvan, satış ve süt analizi',
           renk: Renk.yesil,
           ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => UretimKarlilikEkran(veri: veri))),
+              MaterialPageRoute(builder: (_) => const SuremeEkran())),
         ),
+        _Bolum(
+          ikon: Icons.vaccines_outlined,
+          baslik: 'Sağlık ve Veteriner',
+          aciklama: 'Hastalık dağılımı ve Veteriner Kontrol Paneli',
+          renk: Renk.kirmizi,
+          ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _SaglikVeteriner(veri: veri))),
+        ),
+        _Bolum(
+          ikon: Icons.agriculture_outlined,
+          baslik: 'ESK – Et ve Süt Kurumu',
+          aciklama: _eskOzet(veri),
+          renk: Renk.kirmizi,
+          ac: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => EskEkran(veri: veri))),
+        ),
+        const _Grup('Ortak'),
+        _Bolum(
+          ikon: Icons.agriculture_outlined,
+          baslik: 'Makine ve Bakım',
+          aciklama: 'Araç kullanımı, arıza ve bakım onarım kayıtları',
+          renk: Renk.anaKoyu,
+          ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _MakineBakim(veri: veri))),
+        ),
+        const _Grup('Arşiv ve notlar'),
         _Bolum(
           ikon: Icons.history_edu_outlined,
           baslik: 'Geçmiş Yıllar',
@@ -124,61 +167,6 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.ana,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => GecmisEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.map_outlined,
-          baslik: 'Tarla Haritası',
-          aciklama: '2025-2026 sezonu parseller, ekiliş ve tarım icmaliyle karşılaştırma',
-          renk: Renk.yesil,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => TarlaEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.agriculture_outlined,
-          baslik: 'Araçlar',
-          aciklama: veri.arac.bos
-              ? 'Araç Takip: kullanım, bakım ve arıza'
-              : '${veri.arac.araclar.length} araç · ${veri.arac.aktif.length} aktif kullanım · '
-                  '${veri.arac.ariza.where((x) => !x.kapali).length} açık arıza',
-          renk: Renk.anaKoyu,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => AraclarEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.build_outlined,
-          baslik: 'Bakım Onarım',
-          aciklama: veri.bakimOnarim.bos
-              ? 'Günlük Tarım Bildirimi formundan gelen bakım onarım kayıtları'
-              : '${veri.bakimOnarim.onayli.length} onaylı · '
-                  '${veri.bakimOnarim.onayBekleyen.length} onay bekleyen · '
-                  '${veri.bakimOnarim.acik.length} açık iş',
-          renk: Renk.turuncu,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => BakimOnarimEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.vaccines_outlined,
-          baslik: 'Hastalık Dağılımı',
-          aciklama: 'Aylara göre hastalıklar; çiftlik, cins ve ölüm/kalım/kuru/kesim/imha + önleme tedbirleri',
-          renk: Renk.kirmizi,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => HastalikEkran(veri: veri))),
-        ),
-        _Bolum(
-          ikon: Icons.child_friendly_outlined,
-          baslik: 'Sürü Sağlığı ve Üreme',
-          aciklama: 'Doğum, tohumlama, gebelik muayenesi, senkronizasyon, sürü durumu, aşı, gelen hayvan, satış ve süt analizi',
-          renk: Renk.yesil,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SuremeEkran())),
-        ),
-        _Bolum(
-          ikon: Icons.medical_services_outlined,
-          baslik: 'Veteriner Kontrol Paneli',
-          aciklama: _vetOzet(veri),
-          renk: Renk.mavi,
-          ac: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => VeterinerEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.groups_outlined,
@@ -420,3 +408,81 @@ class _Yakinda extends StatelessWidget {
                 fontSize: 10.5, fontWeight: FontWeight.w700, color: Renk.amber)),
       );
 }
+
+/// Sağlık ve Veteriner: Hastalık Dağılımı ve Veteriner Kontrol Paneli.
+class _SaglikVeteriner extends StatelessWidget {
+  const _SaglikVeteriner({required this.veri});
+  final RaporVerisi veri;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Sağlık ve Veteriner')),
+        body: ListView(padding: const EdgeInsets.all(16), children: [
+            _Bolum(
+              ikon: Icons.vaccines_outlined,
+              baslik: 'Hastalık Dağılımı',
+              aciklama: 'Aylara göre hastalıklar; çiftlik, cins ve ölüm/kalım/kuru/kesim/imha + önleme tedbirleri',
+              renk: Renk.kirmizi,
+              ac: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => HastalikEkran(veri: veri))),
+            ),
+            _Bolum(
+              ikon: Icons.medical_services_outlined,
+              baslik: 'Veteriner Kontrol Paneli',
+              aciklama: _vetOzet(veri),
+              renk: Renk.mavi,
+              ac: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => VeterinerEkran(veri: veri))),
+            ),
+        ]),
+      );
+}
+
+/// Makine ve Bakım: Araçlar ve Bakım Onarım.
+class _MakineBakim extends StatelessWidget {
+  const _MakineBakim({required this.veri});
+  final RaporVerisi veri;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('Makine ve Bakım')),
+        body: ListView(padding: const EdgeInsets.all(16), children: [
+            _Bolum(
+              ikon: Icons.agriculture_outlined,
+              baslik: 'Araçlar',
+              aciklama: veri.arac.bos
+                  ? 'Araç Takip: kullanım, bakım ve arıza'
+                  : '${veri.arac.araclar.length} araç · ${veri.arac.aktif.length} aktif kullanım · '
+                      '${veri.arac.ariza.where((x) => !x.kapali).length} açık arıza',
+              renk: Renk.anaKoyu,
+              ac: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => AraclarEkran(veri: veri))),
+            ),
+            _Bolum(
+              ikon: Icons.build_outlined,
+              baslik: 'Bakım Onarım',
+              aciklama: veri.bakimOnarim.bos
+                  ? 'Günlük Tarım Bildirimi formundan gelen bakım onarım kayıtları'
+                  : '${veri.bakimOnarim.onayli.length} onaylı · '
+                      '${veri.bakimOnarim.onayBekleyen.length} onay bekleyen · '
+                      '${veri.bakimOnarim.acik.length} açık iş',
+              renk: Renk.turuncu,
+              ac: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => BakimOnarimEkran(veri: veri))),
+            ),
+        ]),
+      );
+}
+
+class _Grup extends StatelessWidget {
+  const _Grup(this.ad);
+  final String ad;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 8, 0, 8),
+        child: Text(ad.toUpperCase(),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Renk.soluk)),
+      );
+}
+

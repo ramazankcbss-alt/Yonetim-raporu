@@ -306,7 +306,7 @@ const paylasimMenuAdlari = {
   'tarla': 'Tarla Haritaları',
   'esk': 'ESK – Et ve Süt Kurumu',
   'mali': 'Mali Raporlar',
-  'ciftlikRapor': 'Çiftlikler Rapor',
+  'ciftlikRapor': 'Çiftlik Sonuçları',
   'urun': 'Ürün Takibi',
   'gecmis': 'Geçmiş Yıllar',
   'hastalik': 'Hastalık Dağılımı',

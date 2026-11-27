@@ -12,14 +12,14 @@ import '../veri/senaryo.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
 
-/// Çiftlikler Rapor: her yıl ayrı bir bölümdür (Tarla Haritası sezonları gibi).
+/// Çiftlik Sonuçları: her yıl ayrı bir bölümdür (Tarla Haritası sezonları gibi).
 class CiftlikRaporEkran extends StatelessWidget {
   const CiftlikRaporEkran({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Çiftlikler Rapor')),
+      appBar: AppBar(title: const Text('Çiftlik Sonuçları')),
       body: FutureBuilder<CiftlikRaporu>(
         future: CiftlikRaporu.yukle(),
         builder: (context, s) {
@@ -31,7 +31,7 @@ class CiftlikRaporEkran extends StatelessWidget {
           const net = 'Dönem net kârı/zararı';
           void ac(Widget w) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => w));
           return GonderAlani(
-            konu: 'Çiftlikler Rapor – Yıllar',
+            konu: 'Çiftlik Sonuçları – Yıllar',
             child: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 24), children: [
               BilgiKutusu(
                   yazi: 'Her yıl ayrı bir bölümdür; içinde kâr / zarar, süt, maliyet takip ve piyasa senaryosu sekmeleri yer alır. '
@@ -113,7 +113,7 @@ class _Yil2026 extends StatelessWidget {
   const _Yil2026({required this.r});
   final CiftlikRaporu r;
   @override
-  Widget build(BuildContext context) => _SekmeliYil(baslik: 'Çiftlikler Rapor 2026', sekmeler: [
+  Widget build(BuildContext context) => _SekmeliYil(baslik: 'Çiftlik Sonuçları 2026', sekmeler: [
         ('Kâr / Zarar', _KarZarar(r: r)),
         ('Soru Sor', _SoruSor(r: r)),
         ('Süt', _Sut(r: r)),
@@ -129,7 +129,7 @@ class _Yil2025 extends StatelessWidget {
   const _Yil2025({required this.r});
   final CiftlikRaporu r;
   @override
-  Widget build(BuildContext context) => _SekmeliYil(baslik: 'Çiftlikler Rapor 2025', sekmeler: [
+  Widget build(BuildContext context) => _SekmeliYil(baslik: 'Çiftlik Sonuçları 2025', sekmeler: [
         ('Kâr / Zarar', _KarZarar2025(r: r)),
         ('Süt', _Sut2025(r: r)),
         ('Maliyet Takip', _MaliyetTakip(r: r, yil: 2025)),
@@ -141,7 +141,7 @@ class _Yil2027 extends StatelessWidget {
   const _Yil2027();
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Çiftlikler Rapor 2027')),
+        appBar: AppBar(title: const Text('Çiftlik Sonuçları 2027')),
         body: ListView(padding: const EdgeInsets.all(16), children: const [
           BilgiKutusu(
               uyari: true,
