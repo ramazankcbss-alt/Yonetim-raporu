@@ -4,28 +4,15 @@ import '../bicim.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/arac_masraf.dart';
-import '../veri/dosyalar.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
 import 'esk.dart' show tl;
 import 'gonder.dart';
 
-String? _sonMetin;
-AracMasraflari? _son;
-
-/// arac_masraf_2026 dosyası (sunucudan gelen uygulama verisi); yoksa null.
-AracMasraflari? aracMasrafVerisi() {
-  final m = UygulamaDosyalari.metin('arac_masraf_2026');
-  if (m == null) return null;
-  if (m != _sonMetin) {
-    _sonMetin = m;
-    try {
-      _son = AracMasraflari.coz(m);
-    } catch (_) {
-      _son = null;
-    }
-  }
-  return _son;
+/// Sunucudan gelen araç masrafları; yoksa null.
+AracMasraflari? aracMasrafVerisi([RaporVerisi? v]) {
+  final d = (v ?? VeriDeposu.ben.veri)?.aracMasraf;
+  return d == null || d.bos ? null : d;
 }
 
 const _ayKisa = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
@@ -43,15 +30,15 @@ class AracMasrafEkran extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: VeriDeposu.ben,
         builder: (context, _) {
-          final d = aracMasrafVerisi();
+          final d = aracMasrafVerisi(VeriDeposu.ben.veri ?? veri);
           return Scaffold(
             appBar: AppBar(title: const Text('Araç Masrafları'), actions: const [TabloGuncelleButonu()]),
             body: d == null || d.bos
                 ? const Padding(
                     padding: EdgeInsets.all(16),
                     child: BilgiKutusu(
-                        yazi: 'Araç masrafı verisi henüz gelmedi. Apps Script güncel olmalı '
-                            '(arac_masraf_2026 dosyası).'))
+                        yazi: "Araç masrafı verisi henüz gelmedi. Drive'da 'ÇİFTLİKLER ARAÇ MASRAFLARI' "
+                            'dosyası olmalı ve Apps Script güncel olmalı.'))
                 : GonderAlani(konu: 'Araç Masrafları', child: _Govde(d: d)),
           );
         },
@@ -71,7 +58,8 @@ class _Govde extends StatelessWidget {
     final fark = d.genelToplam == null ? 0.0 : d.araclarToplami - d.genelToplam!;
     return ListView(padding: const EdgeInsets.fromLTRB(14, 8, 14, 24), children: [
       BilgiKutusu(
-          yazi: 'Kaynak: Çiftlikler Araç Masrafları listesi (muhasebe, ${d.donem}). Tutarlar KDV hariç matrahtır; '
+          yazi: 'Kaynak: Çiftlikler Araç Masrafları listesi (muhasebe, ${d.donem}'
+              '${d.guncelleme == null ? '' : '; dosya güncelleme ${tarihKisa(d.guncelleme!)}'}). Tutarlar KDV hariç matrahtır; '
               'tamir-bakım, akaryakıt, araç kirası ve muayene giderlerini kapsar. Plaka ve tedarikçi bilgisi '
               'uygulamaya alınmaz.'),
       const SizedBox(height: 8),

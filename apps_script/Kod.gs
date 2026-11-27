@@ -67,7 +67,6 @@ var BAKIM_TABLO_ID = '1S-2ziLyY2UdjOk6SM7A8Da2D_nPEhCa5R8yFMs5daaI';
 var UYGULAMA_DOSYALARI_ = {
   ciftlik_rapor_2026: '1HGVDbd3sbAdlcBliKdRpITvmG5k2Wrmn',
   maliyet_takip_2026: '15fr-ol9R-oCJcrENyKMY0yDGFYTawpby',
-  arac_masraf_2026: '1JxJTPqwDBPF_sPD6vJmSdw8t5TTwy-WD',
   tarla_2025_2026: '1KKoDN_3OmhiDmCvANwifLMn1PHCce4za',
   tarla_2024_2025: '1OyrP5jygO-Ha0kp9SVpIbjfvDE3lt2g5',
   tarla_2026_2027: '12_B-3yYYrzM-pEP_nvBLNE6mL2uwMjVm'
@@ -220,7 +219,7 @@ function veriTopla_(gun) {
     surum: 1,
     olusturma: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ss"),
     // Uygulama veri dosyaları (çiftlik raporu, maliyet takip, hastalık arşivi, tarla haritası)
-    dosyalar: uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'arac_masraf_2026', 'hastalik', 'uygulamalar'].concat(TARLA_DOSYALARI_)),
+    dosyalar: uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'hastalik', 'uygulamalar'].concat(TARLA_DOSYALARI_)),
     // Tarih, İşletme, Personel, Taşeron, Hayvan, Sağılan, Süt, Doğan Buzağı,
     // İnek/Düve Kesim-Satış, Buzağı Ölümü, Kesilen Dana, İnek Ölüm,
     // Genç Kesim/Satış, Genç Ölüm, Yavru Atma/Ölü Doğum, Ölen Dana,
@@ -319,6 +318,8 @@ function veriTopla_(gun) {
     gelenDosyalar: (function () { try { return gelenDosyalar_(); } catch (err) { return []; } })(),
     // ESK kaynak dosyaları: aylık bakım hizmet tablosu toplamları, parti listesi, aylık yem girişi (plaka/şoför yok)
     eskKaynak: (function () { try { return eskKaynak_(); } catch (err) { return null; } })(),
+    // Araç masrafları: muhasebe xlsx'i doğrudan okunur (araç adı × ay × iş alanı; plaka/satıcı/belge no yok)
+    aracMasraf: (function () { try { return aracMasrafOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
     veriKalitesi: (function () { try { return veriKalitesi_(); } catch (err) { return []; } })(),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
@@ -2073,7 +2074,7 @@ function tarlaVeri_(pay) {
   if (acik('tarla')) dos = dos.concat(TARLA_DOSYALARI_);
   // Net Sonuç (Mali) ve Ürün Kârlılığı muhasebe ve maliyet toplamlarına dayanır.
   if (acik('ciftlikRapor', 'mali', 'urun')) dos = dos.concat(['ciftlik_rapor_2026', 'maliyet_takip_2026']);
-  if (acik('aracMasraf')) dos.push('arac_masraf_2026');
+  if (acik('aracMasraf')) al(['aracMasraf']);
   if (acik('hastalik')) dos.push('hastalik');
   if (acik('sureme')) dos.push('uygulamalar');
   o.dosyalar = uygulamaDosyalari_(dos);
@@ -2798,19 +2799,30 @@ var VERI_KAYNAKLARI_ = [
   { ad: 'Çiftlik Raporları (muhasebe)', kaynak: ['1FniioMusJmKiQIjnt-JZjUtrLisNyGiN'], kopya: 'ciftlik_rapor_2026' },
   { ad: 'Maliyet Takip', kaynak: ['1Yj2GfYBZBK7HqDqb-iGG2dlsBnWFUcMWHWyLwF4pEaM'], kopya: 'maliyet_takip_2026' },
   { ad: 'Aylık gelir satış ve gider tabloları', kaynak: ['1SZdjPUrz3_1aHcWn5xBQJSpMeqBntKMw', '1_68Qn8esEbBH2LnTAfUCtP_V1OsXe1Ci'], kopya: 'mali' },
-  { ad: 'Stok sayımları', kaynak: ['1W9LWXFlDk-jQoj1r-z6qN87T8FFRclcpEWVfBfPs_Kw'] },
+  { ad: 'Stok sayımları', kaynak: [], ara: "title contains 'Stok Sayımları' and trashed = false" },
   { ad: 'Sürü hareketleri', kaynak: ['1yp23PwaA_kFXMapnLQGZfcVhjzcTTbujSUJS3m77y48'] },
-  { ad: 'Tarımsal Faaliyet', kaynak: ['1jeeLe8VF06l_a_JdcS1eF8n8yDGsgEPlIcjO4Y5T7u8'] }
+  { ad: 'Tarımsal Faaliyet', kaynak: ['1jeeLe8VF06l_a_JdcS1eF8n8yDGsgEPlIcjO4Y5T7u8'] },
+  { ad: 'Araç masrafları (muhasebe)', kaynak: [], ara: "title contains 'ARAÇ MASRAFLARI' and trashed = false" },
+  { ad: 'Pancar teslimatı (TarKop)', kaynak: [], ara: "title contains 'TarKop' and trashed = false" },
+  { ad: 'ESK bakım hizmet tablosu', kaynak: ['1Es9f4xiwQaarxb7Rkup2gkbBszrAO4RLMFGWCG4pNOA'] },
+  { ad: 'ESK ithal dana partileri', kaynak: ['1atuPz1wqi42bUzeCzcgZanEtxmRQYdmrIFC9HLsfTOU'] },
+  { ad: 'ESK gelen yemler', kaynak: ['1d7Zvj6SoRKXN71q_bDqF6zVqBG2ehsvSL9yAf8f10WA'] }
 ];
 
 function veriKalitesi_() {
-  return onbellekli_('veriKalitesi_v1', 600, function () {
+  return onbellekli_('veriKalitesi_v2', 600, function () {
     function tarih(d) { return d ? Utilities.formatDate(d, 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss") : ''; }
     function dosya(id) { try { return DriveApp.getFileById(id).getLastUpdated(); } catch (e) { return null; } }
     function maliKopya() { var f = maliDosyasi_(); return f ? f.getLastUpdated() : null; }
     return VERI_KAYNAKLARI_.map(function (k) {
       var son = null;
       k.kaynak.forEach(function (id) { var d = dosya(id); if (d && (!son || d > son)) son = d; });
+      if (k.ara) {
+        try {
+          var it = DriveApp.searchFiles(k.ara);
+          while (it.hasNext()) { var d2 = it.next().getLastUpdated(); if (!son || d2 > son) son = d2; }
+        } catch (e) {}
+      }
       var kopya = !k.kopya ? null : k.kopya === 'mali' ? maliKopya() : dosya(UYGULAMA_DOSYALARI_[k.kopya]);
       return { ad: k.ad, kaynak: tarih(son), kopya: tarih(kopya), canli: !k.kopya };
     });
@@ -2982,6 +2994,98 @@ function eskKaynak_() {
         o.yem.push({ yil: Number(a[0]), ay: Number(a[1]), urun: a[2], kg: top2[k] });
       });
     } catch (e) { o.yemHata = String(e); }
+    return o;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ARAÇ MASRAFLARI: muhasebenin "ÇİFTLİKLER ARAÇ MASRAFLARI <yıl>.xlsx" dosyası doğrudan okunur (en yeni dosya).
+// KVKK: plaka/araç kodu yalnızca aracı iş alanıyla eşleştirmek için bellekte kullanılır, çıktıya yazılmaz;
+// satıcı adı ve numarası, belge numarası ve açıklama metni okunmaz.
+function excelTarih_(n) { return new Date(Date.UTC(1899, 11, 30) + Math.round(n) * 864e5); }
+
+/** sayfalar: xlsxSatirlari_ çıktısı. */
+function aracMasrafCoz_(sayfalar) {
+  var genel = null, detay = null;
+  sayfalar.forEach(function (s) {
+    for (var i = 0; i < Math.min(s.length, 10); i++) {
+      var a = String(s[i].A || '').trim().toLocaleUpperCase('tr');
+      if (!genel && a === 'PLAKA') genel = { s: s, h: i };
+      if (!detay && a === 'ANA HESAP') detay = { s: s, h: i };
+    }
+  });
+  if (!genel) return null;
+  var ustSatir = genel.s[genel.h - 1] || {}, aylar = [], topSut = null;
+  Object.keys(ustSatir).forEach(function (k) {
+    var v = ustSatir[k];
+    if (typeof v === 'number' && v > 40000) {
+      var d = excelTarih_(v);
+      aylar.push({ k: k, ay: d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) });
+    } else if (String(v).trim().toLocaleUpperCase('tr') === 'TOPLAM') topSut = k;
+  });
+  var araclar = [], genelToplam = null;
+  for (var i = genel.h + 1; i < genel.s.length; i++) {
+    var r = genel.s[i], kod = String(r.A || '').trim(), ad = String(r.B || '').trim();
+    if (/GENEL TOPLAM/i.test(kod + ' ' + ad)) { if (topSut && typeof r[topSut] === 'number') genelToplam = r[topSut]; continue; }
+    if (!kod && !ad) continue;
+    var aylik = {}, top = 0;
+    aylar.forEach(function (a) { var v = r[a.k]; if (typeof v === 'number' && v) { aylik[a.ay] = Math.round(v * 100) / 100; top += v; } });
+    var t = topSut && typeof r[topSut] === 'number' ? r[topSut] : top;
+    if (!t) continue;
+    araclar.push({ kod: kod, arac: ad || 'Adı yazılmamış araç', aylik: aylik, toplam: Math.round(t * 100) / 100 });
+  }
+  // Aracın iş alanı: detay satırlarında araç koduyla geçen iş alanlarının çoğunluğu.
+  var oy = {};
+  if (detay) {
+    // Detay sayfası ay ay bloklar hâlinde; her blokta başlık yeniden yazılır (sütun yerleri değişebilir).
+    var cK = null, cU = null, cM = null;
+    for (var j = detay.h; j < detay.s.length; j++) {
+      var r2 = detay.s[j];
+      if (String(r2.A || '').trim().toLocaleUpperCase('tr') === 'ANA HESAP') {
+        cK = null; cU = null; cM = null;
+        Object.keys(r2).forEach(function (k) {
+          var b = String(r2[k]).trim().toLocaleUpperCase('tr');
+          if (b === 'SİPARİŞ') cK = k; else if (b === 'İŞ ALANI') cU = k; else if (b === 'MASRAF YERİ' && !cM) cM = k;
+        });
+        continue;
+      }
+      if (!cK || (!cU && !cM)) continue;
+      var kd = String(r2[cK] || '').trim(), u = cU ? String(r2[cU] || '').trim() : '';
+      if (!/^16\d\d$/.test(u) && cM) u = String(r2[cM] || '').trim().slice(0, 4);  // masraf yeri 1613010001 → 1613
+      if (!kd || !/^16\d\d$/.test(u)) continue;
+      var o = oy[kd] || (oy[kd] = {}); o[u] = (o[u] || 0) + 1;
+    }
+  }
+  var uy = {};
+  araclar.forEach(function (a) {
+    var o = oy[a.kod] || {}, en = '';
+    Object.keys(o).forEach(function (x) { if (!en || o[x] > o[en]) en = x; });
+    a.uy = en;
+    delete a.kod; // plaka içerir; çıktıya yazılmaz
+  });
+  aylar.sort(function (a, b) { return a.ay < b.ay ? -1 : 1; });
+  var ilk = aylar.length ? aylar[0].ay.split('-') : null, son = aylar.length ? aylar[aylar.length - 1].ay.split('-') : null;
+  var dolu = aylar.filter(function (a) { return araclar.some(function (x) { return x.aylik[a.ay]; }); });
+  var sonDolu = dolu.length ? dolu[dolu.length - 1].ay.split('-') : son;
+  return {
+    kaynak: 'ÇİFTLİKLER ARAÇ MASRAFLARI',
+    donem: ilk ? ilk[1] + '.' + ilk[0] + '–' + sonDolu[1] + '.' + sonDolu[0] : '',
+    araclar: araclar,
+    kontrol: { genel_toplam: genelToplam, araclar_toplami: Math.round(araclar.reduce(function (t, a) { return t + a.toplam; }, 0) * 100) / 100 }
+  };
+}
+
+function aracMasrafOku_() {
+  return onbellekli_('aracMasraf_v1', 1800, function () {
+    var it = DriveApp.searchFiles("title contains 'ARAÇ MASRAFLARI' and trashed = false"), en = null;
+    while (it.hasNext()) {
+      var f = it.next();
+      if (!/\.xlsx$/i.test(f.getName())) continue;
+      if (!en || f.getLastUpdated() > en.getLastUpdated()) en = f;
+    }
+    if (!en) return null;
+    var o = aracMasrafCoz_(xlsxSatirlari_(en.getBlob()));
+    if (o) { o.dosya = en.getName(); o.guncelleme = Utilities.formatDate(en.getLastUpdated(), 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss"); }
     return o;
   });
 }

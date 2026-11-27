@@ -1,6 +1,6 @@
 // Araç masrafları (Makine ve Bakım › Araç Masrafları).
-// Kaynak: "ÇİFTLİKLER ARAÇ MASRAFLARI" muhasebe listesi → arac_masraf_<yıl>.json
-// (araclar/arac/arac_masraf.py; Drive "Uygulama Verileri" klasöründe, sunucudan gelir).
+// Kaynak: "ÇİFTLİKLER ARAÇ MASRAFLARI" muhasebe listesi; sunucu (Apps Script › aracMasrafOku_) en yeni
+// xlsx dosyasını doğrudan okur, dosya güncellendikçe uygulama da güncellenir.
 // KVKK: dosyada plaka, araç kodu, satıcı, belge numarası ve açıklama metni bulunmaz.
 import 'dart:convert';
 
@@ -27,13 +27,18 @@ class AracMasrafi {
 }
 
 class AracMasraflari {
-  const AracMasraflari({this.donem = '', this.araclar = const [], this.genelToplam, this.araclarToplami = 0});
+  const AracMasraflari(
+      {this.donem = '', this.araclar = const [], this.genelToplam, this.araclarToplami = 0, this.dosya = '', this.guncelleme});
   final String donem;
   final List<AracMasrafi> araclar;
 
   /// Dosyadaki GENEL TOPLAM hücresi ve araç satırlarının toplamı (fark varsa kaynakta düzeltme gerekir).
   final double? genelToplam;
   final double araclarToplami;
+
+  /// Kaynak dosya adı ve son değişiklik zamanı (sunucudan).
+  final String dosya;
+  final DateTime? guncelleme;
 
   bool get bos => araclar.isEmpty;
 
@@ -64,8 +69,9 @@ class AracMasraflari {
     return kUretimYerleri[kod] ?? kod;
   }
 
-  static AracMasraflari coz(String metin) {
-    final j = jsonDecode(metin);
+  static AracMasraflari coz(String metin) => json(jsonDecode(metin));
+
+  static AracMasraflari json(Object? j) {
     if (j is! Map) return const AracMasraflari();
     double? n(Object? v) => v is num ? v.toDouble() : null;
     final l = <AracMasrafi>[
@@ -88,6 +94,8 @@ class AracMasraflari {
       araclar: l,
       genelToplam: n(k['genel_toplam']),
       araclarToplami: n(k['araclar_toplami']) ?? l.fold(0.0, (t, a) => t + a.toplam),
+      dosya: '${j['dosya'] ?? ''}',
+      guncelleme: DateTime.tryParse('${j['guncelleme'] ?? ''}'),
     );
   }
 }

@@ -17,6 +17,7 @@ import 'uretim_karlilik.dart';
 import 'urun_takip.dart';
 import 'stok_suru.dart';
 import 'esk_kaynak.dart';
+import 'arac_masraf.dart';
 
 export 'arac.dart';
 export 'bakim_onarim.dart';
@@ -1151,6 +1152,7 @@ class RaporVerisi {
     this.stokSayimi = const StokSayimi(),
     this.gelenDosyalar = const [],
     this.eskKaynak = const EskKaynak(),
+    this.aracMasraf = const AracMasraflari(),
     this.vetBildirimleri = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
@@ -1238,6 +1240,9 @@ class RaporVerisi {
 
   /// ESK kaynak tabloları (bakım hizmet tablosu, parti listesi, yem girişi) – yalnızca toplamlar.
   final EskKaynak eskKaynak;
+
+  /// Araç masrafları (muhasebe listesi; araç adı × ay × iş alanı).
+  final AracMasraflari aracMasraf;
   final List<VetBildirim> vetBildirimleri;
 
   /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
@@ -1261,6 +1266,7 @@ class RaporVerisi {
       suruHareketleri: SuruHareketleri.json(j['suruHareketleri']),
       stokSayimi: StokSayimi.json(j['stokSayimi']),
       eskKaynak: EskKaynak.json(j['eskKaynak']),
+      aracMasraf: AracMasraflari.json(j['aracMasraf']),
       gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
           .map(GelenDosya.oku)
           .whereType<GelenDosya>()

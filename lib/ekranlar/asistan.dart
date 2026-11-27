@@ -490,7 +490,7 @@ class _MakineBakim extends StatelessWidget {
               ikon: Icons.local_gas_station_outlined,
               baslik: 'Araç Masrafları',
               aciklama: () {
-                final d = aracMasrafVerisi();
+                final d = aracMasrafVerisi(veri);
                 return d == null || d.bos
                     ? 'Muhasebe araç gider listesi: araç, üretim yeri ve ay kırılımı'
                     : '${d.donem} · ${d.araclar.length} araç · ${tl(d.araclarToplami)}';

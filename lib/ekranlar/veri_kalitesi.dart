@@ -61,6 +61,17 @@ class VeriKalitesi {
       return son == 0 ? '' : 'Ocak–${raporAylari[son - 1]} ${simdi.year}';
     }
 
+    String pancarKapsam() {
+      final g = [for (final x in v.urunTeslimat.gunler) if (x.kaynak == 'TarKop') x.tarih]..sort();
+      String f(String x) => x.length == 10 ? '${x.substring(8)}.${x.substring(5, 7)}.${x.substring(0, 4)}' : x;
+      return g.isEmpty ? 'Veri yok' : '${f(g.first)} – ${f(g.last)}';
+    }
+
+    String yemKapsam() {
+      final y = v.eskKaynak.yemAylik().keys.toList()..sort();
+      return y.isEmpty ? 'Veri yok' : '${y.first} – ${y.last}';
+    }
+
     final kaynaklar = <(KaynakTarihi?, String, String)>[
       (t('Çiftlik Raporları (muhasebe)'), 'Çiftlik Raporları (muhasebe)', muhasebe?.donem ?? 'Veri yok'),
       (t('Maliyet Takip'), 'Maliyet Takip', mtKapsam()),
@@ -69,6 +80,13 @@ class VeriKalitesi {
       (t('Sürü hareketleri'), 'Sürü hareketleri', suruKapsam()),
       (t('Tarımsal Faaliyet'), 'Tarımsal Faaliyet',
           v.tarimsalUretim.bos ? 'Veri yok' : '${v.tarimsalUretim.yilBasligi} hasadı'.trim()),
+      (t('Araç masrafları (muhasebe)'), 'Araç masrafları (muhasebe)', v.aracMasraf.bos ? 'Veri yok' : v.aracMasraf.donem),
+      (t('Pancar teslimatı (TarKop)'), 'Pancar teslimatı (TarKop)', pancarKapsam()),
+      (t('ESK bakım hizmet tablosu'), 'ESK bakım hizmet tablosu',
+          v.eskKaynak.aylar.isEmpty ? 'Veri yok' : '${v.eskKaynak.aylar.first.ad} – ${v.eskKaynak.aylar.last.ad}'),
+      (t('ESK ithal dana partileri'), 'ESK ithal dana partileri',
+          v.eskKaynak.partiler.isEmpty ? 'Veri yok' : '${v.eskKaynak.partiler.length} parti'),
+      (t('ESK gelen yemler'), 'ESK gelen yemler', yemKapsam()),
     ];
 
     // Eksik aylar: bu yıl için tamamlanmış son ay.
@@ -149,6 +167,42 @@ class VeriKalitesi {
               'Maliyet Takip ${sayi(x.hayvan)}, Sürü Hareketleri ${sayi(s)} baş. Hayvan sayısının asıl kaynağı Sürü Hareketleri\'dir.',
               'Maliyet Takip sorumlusu'));
         }
+      }
+    }
+    // Araç masrafları
+    final am = v.aracMasraf;
+    if (!am.bos) {
+      if (am.genelToplam != null && (am.araclarToplami - am.genelToplam!).abs() >= 1) {
+        konular.add(AcikKonu('Araç masrafları: GENEL TOPLAM hücresi',
+            'Dosyada ${_mn(am.genelToplam!)}, araç satırlarının toplamı ${_mn(am.araclarToplami)} '
+                '(fark ${_mn(am.araclarToplami - am.genelToplam!)}); toplam formülüne dahil edilmeyen satır var.',
+            'Muhasebe'));
+      }
+      final adsiz = am.araclar.where((a) => a.arac == 'Adı yazılmamış araç').length;
+      if (adsiz > 0) {
+        konular.add(AcikKonu('Araç masrafları: araç adı boş', '$adsiz satırda araç adı yazılmamış.', 'Muhasebe'));
+      }
+      final uysuz = [for (final a in am.araclar) if (a.uretimYeri.isEmpty) a];
+      if (uysuz.isNotEmpty) {
+        konular.add(AcikKonu('Araç masrafları: iş alanı belirlenemeyen araçlar',
+            '${uysuz.length} araç (${_mn(uysuz.fold(0.0, (t, a) => t + a.toplam))}) detay sayfasında iş alanıyla eşleşmiyor; '
+                'gider kollara dağıtılamıyor.',
+            'Muhasebe'));
+      }
+    }
+    // ESK: kaynak tablo ile ESK aylık rapor
+    final em = v.eskKaynak.mutabakat(v.eskAylik);
+    if (em.isNotEmpty) {
+      konular.add(AcikKonu('ESK: kaynak tablo ile aylık rapor farklı',
+          em.take(4).map((m) => '${m.ay} ${m.kalem}: tablo ${sayi(m.kaynak)}, rapor ${sayi(m.rapor)}').join('; ') +
+              (em.length > 4 ? ' (+${em.length - 4} fark)' : ''),
+          'ESK sorumlusu'));
+    }
+    for (final a in v.eskKaynak.aylar) {
+      final h2 = a.hesaplananGider, b = a.bakimGideri;
+      if (h2 != null && b != null && (h2 - b).abs() > 1) {
+        konular.add(AcikKonu('ESK bakım tablosu: bedel baş-gün × birim fiyattan farklı (${a.ad})',
+            'Tabloda ${_mn(b)}, hesaplanan ${_mn(h2)}.', 'ESK sorumlusu'));
       }
     }
     for (final s in muhasebe?.senaryo?.kontrol ?? const []) {
