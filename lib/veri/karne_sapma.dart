@@ -10,7 +10,10 @@
 // KVKK: yalnızca çiftlik, ay, kalem ve tutar / sayı; kişi bilgisi yoktur.
 
 import 'ciftlik_rapor.dart';
+import 'esk_kaynak.dart';
+import 'esk_plan.dart';
 import 'gecmis_ozet.dart';
+import 'model.dart' show EskAy;
 import 'hasat_durumu.dart';
 import 'gelir_gider.dart';
 import 'havuz.dart';
@@ -22,7 +25,7 @@ class KarneGostergesi {
   const KarneGostergesi(this.ad, this.birim, this.deger, {this.gecenYil, this.yuksekIyi = true, this.ondalik = 1, this.gecmis});
   final String ad, birim;
 
-  /// Geçmiş yıllar kıyası (Değerlendirme Raporu 31.12.2025), ör. "2021 74,7 · 2022 71,3 · … %".
+  /// Kıyas notu: geçmiş yıllar (Değerlendirme Raporu 31.12.2025) ya da plan değeri (ESK çalışma dosyası).
   final String? gecmis;
   final double? deger, gecenYil;
 
@@ -113,7 +116,7 @@ String? gecmisSeri(GecmisOzet? g, String ciftlik, RegExp tablo, RegExp olcu, {in
   if (m.values.every((v) => v == 0)) return null;
   final y = m.keys.toList()..sort();
   String f(double v) => v.toStringAsFixed(ondalik).replaceAll('.', ',');
-  return '${[for (final k in y) '$k ${f(m[k]!)}'].join(' · ')}$birim';
+  return 'Geçmiş yıllar: ${[for (final k in y) '$k ${f(m[k]!)}'].join(' · ')}$birim';
 }
 
 List<KarneBolumu> verimlilikKarnesi({
@@ -124,6 +127,9 @@ List<KarneBolumu> verimlilikKarnesi({
   UrunKarlilik? tarim,
   List<HasatKaydi> hasat = const [],
   GecmisOzet? gecmis,
+  List<EskAy> eskAylik = const [],
+  EskKaynak? eskKaynak,
+  EskPlan? eskPlan,
 }) {
   final out = <KarneBolumu>[];
   final donem = '${raporAylari[ay - 1]} $yil · geçen yılın aynı ayıyla';
@@ -185,6 +191,27 @@ List<KarneBolumu> verimlilikKarnesi({
         if (gecmisSeri(gecmis, c, RegExp('Karkas Verimliliği', caseSensitive: false), RegExp('^Randıman', caseSensitive: false)) != null)
           KarneGostergesi('Karkas randımanı', '%', null,
               gecmis: gecmisSeri(gecmis, c, RegExp('Karkas Verimliliği', caseSensitive: false), RegExp('^Randıman', caseSensitive: false), ondalik: 0, birim: ' %')),
+      ]));
+    }
+  }
+  // ESK-Taşağıl (bakım hizmeti): son kesin ESK ayı; plan değerleri ESK çalışma dosyasından.
+  {
+    final kesin = [for (final a in eskAylik) if (!a.tahmini && eskAyCoz(a.ay) != null && (a.hayvanGun ?? 0) > 0) a];
+    if (kesin.isNotEmpty) {
+      final a = kesin.last, c = eskAyCoz(a.ay)!;
+      final yem = eskKaynak == null ? null : eskGunlukYem(eskKaynak.yem, eskAylik, c.$1, c.$2);
+      final plan = eskPlan?.sabitGider == null ? null : eskPlan!.sabitGider! + (eskPlan.kesimBirim ?? 0) * ((a.kesim ?? 0) + (a.disKesim ?? 0));
+      String f(double v) => v.toStringAsFixed(0).replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+      out.add(KarneBolumu(Kol.esk, 'ESK-Taşağıl (bakım hizmeti)', '${a.ay} · son kesin ay', [
+        KarneGostergesi('Ortalama hayvan', 'baş', a.ortBas, ondalik: 0),
+        KarneGostergesi('Gelen yem', 'kg/baş/gün', yem, yuksekIyi: false,
+            gecmis: eskPlan?.rasyonKg == null
+                ? null
+                : 'Rasyon planı: ${eskPlan!.rasyonKg!.toStringAsFixed(2).replaceAll('.', ',')} kg/baş/gün'
+                    '${eskPlan.rasyonTl == null ? '' : ', ${eskPlan.rasyonTl!.toStringAsFixed(2).replaceAll('.', ',')} ₺/baş/gün (güncel fiyat)'}'),
+        KarneGostergesi('İşletme gideri', '₺/ay', a.gider, yuksekIyi: false, ondalik: 0,
+            gecmis: plan == null ? null : 'Maliyet planı: ${f(plan)} ₺ (sabit ${f(eskPlan!.sabitGider!)} ₺ + kesim ${f(eskPlan.kesimBirim ?? 0)} ₺/baş)'),
+        KarneGostergesi('Ölüm (ay)', 'baş', a.olen, yuksekIyi: false, ondalik: 0),
       ]));
     }
   }

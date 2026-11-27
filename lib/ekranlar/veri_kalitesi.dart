@@ -1,3 +1,4 @@
+import '../veri/esk_plan.dart';
 import '../veri/kaynak_envanteri.dart';
 import 'kaynak_kapsami.dart';
 import 'package:flutter/material.dart';
@@ -198,6 +199,11 @@ class VeriKalitesi {
       if (r.length >= 5 && r[3] == 'hata') {
         konular.add(AcikKonu('Kaynak okunamadı: ${r[1]}${r[2].isEmpty ? '' : ' › ${r[2]}'}', r[4], 'Uygulama sahibi'));
       }
+    }
+    // ESK çalışma › ÖZET sayfası ile ESK_Aylık
+    for (final f in eskOzetMutabakat(EskPlan.coz(v.kaynakTablolari), v.eskAylik)) {
+      konular.add(AcikKonu('ESK çalışma › ÖZET ile ESK_Aylık farklı (${raporAylari[f.ay - 1]} ${f.yil})',
+          '${f.kalem}: ÖZET sayfasında ${sayi(f.ozet)}, ESK_Aylık\'ta ${sayi(f.aylik)}.', 'ESK sorumlusu'));
     }
     // Değerlendirme raporu: oranlar sayılarla tutarlı mı
     for (final k in v.gecmisOzet.kontroller) {

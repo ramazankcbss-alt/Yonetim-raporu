@@ -6,6 +6,7 @@ import '../pdf/rapor_pdf.dart';
 import '../servis/bildirim_servisi.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
+import '../veri/esk_plan.dart';
 import '../veri/ciftlik_rapor.dart';
 import '../veri/duyarlilik.dart';
 import '../veri/havuz.dart';
@@ -79,7 +80,8 @@ class _Icerik extends StatelessWidget {
     final karne = r == null || h1.sonMuhasebeAyi == 0
         ? const <KarneBolumu>[]
         : verimlilikKarnesi(
-            muhasebe: r!, suru: v.suruHareketleri, yil: h1.yil, ay: h1.sonMuhasebeAyi, tarim: tarim, hasat: v.hasatDurumu, gecmis: v.gecmisOzet);
+            muhasebe: r!, suru: v.suruHareketleri, yil: h1.yil, ay: h1.sonMuhasebeAyi, tarim: tarim, hasat: v.hasatDurumu, gecmis: v.gecmisOzet,
+            eskAylik: v.eskAylik, eskKaynak: v.eskKaynak, eskPlan: EskPlan.coz(v.kaynakTablolari));
     final sap = r == null || h1.sonMuhasebeAyi == 0
         ? const <Sapma>[]
         : sapmalar(muhasebe: r!, suru: v.suruHareketleri, faturalar: v.mali.gelirGider, yil: h1.yil, sonAy: h1.sonMuhasebeAyi, mt: mt);
@@ -287,7 +289,7 @@ class _KarneKarti extends StatelessWidget {
                   ),
                 ]),
                 if (g.gecmis != null)
-                  Text('Geçmiş yıllar: ${g.gecmis}', style: const TextStyle(fontSize: 11, color: Renk.soluk)),
+                  Text(g.gecmis!, style: const TextStyle(fontSize: 11, color: Renk.soluk)),
                 ]),
               ),
         ]),
