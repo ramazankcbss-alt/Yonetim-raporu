@@ -10,6 +10,7 @@
 // KVKK: yalnızca çiftlik, ay, kalem ve tutar / sayı; kişi bilgisi yoktur.
 
 import 'ciftlik_rapor.dart';
+import 'gecmis_ozet.dart';
 import 'hasat_durumu.dart';
 import 'gelir_gider.dart';
 import 'havuz.dart';
@@ -18,8 +19,11 @@ import 'stok_suru.dart';
 import 'urun_karlilik.dart';
 
 class KarneGostergesi {
-  const KarneGostergesi(this.ad, this.birim, this.deger, {this.gecenYil, this.yuksekIyi = true, this.ondalik = 1});
+  const KarneGostergesi(this.ad, this.birim, this.deger, {this.gecenYil, this.yuksekIyi = true, this.ondalik = 1, this.gecmis});
   final String ad, birim;
+
+  /// Geçmiş yıllar kıyası (Değerlendirme Raporu 31.12.2025), ör. "2021 74,7 · 2022 71,3 · … %".
+  final String? gecmis;
   final double? deger, gecenYil;
 
   /// Değerin yüksek olması iyi mi (verim) yoksa kötü mü (maliyet, kayıp).
@@ -99,6 +103,19 @@ double _ytd(SuruHareketleri s, String c, int yil, int ay, double Function(int) f
 }
 
 /// Verimlilik karnesi: hayvancılık için [ay] (son kesin ay), ziraat için hasat sezonu.
+/// Değerlendirme raporundaki bir göstergenin yıllar boyunca değerleri: "2021 74,7 · 2022 71,3 …".
+String? gecmisSeri(GecmisOzet? g, String ciftlik, RegExp tablo, RegExp olcu, {int ondalik = 1, String birim = ''}) {
+  if (g == null) return null;
+  final m = <int, double>{};
+  for (final x in g.gostergeler) {
+    if (tablo.hasMatch(x.tablo) && olcu.hasMatch(x.olcu) && gecmisCiftlikAdi(x.ciftlik) == ciftlik) m[x.yil] = x.deger;
+  }
+  if (m.values.every((v) => v == 0)) return null;
+  final y = m.keys.toList()..sort();
+  String f(double v) => v.toStringAsFixed(ondalik).replaceAll('.', ',');
+  return '${[for (final k in y) '$k ${f(m[k]!)}'].join(' · ')}$birim';
+}
+
 List<KarneBolumu> verimlilikKarnesi({
   required CiftlikRaporu muhasebe,
   required SuruHareketleri suru,
@@ -106,6 +123,7 @@ List<KarneBolumu> verimlilikKarnesi({
   required int ay,
   UrunKarlilik? tarim,
   List<HasatKaydi> hasat = const [],
+  GecmisOzet? gecmis,
 }) {
   final out = <KarneBolumu>[];
   final donem = '${raporAylari[ay - 1]} $yil · geçen yılın aynı ayıyla';
@@ -136,7 +154,14 @@ List<KarneBolumu> verimlilikKarnesi({
       KarneGostergesi('Satış fiyatı − maliyet', '₺/L', marj, gecenYil: marj0, ondalik: 2),
       KarneGostergesi('Çiftlik gideri', '₺/baş/ay', basa(yil), gecenYil: basa(yil - 1), yuksekIyi: false, ondalik: 0),
       KarneGostergesi('Kayıp (yıl başından)', 'baş', kayip(yil), gecenYil: kayip(yil - 1), yuksekIyi: false, ondalik: 0),
-      KarneGostergesi('Abort / doğum (yıl başından)', '%', abort(yil), gecenYil: abort(yil - 1), yuksekIyi: false),
+      KarneGostergesi('Abort / doğum (yıl başından)', '%', abort(yil), gecenYil: abort(yil - 1), yuksekIyi: false,
+          gecmis: gecmisSeri(gecmis, c, RegExp('abort', caseSensitive: false), RegExp('abort.*oran|oran.*abort', caseSensitive: false), birim: ' %')),
+      if (gecmisSeri(gecmis, c, RegExp('^Doğum oranları', caseSensitive: false), RegExp('Doğum Oranı', caseSensitive: false)) != null)
+        KarneGostergesi('Doğum oranı (inek + düve)', '%', null, ondalik: 1,
+            gecmis: gecmisSeri(gecmis, c, RegExp('^Doğum oranları', caseSensitive: false), RegExp('Doğum Oranı', caseSensitive: false), birim: ' %')),
+      if (gecmisSeri(gecmis, c, RegExp('^Ölüm oranları', caseSensitive: false), RegExp('oran', caseSensitive: false)) != null)
+        KarneGostergesi('Ölüm oranı', '%', null,
+            gecmis: gecmisSeri(gecmis, c, RegExp('^Ölüm oranları', caseSensitive: false), RegExp('oran', caseSensitive: false), birim: ' %')),
     ]));
   }
   // Aslım (besi): gider ve kayıp
@@ -154,6 +179,12 @@ List<KarneBolumu> verimlilikKarnesi({
         KarneGostergesi('Kayıp (yıl başından)', 'baş', _ytd(suru, c, yil, ay, (m) => suru.kayip(c, yil, m)),
             gecenYil: suru.sonAy(c, yil - 1) < ay ? null : _ytd(suru, c, yil - 1, ay, (m) => suru.kayip(c, yil - 1, m)),
             yuksekIyi: false, ondalik: 0),
+        if (gecmisSeri(gecmis, c, RegExp('Karkas Verimliliği', caseSensitive: false), RegExp('^Ortalama Karkas', caseSensitive: false)) != null)
+          KarneGostergesi('Ortalama karkas', 'kg', null,
+              gecmis: gecmisSeri(gecmis, c, RegExp('Karkas Verimliliği', caseSensitive: false), RegExp('^Ortalama Karkas', caseSensitive: false), birim: ' kg')),
+        if (gecmisSeri(gecmis, c, RegExp('Karkas Verimliliği', caseSensitive: false), RegExp('^Randıman', caseSensitive: false)) != null)
+          KarneGostergesi('Karkas randımanı', '%', null,
+              gecmis: gecmisSeri(gecmis, c, RegExp('Karkas Verimliliği', caseSensitive: false), RegExp('^Randıman', caseSensitive: false), ondalik: 0, birim: ' %')),
       ]));
     }
   }

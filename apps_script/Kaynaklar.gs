@@ -589,8 +589,12 @@ function gecmisMatrisOku_(d, baslik) {
   }
   if (hb < 0) return [];
   var h = d[hb], ust = hb > 0 ? d[hb - 1] : [], out = [], yil = null, yillar = [], olcu = [];
+  var toplamda = false;
   for (var j = 1; j < h.length; j++) {
     var t = String(h[j] || '').replace(/\n/g, ' ').trim(), m = t.match(/20\d\d/) || String(ust[j] || '').match(/20\d\d/);
+    // "TOPLAM …" sütunuyla başlayan dönem toplamı bloğu ve sağındaki ayrı tablolar yıl göstergesi değildir.
+    if (/TOPLAM/i.test(t) || /TOPLAM/i.test(String(ust[j] || ''))) toplamda = true;
+    if (toplamda) { yillar[j] = null; olcu[j] = null; continue; }
     if (m) yil = +m[0];
     yillar[j] = t ? yil : null;
     olcu[j] = t.replace(/20\d\d/g, '').replace(/%/g, '').replace(/\s+/g, ' ').trim() || null;
@@ -636,7 +640,7 @@ function gecmisKontrol_(gl) {
 }
 
 function gecmisOzet_() {
-  return onbellekli_('gecmisOzet_v2', 21600, function () {
+  return onbellekli_('gecmisOzet_v3', 21600, function () {
     var o = { kesim: [], alim: [], gostergeler: [], hatalar: [] };
     try {
       var sh = SpreadsheetApp.openById(GECMIS_OZET_.kesim).getSheetByName('KESİMLER');

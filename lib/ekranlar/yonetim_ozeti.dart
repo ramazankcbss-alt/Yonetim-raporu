@@ -79,7 +79,7 @@ class _Icerik extends StatelessWidget {
     final karne = r == null || h1.sonMuhasebeAyi == 0
         ? const <KarneBolumu>[]
         : verimlilikKarnesi(
-            muhasebe: r!, suru: v.suruHareketleri, yil: h1.yil, ay: h1.sonMuhasebeAyi, tarim: tarim, hasat: v.hasatDurumu);
+            muhasebe: r!, suru: v.suruHareketleri, yil: h1.yil, ay: h1.sonMuhasebeAyi, tarim: tarim, hasat: v.hasatDurumu, gecmis: v.gecmisOzet);
     final sap = r == null || h1.sonMuhasebeAyi == 0
         ? const <Sapma>[]
         : sapmalar(muhasebe: r!, suru: v.suruHareketleri, faturalar: v.mali.gelirGider, yil: h1.yil, sonAy: h1.sonMuhasebeAyi, mt: mt);
@@ -267,10 +267,11 @@ class _KarneKarti extends StatelessWidget {
           Text(k.baslik, style: const TextStyle(fontWeight: FontWeight.w700, color: Renk.anaKoyu, fontSize: 13.5)),
           Text(k.donem, style: const TextStyle(fontSize: 11.5, color: Renk.soluk)),
           for (final g in k.gostergeler)
-            if (g.deger != null || g.gecenYil != null)
+            if (g.deger != null || g.gecenYil != null || g.gecmis != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(children: [
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
                   Expanded(child: Text('${g.ad} (${g.birim})', style: const TextStyle(fontSize: 13, color: Renk.soluk))),
                   Text(g.deger == null ? '—' : sayi(g.deger, ondalik: g.ondalik),
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -284,6 +285,9 @@ class _KarneKarti extends StatelessWidget {
                       style: TextStyle(fontSize: 12, color: g.iyi == null ? Renk.soluk : (g.iyi! ? Renk.yesil : Renk.kirmizi)),
                     ),
                   ),
+                ]),
+                if (g.gecmis != null)
+                  Text('Geçmiş yıllar: ${g.gecmis}', style: const TextStyle(fontSize: 11, color: Renk.soluk)),
                 ]),
               ),
         ]),
