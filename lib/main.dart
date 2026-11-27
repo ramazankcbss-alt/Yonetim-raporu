@@ -8,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'ekranlar/ana.dart';
 import 'servis/rapor_arsivi.dart';
+import 'servis/bildirim_servisi.dart';
 import 'servis/veri_servisi.dart';
 import 'servis/web_kopru.dart';
 import 'tema.dart';
@@ -44,7 +45,12 @@ Future<void> _baslat() async {
     }
   } else {
     await VeriDeposu.ben.baslat();
-    VeriDeposu.ben.veriGeldi = RaporArsivi.guncelle;
+    VeriDeposu.ben.veriGeldi = (v, ham) async {
+      await RaporArsivi.guncelle(v, ham);
+      await BildirimServisi.ben.kontrolEt(v);
+    };
+    final onceki = VeriDeposu.ben.veri;
+    if (onceki != null && onceki.paylasim == null) unawaited(BildirimServisi.ben.kontrolEt(onceki));
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,

@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 
 import '../bicim.dart';
+import '../pdf/rapor_pdf.dart';
+import '../servis/bildirim_servisi.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/ciftlik_rapor.dart';
+import '../veri/duyarlilik.dart';
 import '../veri/havuz.dart';
 import '../veri/karne_sapma.dart';
 import '../veri/model.dart';
 import '../veri/urun_karlilik.dart';
 import '../veri/urun_takip.dart';
 import 'bilesenler.dart';
+import 'bildirimler.dart';
+import 'duyarlilik.dart';
 import 'gonder.dart';
 import 'mali.dart';
 import 'net_sonuc.dart' show mtKgMaliyetleri;
@@ -38,7 +44,7 @@ class _YonetimOzetiEkranState extends State<YonetimOzetiEkran> {
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('Yönetim Özeti'), actions: const [TabloGuncelleButonu()]),
         body: ListenableBuilder(
-          listenable: VeriDeposu.ben,
+          listenable: Listenable.merge([VeriDeposu.ben, BildirimServisi.ben]),
           builder: (context, _) => FutureBuilder<CiftlikRaporu?>(
             future: _muhasebe,
             builder: (context, snap) {
@@ -125,6 +131,22 @@ class _Icerik extends StatelessWidget {
           ),
         ),
         Wrap(spacing: 8, runSpacing: 8, children: [
+          if (r != null && h1.sonMuhasebeAyi > 0)
+            FilledButton.icon(
+              icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+              label: Text('${raporAylari[h1.sonMuhasebeAyi - 1]} aylık raporu'),
+              onPressed: () => _aylikRapor(context, h1, h2, tarim, karne, sap, kalite),
+            ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.tune, size: 18),
+            label: const Text('Duyarlılık analizi'),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DuyarlilikEkran(veri: v))),
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.notifications_none, size: 18),
+            label: Text(BildirimServisi.ben.okunmamis > 0 ? 'Bildirimler (${BildirimServisi.ben.okunmamis})' : 'Bildirimler'),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => BildirimlerEkran(veri: v))),
+          ),
           OutlinedButton.icon(
             icon: const Icon(Icons.account_balance_outlined, size: 18),
             label: const Text('Net Sonuç'),
@@ -144,6 +166,50 @@ class _Icerik extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+Future<void> _aylikRapor(BuildContext context, GelirGiderHavuzu h1, GelirGiderHavuzu h2, UrunKarlilik? tarim,
+    List<KarneBolumu> karne, List<Sapma> sap, VeriKalitesi kalite) async {
+  final mesaj = ScaffoldMessenger.of(context);
+  final v = VeriDeposu.ben.veri;
+  try {
+    var kayitli = await kayitliSenaryolar();
+    if (kayitli.isEmpty) kayitli = const [kOrnekSenaryo];
+    final d = v == null ? const <DuyarlilikDegiskeni>[] : veridenDegiskenler(v);
+    final pdf = await aylikYonetimRaporuPdf(
+      a: VeriDeposu.ben.ayar,
+      h1: h1,
+      h2: h2,
+      tarim: tarim,
+      karne: karne,
+      sapmalar: sap,
+      senaryolar: [for (final s in kayitli) (s.ad, s.etki(d))],
+      kalite: kalite,
+    );
+    final ad = aylikDosyaAdi(h1.yil, h1.sonMuhasebeAyi);
+    if (!context.mounted) return;
+    final secim = await showModalBottomSheet<String>(
+      context: context,
+      builder: (c) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(leading: const Icon(Icons.cloud_upload_outlined), title: const Text('Drive\'a kaydet (paylaşılmayan rapor klasörü)'),
+              onTap: () => Navigator.pop(c, 'drive')),
+          ListTile(leading: const Icon(Icons.share_outlined), title: const Text('Paylaş / yazdır'), onTap: () => Navigator.pop(c, 'paylas')),
+        ]),
+      ),
+    );
+    if (secim == 'drive') {
+      final m = await VeriDeposu.ben.raporuDriveKaydet(ad, pdf);
+      mesaj.showSnackBar(SnackBar(content: Text(m)));
+    } else if (secim == 'paylas') {
+      await Printing.sharePdf(bytes: pdf, filename: ad);
+    } else {
+      return;
+    }
+    await BildirimServisi.ben.aylikRaporYapildi(h1.yil, h1.sonMuhasebeAyi);
+  } catch (e) {
+    mesaj.showSnackBar(SnackBar(content: Text('Rapor hazırlanamadı: $e')));
   }
 }
 

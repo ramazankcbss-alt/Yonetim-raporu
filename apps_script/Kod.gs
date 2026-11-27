@@ -2230,7 +2230,7 @@ function cksYukle_(g) {
 
 function raporKaydet_(g) {
   var ad = String(g.ad || '');
-  if (!/^Haftalik_Rapor_\d{1,2}_Hafta_\d{4}\.pdf$/.test(ad)) {
+  if (!/^(Haftalik_Rapor_\d{1,2}_Hafta_\d{4}|Aylik_Yonetim_Raporu_\d{4}_\d{2})\.pdf$/.test(ad)) {
     return { ok: false, hata: 'Geçersiz rapor adı.' };
   }
   var bayt = Utilities.base64Decode(String(g.pdf || ''));

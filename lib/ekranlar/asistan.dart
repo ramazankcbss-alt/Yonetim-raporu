@@ -12,6 +12,8 @@ import 'gecmis.dart';
 import 'genel_soru.dart';
 import 'veri_kalitesi.dart';
 import 'yonetim_ozeti.dart';
+import 'bildirimler.dart';
+import '../servis/bildirim_servisi.dart';
 import 'stok_suru.dart';
 import 'hastalik.dart';
 import 'gunce.dart';
@@ -52,6 +54,19 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.anaKoyu,
           ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => YonetimOzetiEkran(veri: veri))),
         ),
+        if (VeriDeposu.ben.paylasim == null)
+          ListenableBuilder(
+            listenable: BildirimServisi.ben,
+            builder: (context, _) => _Bolum(
+              ikon: Icons.notifications_none,
+              baslik: BildirimServisi.ben.okunmamis > 0 ? 'Bildirimler (${BildirimServisi.ben.okunmamis})' : 'Bildirimler',
+              aciklama: BildirimServisi.ben.kritikOkunmamis > 0
+                  ? '${BildirimServisi.ben.kritikOkunmamis} kritik uyarı · sapmalar, eksik dönemler, aylık rapor'
+                  : 'Kritik uyarılar, sapmalar, eksik dönemler ve aylık rapor hatırlatması',
+              renk: BildirimServisi.ben.kritikOkunmamis > 0 ? Renk.kirmizi : Renk.mavi,
+              ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => BildirimlerEkran(veri: veri))),
+            ),
+          ),
         _Bolum(
           ikon: Icons.question_answer_outlined,
           baslik: 'Soru Sor',

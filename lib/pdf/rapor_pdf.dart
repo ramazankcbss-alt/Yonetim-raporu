@@ -11,6 +11,11 @@ import '../veri/faaliyet_ozet.dart';
 import '../veri/model.dart';
 import '../veri/tablolar.dart';
 import '../veri/urun_takip.dart';
+import '../ekranlar/veri_kalitesi.dart' show VeriKalitesi;
+import '../veri/ciftlik_rapor.dart' show raporAylari;
+import '../veri/havuz.dart';
+import '../veri/karne_sapma.dart';
+import '../veri/urun_karlilik.dart';
 
 const _ana = PdfColor.fromInt(0xFF1F7A4D);
 const _anaKoyu = PdfColor.fromInt(0xFF14593A);
@@ -565,3 +570,136 @@ pw.Widget _altBilgi(pw.Context c, RaporAyari a) => pw.Container(
         ],
       ),
     );
+
+
+// ---------------------------------------------------------------------------
+// AYLIK YÖNETİM RAPORU (piramidin tepesi): net sonuç, ürün sonuçları, verimlilik karnesi, sapmalar,
+// duyarlılık senaryoları ve veri kalitesi. Kişisel veri içermez.
+
+String aylikDosyaAdi(int yil, int ay) => 'Aylik_Yonetim_Raporu_${yil}_${ay.toString().padLeft(2, '0')}.pdf';
+
+String _mnP(double v) => '${v < 0 ? '−' : ''}${sayi(v.abs() / 1e6, ondalik: 2)}';
+
+Future<Uint8List> aylikYonetimRaporuPdf({
+  required RaporAyari a,
+  required GelirGiderHavuzu h1,
+  required GelirGiderHavuzu h2,
+  UrunKarlilik? tarim,
+  List<KarneBolumu> karne = const [],
+  List<Sapma> sapmalar = const [],
+  List<(String, double)> senaryolar = const [],
+  VeriKalitesi? kalite,
+}) async {
+  final tema = await _temaYukle();
+  final ay = h1.sonMuhasebeAyi < 1 ? 1 : h1.sonMuhasebeAyi;
+  final donem = '${raporAylari[ay - 1]} ${h1.yil}';
+  final t1 = h1.toplam(), t2 = h2.toplam();
+  final doc = pw.Document(title: '${a.baslik} — Aylık Yönetim Raporu $donem', author: a.hazirlayan);
+  final sonAyAd = raporAylari[(h1.sonAy < 1 ? 1 : h1.sonAy) - 1];
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.fromLTRB(30, 28, 30, 28),
+    theme: tema,
+    footer: (c) => _altBilgi(c, a),
+    build: (c) => [
+      _bant(a, 'Aylık Yönetim Raporu', donem),
+      ..._hitap(a, '$donem itibarıyla çiftliklerin net sonucu, verimlilik göstergeleri ve sapmalar aşağıda bilgilerinize sunulmuştur.'),
+      _bolum('Net Sonuç (Ocak–$sonAyAd ${h1.yil}, mn ₺)'),
+      _tablo(
+        ['Kalem', 'Maliyet bedeli', 'Piyasa fiyatı'],
+        [
+          ['Konsolide (ESK hariç)', _mnP(t1.net), _mnP(t2.net)],
+          if (h1.sonAy > h1.sonMuhasebeAyi) ...[
+            ['  Kesin (Ocak–${raporAylari[ay - 1]})', _mnP(t1.kesinNet), _mnP(t2.kesinNet)],
+            ['  Tahmin', _mnP(t1.tahminNet), _mnP(t2.tahminNet)],
+          ],
+          ['Ziraat', _mnP(h1.toplam(kol: Kol.ziraat).net), _mnP(h2.toplam(kol: Kol.ziraat).net)],
+          ['Hayvancılık', _mnP(h1.toplam(kol: Kol.hayvancilik).net), _mnP(h2.toplam(kol: Kol.hayvancilik).net)],
+          ['ESK (ayrı izlenir)', _mnP(h1.eskToplam.net), _mnP(h1.eskToplam.net)],
+        ],
+        genislik: const {0: pw.FlexColumnWidth(2.2)},
+      ),
+      _not([
+        'Maliyet bedeli: grup içi aktarımlar maliyetle; piyasa fiyatı: dışarı satılsaydı / dışarıdan alınsaydı fiyatıyla (muhasebe 2. senaryo).',
+        if (h1.konsolideFark != null)
+          h1.konsolideFark!.abs() < 1000
+              ? 'Muhasebe mutabakatı sağlandı (Ocak–${raporAylari[ay - 1]}).'
+              : 'Muhasebe ile ${_mnP(h1.konsolideFark!)} mn ₺ fark var.',
+        'Yatırım niteliğindeki alımlar (${_mnP(h1.yatirimToplami)} mn ₺) net sonuca dahil değildir.',
+      ].join(' ')),
+      if (tarim != null && !tarim.bos) ...[
+        _bolum('Ürün Sonuçları – ${tarim.hasatYili} hasat sezonu (mn ₺)'),
+        _tablo(
+          ['Ürün', 'Dekar', 'Beklenen satış', 'Doğrudan maliyet', 'Net (piyasa)', 'Net (maliyet b.)'],
+          [
+            for (final u in tarim.urunler)
+              [u.urun, sayi(u.dekar), _mnP(u.planSatis), _mnP(u.maliyet), _mnP(u.netKar), _mnP(u.netKarMaliyetBedeli)],
+            ['Toplam', sayi(tarim.dekar), _mnP(tarim.planSatis), _mnP(tarim.maliyet), _mnP(tarim.netKar), _mnP(tarim.netKarMaliyetBedeli)],
+          ],
+          genislik: const {0: pw.FlexColumnWidth(1.6)},
+          vurguSon: true,
+          kucuk: true,
+        ),
+        _not('Ortak giderler ekim alanına göre dağıtılmıştır. Henüz faturalanmayan satış plan tonaj ve fiyatıyla yer alır.'),
+      ],
+      if (karne.isNotEmpty) ...[
+        _bolum('Verimlilik Karnesi'),
+        for (final k in karne) ...[
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 6, bottom: 2),
+            child: pw.Text('${k.baslik} · ${k.donem}', style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: _anaKoyu)),
+          ),
+          _tablo(
+            ['Gösterge', 'Değer', 'Karşılaştırma', 'Değişim'],
+            [
+              for (final g in k.gostergeler)
+                if (g.deger != null || g.gecenYil != null)
+                  [
+                    '${g.ad} (${g.birim})',
+                    g.deger == null ? '—' : sayi(g.deger, ondalik: g.ondalik),
+                    g.gecenYil == null ? '—' : sayi(g.gecenYil, ondalik: g.ondalik),
+                    g.degisim == null ? '—' : '${g.degisim! >= 0 ? '+' : '−'}%${sayi(g.degisim!.abs())}',
+                  ],
+            ],
+            genislik: const {0: pw.FlexColumnWidth(2.4)},
+            kucuk: true,
+          ),
+        ],
+      ],
+      _bolum('Sapmalar ve Nedenleri'),
+      if (sapmalar.isEmpty)
+        _not('Normal seviyenin belirgin üstüne çıkan kalem yok.')
+      else
+        for (final s in sapmalar)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 4),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('${s.alarm ? 'ALARM · ' : ''}${s.ciftlik} · ${s.donem}: ${s.baslik}',
+                  style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: _yazi)),
+              for (final n in s.nedenler) pw.Text('• $n', style: const pw.TextStyle(fontSize: 8, color: _soluk)),
+            ]),
+          ),
+      if (senaryolar.isNotEmpty) ...[
+        _bolum('Duyarlılık Senaryoları'),
+        _tablo(['Senaryo', 'Net sonuca etkisi (mn ₺)'], [for (final s in senaryolar) [s.$1, _mnP(s.$2)]],
+            genislik: const {0: pw.FlexColumnWidth(3)}),
+      ],
+      if (kalite != null) ...[
+        _bolum('Veri Kalitesi'),
+        _not('${kalite.eskiSayisi} kaynakta veri eski · ${kalite.eksikAylar.length} eksik dönem · ${kalite.konular.length} açık konu.'),
+        for (final e in kalite.eksikAylar) _not('• $e'),
+        for (final k in kalite.konular.take(8)) _not('• ${k.baslik} (sorumlu: ${k.sorumlu})'),
+      ],
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 10),
+        child: pw.Text(
+          'Kaynak: 2026 Yılı Çiftlik Raporları (muhasebe), aylık gelir satış ve gider tabloları, Maliyet Takip, Tarımsal Faaliyet, '
+          'Sürü Hareketleri. Kesin aylar muhasebeye, sonrası faturalara dayanır.',
+          style: const pw.TextStyle(fontSize: 7, color: _soluk),
+        ),
+      ),
+      ..._imza(a),
+    ],
+  ));
+  return doc.save();
+}
