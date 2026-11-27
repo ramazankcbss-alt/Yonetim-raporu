@@ -10,7 +10,7 @@ Future<bool> _baslat() async {
   if (!Platform.isAndroid) return false;
   if (_hazir) return true;
   try {
-    await _eklenti.initialize(const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')));
+    await _eklenti.initialize(settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')));
     _hazir = true;
   } catch (_) {
     return false;
@@ -32,10 +32,10 @@ Future<void> sistemBildirimiGoster(int id, String baslik, String metin) async {
   if (!await _baslat()) return;
   try {
     await _eklenti.show(
-      id,
-      baslik,
-      metin,
-      const NotificationDetails(
+      id: id,
+      title: baslik,
+      body: metin,
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           'kritik',
           'Kritik uyarılar',
