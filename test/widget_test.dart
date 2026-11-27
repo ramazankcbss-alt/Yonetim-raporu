@@ -112,6 +112,8 @@ void main() {
     // Asistan: KVKK kapsamında kaldırılan bölümler görünmez
     await t.tap(find.text('Asistan'));
     await t.pumpAndSettle();
+    expect(find.text('Yönetim Özeti'), findsOneWidget);
+    await t.scrollUntilVisible(find.text('Tarım ve Hayvancılık Paylaşımı'), 300, scrollable: find.byType(Scrollable).last);
     expect(find.text('Tarım ve Hayvancılık Paylaşımı'), findsOneWidget);
     await t.scrollUntilVisible(find.text('ESK – Et ve Süt Kurumu'), 300, scrollable: find.byType(Scrollable).last);
     expect(find.text('ESK – Et ve Süt Kurumu'), findsOneWidget);
