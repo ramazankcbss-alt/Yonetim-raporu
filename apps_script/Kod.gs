@@ -1317,7 +1317,7 @@ function tarimsalUretimOku_() {
     var ss = SpreadsheetApp.openById(TARIM_FAALIYET_ID);
     var sh = ss.getSheetByName('ÇİFTLİK BAZINDA');
     if (!sh || sh.getLastRow() < 3) return null;
-    var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 80), 13).getValues().map(function (r) {
+    var v = sh.getRange(1, 1, sh.getLastRow(), 13).getValues().map(function (r) {
       return r.map(function (x) { return x instanceof Date ? '' : x; });
     });
     var ub = ss.getSheetByName('ÜRÜN BAZINDA');
@@ -1619,7 +1619,7 @@ function ekimPlaniOku_() {
   return onbellekli_('ekimPlani', 3600, function () {
     var ss = SpreadsheetApp.openById(EKIM_PLANI_ID);
     var sh = ss.getSheets()[0];
-    var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 200), Math.min(sh.getLastColumn(), 27)).getDisplayValues();
+    var v = sh.getRange(1, 1, sh.getLastRow(), Math.min(sh.getLastColumn(), 27)).getDisplayValues();
     var yil = '', urunler = null, cikti = [];
     v.forEach(function (r) {
       var metin = r.join(' ');
@@ -1648,7 +1648,7 @@ function resmiParsellerOku_() {
   return onbellekli_('resmiParsel', 3600, function () {
     var sh = SpreadsheetApp.openById(TARIM_FAALIYET_ID).getSheetByName('PARSEL');
     if (!sh) return [];
-    var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 400), 6).getDisplayValues();
+    var v = sh.getRange(1, 1, sh.getLastRow(), 6).getDisplayValues();
     var cikti = [];
     v.forEach(function (r) {
       if (!r[0] || !r[1] || /^(İLÇESİ|TOPLAM)/i.test(r[0]) || !r[3]) return;
@@ -2856,7 +2856,7 @@ function suruHareketleriOku_() {
     [yil, yil - 1].forEach(function (y) {
       var sh = ss.getSheetByName(String(y));
       if (!sh) return;
-      var n = Math.min(sh.getLastRow(), 200);
+      var n = sh.getLastRow();
       if (n < 3) return;
       sayfalar[String(y)] = sh.getRange(1, 1, n, 14).getValues().map(function (r) {
         return r.map(function (x) { return x instanceof Date ? '' : x; });
@@ -2890,7 +2890,7 @@ function stokSayimiOku_() {
       var son = -1;
       baslik.forEach(function (b, i) { if (STOK_BASLIKLARI_.indexOf(b) >= 0) son = i; });
       if (son < 0) return;
-      var n = Math.min(sh.getLastRow(), 600);
+      var n = sh.getLastRow();
       sayfalar[ad] = sh.getRange(1, 1, n, son + 1).getValues().map(function (r) {
         return r.map(function (x) { return x instanceof Date ? '' : x; });
       });
@@ -3387,7 +3387,7 @@ function gecmisOzet_() {
       var ss = SpreadsheetApp.openById(GECMIS_OZET_.degerlendirme);
       GECMIS_OZET_.sayfalar.forEach(function (ad) {
         var s = ss.getSheetByName(ad);
-        if (s) o.gostergeler = o.gostergeler.concat(gecmisMatrisOku_(s.getRange(1, 1, Math.min(s.getLastRow(), 40), Math.min(s.getLastColumn(), 30)).getDisplayValues(), ad.trim()));
+        if (s) o.gostergeler = o.gostergeler.concat(gecmisMatrisOku_(s.getDataRange().getDisplayValues(), ad.trim()));
       });
     } catch (e) { o.hatalar.push('Değerlendirme raporu: ' + e); }
     return o;
