@@ -184,6 +184,11 @@ class VeriKalitesi {
       konular.add(AcikKonu('Çiftlik Raporları otomatik dönüştürülemiyor',
           '$dn. Apps Script › Hizmetler › Drive API eklenmeli; o zamana kadar yeni xlsx elle E-Tabloya çevrilmeli.', 'Uygulama sahibi'));
     }
+    for (final m in v.ciftlikRaporTam.mutabakat.where((m) => !m.uyumlu)) {
+      konular.add(AcikKonu('Çiftlik Raporları: ${m.sayfa} ile ${m.karsi} farklı',
+          'Özet ${_mn(m.ozet)}, detay 2026 ${_mn(m.detay2026)}, detay tüm yıllar ${_mn(m.detayTum)}.${m.aciklama.isEmpty ? '' : ' ${m.aciklama}'}',
+          'Muhasebe'));
+    }
     for (final h in v.ciftlikRaporTam.hatalar) {
       konular.add(AcikKonu('Çiftlik Raporları sayfası okunamadı', h, 'Uygulama sahibi'));
     }

@@ -3562,7 +3562,78 @@ function ciftlikRaporTamHesapla_(dosya) {
   }
   try { o.duranVarlik = tuketim('Duran Varlık Yem Tüketimi', true); } catch (e) { o.hatalar.push('Duran varlık yem: ' + e); }
   try { o.tarim = tuketim('Tarımsal Alan Tüketim Raporu', false); } catch (e) { o.hatalar.push('Tarımsal alan tüketimi: ' + e); }
+  try { o.mutabakat = crOzetMutabakat_(ss, o); } catch (e) { o.hatalar.push('Özet sayfa mutabakatı: ' + e); }
   return o;
+}
+
+/** Özet ve çiftlik bazlı detay sayfaları (pivot) ana detay sayfalarıyla karşılaştırılır; böylece bu sayfalar da
+ *  tamamen okunur ve muhasebe dosyasındaki iç tutarsızlıklar görünür. [{sayfa, karsi, ozet, detay2026, detayTum, durum, aciklama}] */
+function crOzetMutabakat_(ss, o) {
+  var l = [];
+  function topla(a, f) { return a.reduce(function (t, r) { return f(r) ? t + r[r.length - 1] : t; }, 0); }
+  function sutunlar(h, desen) { var m = []; h.forEach(function (x, j) { if (desen.test(String(x).trim())) m.push(j); }); return m; }
+  function ekle(sayfa, karsi, oz, d26, dTum, not) {
+    var uy = Math.abs(oz - d26) <= Math.max(1, Math.abs(d26) * 0.001) || Math.abs(oz - dTum) <= Math.max(1, Math.abs(dTum) * 0.001);
+    l.push({ sayfa: sayfa, karsi: karsi, ozet: Math.round(oz), detay2026: Math.round(d26), detayTum: Math.round(dTum), durum: uy ? 'uyumlu' : 'farkli', aciklama: not || '' });
+  }
+  // 1) Çiftlik bazlı gider detay sayfaları (Ay/Yıl sütunlu) ↔ Çiftlikler Gider Raporu Detay
+  [['Taşağıl Gider Raporu Detay', '1604'], ['Aslım Gider Raporu Detay', '1605'], ['Tarımsal Gider Raporu Detay', '1611'],
+   ['Şekersüt Detay Gider Raporu', '1613'], ['Pan-Gev Detay Gider Raporu', '1614']].forEach(function (x) {
+    var sh = ss.getSheetByName(x[0]);
+    if (!sh) return;
+    var d = sh.getDataRange().getValues(), h = d[0].map(String), kod = h.findIndex(function (t) { return t.trim() === 'Hesap Kodu'; });
+    var ay = []; h.forEach(function (t, j) { var m = /^\s*([A-Za-zÇĞİÖŞÜçğıöşü]+)\/(\d{4})\s*$/.exec(t); if (m && crAy_(m[1])) ay.push([j, +m[2]]); });
+    var yil = {};
+    for (var i = 1; i < d.length; i++) {
+      if (!/^\d{6,}$/.test(String(d[i][kod]).trim())) continue;
+      ay.forEach(function (a) { yil[a[1]] = (yil[a[1]] || 0) + crSayi_(d[i][a[0]]); });
+    }
+    Object.keys(yil).sort().forEach(function (y) {
+      var dt = topla(o.gider, function (r) { return r[0] === +y && r[2] === x[1]; });
+      ekle(x[0] + ' · ' + y, 'Çiftlikler Gider Raporu Detay (' + x[1] + ', ' + y + ')', yil[y], dt, dt);
+    });
+  });
+  // 2) Çiftlikler Gider Raporu Özet (aylık) ↔ detay
+  var go = ss.getSheetByName('Çiftlikler Gider Raporu Özet');
+  if (go) {
+    var d2 = go.getDataRange().getValues(), bs = -1;
+    for (var r = 0; r < Math.min(20, d2.length) && bs < 0; r++) if (d2[r].map(String).some(function (t) { return t.trim() === 'Hesap Kodu'; })) bs = r;
+    if (bs >= 0) {
+      var h2 = d2[bs].map(String), k2 = h2.findIndex(function (t) { return t.trim() === 'Hesap Kodu'; }), oz = 0;
+      var ayS = []; h2.forEach(function (t, j) { if (crAy_(t.trim()) && !/TOPLAM/i.test(t)) ayS.push(j); });
+      for (var i2 = bs + 1; i2 < d2.length; i2++) if (/^\d{6,}$/.test(String(d2[i2][k2]).trim())) ayS.forEach(function (j) { oz += crSayi_(d2[i2][j]); });
+      ekle('Çiftlikler Gider Raporu Özet', 'Çiftlikler Gider Raporu Detay', oz, topla(o.gider, function (rr) { return rr[0] === 2026; }), topla(o.gider, function () { return true; }),
+        'Özet sayfası bir pivot tablodur; seçili filtreye göre tek yıl/çiftlik gösterebilir.');
+    }
+  }
+  // 3) Tüketim özetleri ↔ detay
+  [['Besi-Düve Yem Tüketimi Özet', o.yem, 'Besi-Düve Yem Tüketimi'], ['Duran Varlık Yem Tüketimi Özet', o.duranVarlik, 'Duran Varlık Yem Tüketimi'],
+   ['Tarımsal Alan Tüketim Özet', o.tarim, 'Tarımsal Alan Tüketim Raporu']].forEach(function (x) {
+    var sh = ss.getSheetByName(x[0]);
+    if (!sh || !x[1]) return;
+    var d = sh.getDataRange().getValues(), bs = -1, c = -1;
+    for (var r = 0; r < Math.min(20, d.length) && bs < 0; r++) { c = d[r].map(String).findIndex(function (t) { return t.trim() === 'Toplam Tutar'; }); if (c >= 0) bs = r; }
+    if (bs < 0) return;
+    var oz = 0;
+    for (var i = bs + 1; i < d.length; i++) if (String(d[i][0]).trim() && !/toplam/i.test(String(d[i][0]))) oz += crSayi_(d[i][c]);
+    var tut = function (r) { return r[6]; };
+    var d26 = x[1].reduce(function (t, r) { return r[0] === 2026 ? t + tut(r) : t; }, 0), dt = x[1].reduce(function (t, r) { return t + tut(r); }, 0);
+    ekle(x[0], x[2], oz, d26, dt, 'Özet sayfası pivot tablodur; seçili filtreye göre dönem farklı olabilir.');
+  });
+  // 4) Satılan Mamül Maliyeti Özet ↔ SMM Detay
+  var so = ss.getSheetByName('Satılan Mamül Maliyeti Özet'), sd = ss.getSheetByName('SMM Detay');
+  if (so && sd) {
+    var d4 = so.getDataRange().getValues(), bs4 = -1, c4 = -1;
+    for (var r4 = 0; r4 < Math.min(20, d4.length) && bs4 < 0; r4++) { c4 = d4[r4].map(String).findIndex(function (t) { return /Fiili Top\.Değer/.test(t); }); if (c4 >= 0) bs4 = r4; }
+    var dd = sd.getDataRange().getValues(), hc = dd[0].map(String).findIndex(function (t) { return /Fiili Top\.Değer/.test(t); }), d26 = 0, dt = 0;
+    for (var i5 = 1; i5 < dd.length; i5++) { var v = crSayi_(dd[i5][hc]); dt += v; if (String(dd[i5][1]).trim() === '2026') d26 += v; }
+    if (bs4 >= 0) {
+      var oz4 = 0;
+      for (var i4 = bs4 + 1; i4 < d4.length; i4++) if (String(d4[i4][0]).trim() && !/toplam/i.test(String(d4[i4][0]))) oz4 += crSayi_(d4[i4][c4]);
+      ekle('Satılan Mamül Maliyeti Özet', 'SMM Detay', oz4, d26, dt, 'Özet sayfası pivot tablodur; seçili filtreye göre dönem farklı olabilir.');
+    }
+  }
+  return l;
 }
 
 /** Kaynak değişmedikçe kayıtlı sonucu döndürür; değiştiyse yeniden hesaplar ve kaydeder. */
@@ -3582,6 +3653,8 @@ function ciftlikRaporTam_(zorla) {
     } catch (e) {}
   }
   var o = ciftlikRaporTamHesapla_(kaynak);
+  // Yeni muhasebe dosyası: gelir tabloları, satış ve SMM (ciftlik_rapor_2026.json) da yeniden üretilir.
+  if (!zorla) { try { ciftlikRaporUret_(kaynak); } catch (e) { o.hatalar.push('Gelir tabloları üretilemedi: ' + e); } }
   o.imza = imza;
   o.guncelleme = Utilities.formatDate(kaynak.getLastUpdated(), 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss");
   var metin = JSON.stringify(o);
@@ -3593,6 +3666,7 @@ function ciftlikRaporTam_(zorla) {
 
 /** Düzenleyiciden bir kez çalıştırın: Çiftlik Raporları E-Tablosunun tamamını okuyup kaydeder. */
 function ciftlikRaporHazirla() {
+  try { Logger.log('Gelir tabloları / satış / SMM: ' + JSON.stringify(ciftlikRaporUret_())); } catch (e) { Logger.log('Gelir tabloları üretilemedi: ' + e); }
   var o = ciftlikRaporTam_(true);
   Logger.log('Dönüştürme: ' + JSON.stringify(o && o.donusum));
   Logger.log(o ? (o.dosya + ': ' + o.sayfalar.length + ' sayfa, gider ' + o.gider.length + ', besi-düve yem ' + o.yem.length +
@@ -3708,8 +3782,15 @@ function maliyetTakipDetay_() {
 //   kişi bilgisi sütunları (ad soyad, operatör, şoför, TC, telefon, IBAN, plaka, adres, e-posta) ve hücre
 //   içindeki TC / telefon / IBAN / e-posta / plaka kalıpları maskelenir; uygulamaya hiçbir zaman açık gitmez.
 var KAYNAK_ENVANTER_DOSYA_ = 'kaynak_envanteri.json';
+// Dosyaya özgü maskeler: stok sayımlarında açıklama sütunu kişi adı içerebilir.
+var KVKK_DOSYA_SUTUN_ = [[/Stok Sayımları/i, /açıklama|aciklama|not/i]];
+function kvkkSutunMu_(dosyaAdi, baslik) {
+  baslik = String(baslik || '');
+  if (KVKK_SUTUN_.test(baslik)) return true;
+  return KVKK_DOSYA_SUTUN_.some(function (k) { return k[0].test(dosyaAdi || '') && k[1].test(baslik); });
+}
 var KVKK_SAYFA_ = /personel|organizasyon|şoför|sürücü|kişiler|kisiler|kişi olay|mesaj|iletişim|telefon/i;
-var KVKK_SUTUN_ = /ad[ıi]?\s*[-\/]?\s*soyad|^ad[ıi]?$|^soyad|isim|personel|çalışan|şoför|sürücü|operatör|operator|^tc\b|t\.c\.|kimlik|telefon|^tel\b|gsm|cep no|iban|plaka|adres|e-?posta|mail|imza|bildiren|onaylayan|teslim alan|teslim eden|kişi/i;
+var KVKK_SUTUN_ = /tedarikçi|tedarikci|cari|müşteri|musteri|alıcı|alici|satıcı|unvan|ünvan|firma adı|kullanıcı|kullanici|ad[ıi]?\s*[-\/]?\s*soyad|^ad[ıi]?$|^soyad|isim|personel|çalışan|şoför|sürücü|operatör|operator|^tc\b|t\.c\.|kimlik|telefon|^tel\b|gsm|cep no|iban|plaka|adres|e-?posta|mail|imza|bildiren|onaylayan|teslim alan|teslim eden|kişi/i;
 
 function kvkkHucre_(x) {
   var t = String(x == null ? '' : x);
@@ -3728,6 +3809,10 @@ function kaynakKullanim_() {
     [MALIYET_TAKIP_ID_, /^(MALİYET ÖZET HAYVANCILIK|MALİYET ÖZET TARIM 2026|YEM|SÜT MALİYETİ|KARKAS MALİYETİ|KAYAR ORTALAMA|ÖZET)$/, 'Çiftlik Sonuçları › maliyet (dönüştürücü)'],
     [MALIYET_TAKIP_ID_, /^(İLAÇ AŞI|DİĞER MALZEMELER)$/, 'Çiftlik Sonuçları › İlaç ve Malzeme'],
     [/Çiftlik Raporları/, /^(Çiftlikler Gider Raporu Detay|Besi-Düve Yem Tüketimi|Duran Varlık Yem Tüketimi|Tarımsal Alan Tüketim Raporu)$/, 'Çiftlik Sonuçları › Gider / Yem ve Tüketim'],
+    [/Çiftlik Raporları/, /^(Çiftlikler Konsolide( \(2\))?|16\d\d - .+)$/, 'Çiftlik Sonuçları › gelir tabloları (iki senaryo)'],
+    [/Çiftlik Raporları/, /^(Satış|SMM Detay)$/, 'Çiftlik Sonuçları › birim maliyet, tarım ürünleri, teşvikler'],
+    [/Çiftlik Raporları/, /(Gider Raporu Detay|Detay Gider Raporu|Gider Raporu Özet|Tüketim(i)? Özet|Satılan Mamül Maliyeti Özet)$/, 'Veri Kalitesi › özet / detay mutabakatı'],
+    [/Çiftlik Raporları/, /^Satış Özet$/, 'Ürün listesi (malzeme kodu ve adı)'],
     [TARIM_FAALIYET_ID, /^(ÇİFTLİK BAZINDA|ÜRÜN BAZINDA)$/, 'Ürün Karlılığı › üretim'],
     [TARIM_FAALIYET_ID, /^PARSEL$/, 'Tarla Haritası › resmi parseller'],
     [TARIM_ICMAL_ID, /^(ŞEKER SÜT|ASLIM|TAŞAĞIL|FİDANLIK)$/, 'Tarım günlük kayıtları (Eşitle)'],
@@ -3775,7 +3860,12 @@ function kaynakListesi_() {
 
 function kaynakDosyalari_(k) {
   var o = [], gor = {};
-  function ekle(f, kaynakId) { if (!gor[f.getId()]) { gor[f.getId()] = true; o.push({ f: f, kaynakId: kaynakId }); } }
+  function ekle(f, kaynakId) {
+    var mt = f.getMimeType();
+    if (mt === MimeType.FOLDER) { try { klasor(DriveApp.getFolderById(f.getId()), kaynakId, 0); } catch (e) {} return; }
+    if (mt === MimeType.SHORTCUT) { try { f = DriveApp.getFileById(f.getTargetId()); } catch (e) { return; } }  // kısayol: asıl dosya
+    if (!gor[f.getId()]) { gor[f.getId()] = true; o.push({ f: f, kaynakId: kaynakId }); }
+  }
   function klasor(d, kaynakId, derin) {
     var fi = d.getFiles();
     while (fi.hasNext()) ekle(fi.next(), kaynakId);
@@ -3788,7 +3878,10 @@ function kaynakDosyalari_(k) {
     try { klasor(DriveApp.getFolderById(id), id, 0); } catch (e2) {}
   });
   if (k.ara) { var it = DriveApp.searchFiles(k.ara); while (it.hasNext()) ekle(it.next(), ''); }
-  return o;
+  // Aynı adlı E-Tablo varsa xlsx'in kendisi ayrıca incelenmez (içerik aynı).
+  var tablolar = {};
+  o.forEach(function (x) { if (x.f.getMimeType() === MimeType.GOOGLE_SHEETS) tablolar[x.f.getName().trim()] = true; });
+  return o.filter(function (x) { return !(/\.xlsx$/i.test(x.f.getName()) && tablolar[x.f.getName().replace(/\.xlsx$/i, '').trim()]); });
 }
 
 var DONUSTURULEN_KLASOR_ADI_ = 'Dönüştürülmüş kaynaklar (otomatik)';
@@ -3817,7 +3910,7 @@ function kaynakDonustur_(f) {
   return { id: yeni.id };
 }
 
-function kaynakSayfaIncele_(sh) {
+function kaynakSayfaIncele_(sh, dosyaAdi) {
   var ad = sh.getName(), o = { ad: ad, satir: sh.getLastRow(), sutun: sh.getLastColumn(), dolu: 0, hata: 0, notlar: [], sutunlar: [] };
   if (KVKK_SAYFA_.test(ad)) { o.durum = 'kvkk'; return o; }
   if (!o.satir || !o.sutun) { o.durum = 'bos'; return o; }
@@ -3830,6 +3923,8 @@ function kaynakSayfaIncele_(sh) {
     if (m > en) { en = m; bs = r; }
   }
   o.baslikSatiri = bs + 1;
+  var gizliSut = {};
+  for (var c0 = 0; c0 < o.sutun; c0++) if (kvkkSutunMu_(dosyaAdi, d[bs][c0])) gizliSut[c0] = true;
   for (var c = 0; c < o.sutun; c++) {
     var bas = String(d[bs][c] || '').trim(), dolu = 0, sayisal = 0, top = 0, hata = 0;
     for (var r2 = bs + 1; r2 < d.length; r2++) {
@@ -3843,15 +3938,16 @@ function kaynakSayfaIncele_(sh) {
     for (var r3 = 0; r3 <= bs; r3++) if (d[r3][c]) dolu++;
     o.dolu += dolu; o.hata += hata;
     if (!dolu) continue;
-    o.sutunlar.push({ no: c + 1, baslik: KVKK_SUTUN_.test(bas) ? bas + ' (KVKK, maskeli)' : kvkkHucre_(bas), dolu: dolu, sayisal: sayisal,
-      toplam: sayisal ? Math.round(top * 100) / 100 : null, hata: hata, kvkk: KVKK_SUTUN_.test(bas) });
+    var gizli = kvkkSutunMu_(dosyaAdi, bas);
+    o.sutunlar.push({ no: c + 1, baslik: gizli ? bas + ' (KVKK, maskeli)' : kvkkHucre_(bas), dolu: dolu, sayisal: gizli ? 0 : sayisal,
+      toplam: !gizli && sayisal ? Math.round(top * 100) / 100 : null, hata: hata, kvkk: gizli });
   }
-  for (var a = 0; a < n.length; a++) for (var b = 0; b < n[a].length; b++) if (n[a][b]) {
+  for (var a = 0; a < n.length; a++) for (var b = 0; b < n[a].length; b++) if (n[a][b] && !gizliSut[b]) {
     o.notlar.push({ hucre: sutunHarf_(b + 1) + (a + 1), not: kvkkHucre_(n[a][b]) });
   }
   // Hücreye yazılmış açıklamalar (uzun metinler) ayrıca not olarak listelenir
   for (var a2 = 0; a2 < d.length; a2++) for (var b2 = 0; b2 < d[a2].length; b2++) {
-    var t = String(d[a2][b2] || '');
+    var t = gizliSut[b2] ? '' : String(d[a2][b2] || '');
     if (t.length >= 40 && /\s/.test(t) && /[a-zçğıöşü]{3}/i.test(t)) o.notlar.push({ hucre: sutunHarf_(b2 + 1) + (a2 + 1), not: kvkkHucre_(t), metin: true });
   }
   return o;
@@ -3899,7 +3995,7 @@ function kaynakEnvanteriHazirla() {
           if (yapilan[sh.getName()]) return;
           if (bitmedi || Date.now() - bas > 240000) { bitmedi = true; kayit.yarim = true; return; }
           var s;
-          try { s = kaynakSayfaIncele_(sh); } catch (e) { s = { ad: sh.getName(), durum: 'hata', hataMetni: String(e) }; }
+          try { s = kaynakSayfaIncele_(sh, kayit.ad); } catch (e) { s = { ad: sh.getName(), durum: 'hata', hataMetni: String(e) }; }
           if (!s.durum) { s.kullanim = kaynakKullanimBul_(kayit, s.ad); s.durum = s.kullanim ? 'kullaniliyor' : 'kullanilmiyor'; }
           kayit.sayfalar.push(s);
         });
@@ -3982,9 +4078,294 @@ function kaynakSayfa_(dosyaId, sayfa, bas, adet) {
   if (bas >= n) return { ok: true, toplam: n, bas: bas, satirlar: [] };
   var bsr = 1;
   (bul.sayfalar || []).forEach(function (s) { if (s.ad === sayfa && s.baslikSatiri) bsr = s.baslikSatiri; });
-  var bslk = sh.getRange(bsr, 1, 1, w).getDisplayValues()[0], maske = bslk.map(function (h) { return KVKK_SUTUN_.test(String(h)); });
+  var bslk = sh.getRange(bsr, 1, 1, w).getDisplayValues()[0], maske = bslk.map(function (h) { return kvkkSutunMu_(bul.ad, h); });
   var d = sh.getRange(bas + 1, 1, son - bas, w).getDisplayValues().map(function (r) {
     return r.map(function (x, j) { return maske[j] && x ? '•••' : kvkkHucre_(x); });
   });
   return { ok: true, toplam: n, sutun: w, bas: bas, baslikSatiri: bsr, satirlar: d };
+}
+
+
+// ---------------------------------------------------------------------------
+// ÇİFTLİK RAPORLARI (muhasebe) – gelir tabloları, satış ve satılan mamul maliyeti: canlı ve tam okuma.
+// Daha önce dosyanın ~1 MB ile sınırlı metin dökümünden çevrimdışı üretiliyordu (araclar/ciftlik_rapor/uret.py);
+// artık E-Tablo kopyasının bütün satır ve sütunları okunur ve ciftlik_rapor_2026.json sunucuda üretilir.
+// Dönem sabit değildir: muhasebenin kapattığı son ay otomatik bulunur.
+// KVKK: fatura alıcısı (müşteri) adı ve kodu okunmaz; yalnızca üretim yeri, ay, ürün, miktar ve tutar.
+var CR_AY_ADLARI_ = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+var CR_CIFTLIKLER_ = [['Çiftlikler Konsolide', 'Konsolide (tüm çiftlikler)', 'Toplam'], ['1613 - Şekersüt', 'Şekersüt', 'Süt'],
+  ['1614 - Pan-Gev', 'Pan-Gev', 'Süt'], ['1611 - Tarımsal Alan', 'Tarımsal Alan', 'Tarım'], ['1605 - Aslım', 'Aslım', 'Et / Besi'],
+  ['1604 - Taşağıl', 'ESK-Taşağıl (Besi hizmeti)', 'ESK (ayrı)']];
+var CR_KALEMLER_ = [['Brüt satışlar', 'A- 60-BRÜT SATIŞLAR'], ['Net satışlar', 'NET SATIŞLAR'],
+  ['Satışların maliyeti', 'C- 62-SATIŞLARIN MALİYETİ (-)'], ['Brüt satış kârı/zararı', 'BRÜT SATIŞ KÂRI VEYA ZARARI'],
+  ['Faaliyet giderleri', 'D- 63-FAALİYET GİDERLERİ (-)'], ['Diğer olağan gelirler (649)', 'E- 64-DİĞER FAALİYETLERDEN OLAĞAN GELİR VE KÂRLAR'],
+  ['Diğer olağan giderler', 'F- 65-DİĞ.FAALİYETLERDEN OL.GİDER VE ZARARLAR (-)'], ['Finansman giderleri', 'G- 66-FİNANSMAN GİDERLERİ (-)'],
+  ['Olağandışı gelirler (679)', 'H- 67-OLAĞANDIŞI GELİR VE KÂRLAR'], ['Olağandışı giderler', 'I- 68-OLAĞANDIŞI GİDER VE ZARARLAR (-)'],
+  ['Amortisman', 'AMORTİSMAN'], ['FAVÖK (EBITDA)', 'EBITDA'], ['Dönem net kârı/zararı', 'DÖNEM NET KÂRI VEYA ZARARI ( DÖNEM KARI VEYA ZARARI-J)']];
+var CR_BIRIM_URUN_ = { '1613': 'Süt – Şekersüt', '1614': 'Süt – Pan-Gev', '1604': 'ESK besi hizmeti' };
+// SMM bileşenleri: [ad, başlık deseni]
+var CR_BILESEN_ = [['Hammadde (yem)', /Hammadde/], ['Yardımcı malzeme', /Yardımcı/], ['Ambalaj malzemesi', /Ambalaj/],
+  ['Direkt işçilik', /Direkt İşçilik/], ['Enerji', /Enerji/], ['Bakım onarım', /Bakım Onarım/], ['Endirekt işçilik', /Endirekt/],
+  ['Genel üretim', /Genel Üretim/], ['Amortisman', /Amortisman/]];
+var CR_TARIM_AD_ = { 'BUĞDAY': 'Buğday', 'PANCAR(TARLA)': 'Şeker pancarı', 'YONCA BALYASI': 'Yonca balyası', 'TRİTİKALE(TARLA)': 'Tritikale',
+  'PATATES': 'Patates', 'MISIR SILAJI': 'Mısır silajı', 'SAP BALYASI': 'Sap balyası', 'ESK SAP BALYASI': 'Sap balyası (ESK’ya)',
+  'AİDA TEMİZ ARPA TOHUMU KG': 'Arpa tohumu (Aida)', 'TOHUM ARPA CERVOİSE': 'Arpa tohumu (Cervoise)', 'TOHUM BUĞDAY': 'Buğday tohumu' };
+var CR_TARIM_CIFTLIK_ = { '1604': 'ESK-Taşağıl', '1605': 'Aslım', '1611': 'Tarımsal Alan' };
+var CR_NET_ = 'DÖNEM NET KÂRI VEYA ZARARI ( DÖNEM KARI VEYA ZARARI-J)';
+var CR_DONEM_KARI_ = 'DÖNEM KÂRI VEYA ZARARI (OLAĞAN KAR VEYA ZARAR+H-I)';
+
+function crSayiH_(v) {
+  if (typeof v === 'number') return v;
+  var t = String(v == null ? '' : v).trim();
+  if (!t || t === '-' || /%$/.test(t)) return 0;
+  var x = eskTrSayi_(t);
+  return x === null || isNaN(x) ? 0 : x;
+}
+
+/** Gelir tablosu sayfası → { satırEtiketi: {'26': [12], '25': [12], '24': [12]} }; bütün satırlar. */
+function crGelirTablosu_(d) {
+  var bs = -1, sut = {};
+  for (var r = 0; r < Math.min(10, d.length) && bs < 0; r++) {
+    d[r].forEach(function (x, j) {
+      var m = /^\s*(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)\s+(\d\d)\s*$/.exec(String(x));
+      if (m) { sut[m[2] + '|' + CR_AY_ADLARI_.indexOf(m[1])] = j; bs = r; }
+    });
+  }
+  var o = {}, sira = [];
+  if (bs < 0) return { satirlar: o, sira: sira };
+  for (var i = bs + 1; i < d.length; i++) {
+    var ad = String(d[i][0] || '').trim();
+    if (!ad) continue;
+    var y = {};
+    ['26', '25', '24'].forEach(function (yy) {
+      var l = [];
+      for (var a = 0; a < 12; a++) { var j = sut[yy + '|' + a]; l.push(j == null ? 0 : crSayiH_(d[i][j])); }
+      y[yy] = l;
+    });
+    if (!o[ad]) sira.push(ad);
+    o[ad] = y;
+  }
+  return { satirlar: o, sira: sira };
+}
+
+function crBaslikIndeks_(h, desen) {
+  for (var j = 0; j < h.length; j++) if (desen.test(String(h[j]).replace(/\s+/g, ' ').trim())) return j;
+  return -1;
+}
+
+/** @param oku function(sayfaAdı) → 2B dizi (yoksa null). */
+function ciftlikRaporUretCekirdek_(oku, kaynakAdi) {
+  var g = {}, tam = {}, hatalar = [];
+  ['Çiftlikler Konsolide', 'Çiftlikler Konsolide (2)', '1604 - Taşağıl', '1605 - Aslım', '1605 - Aslım 2', '1611 - Tarımsal Alan',
+   '1611 - Tarımsal Alan 2', '1613 - Şekersüt', '1613 - Şekersüt 2', '1614 - Pan-Gev', '1614 - Pan-Gev 2'].forEach(function (s) {
+    var d = oku(s);
+    if (!d) { hatalar.push(s + ' sayfası yok'); return; }
+    var t = crGelirTablosu_(d);
+    g[s] = t.satirlar;
+    tam[s] = t.sira.map(function (ad) { return [ad, t.satirlar[ad]['26'], t.satirlar[ad]['25'], t.satirlar[ad]['24']]; });
+  });
+  function seri(s, k, y) { return ((g[s] || {})[k] || {})[y] || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; }
+  // Kapanan son ay: Konsolide'de satış veya net sonucu sıfırdan farklı olan son 2026 ayı
+  var n = 0;
+  for (var a = 0; a < 12; a++) if (seri('Çiftlikler Konsolide', 'NET SATIŞLAR', '26')[a] || seri('Çiftlikler Konsolide', CR_NET_, '26')[a]) n = a + 1;
+  if (!n) n = 1;
+  function top(l, k) { var s = 0; for (var i = 0; i < (k || 12); i++) s += l[i] || 0; return Math.round(s); }
+
+  var gelir = [], aylik = [];
+  CR_CIFTLIKLER_.forEach(function (c) {
+    CR_KALEMLER_.forEach(function (k) {
+      gelir.push({ ciftlik: c[1], bolum: c[2], kalem: k[0], y2026_9ay: top(seri(c[0], k[1], '26'), n), y2025_9ay: top(seri(c[0], k[1], '25'), n),
+        y2025_yil: top(seri(c[0], k[1], '25')), y2024_yil: top(seri(c[0], k[1], '24')) });
+    });
+    [['26', 2026, n], ['25', 2025, 12]].forEach(function (p) {
+      for (var i = 0; i < p[2]; i++) aylik.push({ ciftlik: c[1], yil: p[1], ay: CR_AY_ADLARI_[i], ay_no: i + 1,
+        net_kar: Math.round(seri(c[0], CR_NET_, p[0])[i]), brut_kar: Math.round(seri(c[0], CR_KALEMLER_[3][1], p[0])[i]) });
+    });
+  });
+  CR_KALEMLER_.forEach(function (k) {
+    var f = {};
+    ['26', '25', '24'].forEach(function (y) { var a1 = seri('Çiftlikler Konsolide', k[1], y), b1 = seri('1604 - Taşağıl', k[1], y); f[y] = a1.map(function (x, i) { return x - b1[i]; }); });
+    gelir.push({ ciftlik: 'Çiftliklerimiz (ESK hariç)', bolum: 'Toplam', kalem: k[0], y2026_9ay: top(f['26'], n), y2025_9ay: top(f['25'], n),
+      y2025_yil: top(f['25']), y2024_yil: top(f['24']) });
+  });
+
+  // Satış ve SMM detayı (bütün satırlar)
+  var satis = oku('Satış') || [], smm = oku('SMM Detay') || [];
+  if (!satis.length) hatalar.push('Satış sayfası yok');
+  if (!smm.length) hatalar.push('SMM Detay sayfası yok');
+  var hs = satis[0] || [], hm = smm[0] || [];
+  var S = { uy: 0, yil: 1, ay: 2, mal: crBaslikIndeks_(hs, /^Malzeme$/), ad: crBaslikIndeks_(hs, /^Malzeme Adı$/),
+    kg: crBaslikIndeks_(hs, /^NET KG$/), tl: crBaslikIndeks_(hs, /^Net Tutar TL$/), hesap: crBaslikIndeks_(hs, /^Fatura Alıcısı Adı$/) };
+  var M = { uy: 0, yil: 1, ay: 2, ad: crBaslikIndeks_(hm, /kısa metni/), mik: crBaslikIndeks_(hm, /Top\.Ürt\.Miktarı/), top: crBaslikIndeks_(hm, /Fiili Top\.Değer/) };
+  var bil = CR_BILESEN_.map(function (b) { return [b[0], crBaslikIndeks_(hm, b[1])]; });
+  function grup(p) { p = String(p); return p.indexOf('SÜT') >= 0 ? 'SÜT' : p.indexOf('ESK BÜYÜKBAŞ') >= 0 ? 'ESK' : null; }
+  var U = {}, F = {}, T = {}, tes = {}, satisSatir = [], smmSatir = [];
+  for (var i = 1; i < smm.length; i++) {
+    var r = smm[i], uy = String(r[M.uy]).trim(), yil = String(r[M.yil]).trim(), ay = CR_AY_ADLARI_.indexOf(String(r[M.ay]).trim()), urun = String(r[M.ad]).trim();
+    if (!uy || ay < 0) continue;
+    var mik = crSayiH_(r[M.mik]), tt = crSayiH_(r[M.top]);
+    var b = bil.map(function (x) { return x[1] >= 0 ? crSayiH_(r[x[1]]) : 0; });
+    smmSatir.push([uy, +yil, ay + 1, urun, mik, Math.round(tt * 100) / 100].concat(b.map(function (x) { return Math.round(x * 100) / 100; })));
+    if (grup(urun)) {
+      var k = uy + '|' + yil + '|' + ay, u = U[k] || (U[k] = { q: 0, t: 0, b: bil.map(function () { return 0; }) });
+      u.q += mik; u.t += tt; b.forEach(function (x, j) { u.b[j] += x; });
+    }
+    if (CR_TARIM_CIFTLIK_[uy] && CR_TARIM_AD_[urun]) { var kt = uy + '|' + urun + '|' + yil, t0 = T[kt] || (T[kt] = [0, 0, 0, 0]); t0[2] += mik; t0[3] += tt; }
+  }
+  for (var i2 = 1; i2 < satis.length; i2++) {
+    var s = satis[i2], uy2 = String(s[S.uy]).trim(), yil2 = String(s[S.yil]).trim(), ay2 = CR_AY_ADLARI_.indexOf(String(s[S.ay]).trim());
+    var mal = String(s[S.mal]).trim(), ad2 = String(s[S.ad]).trim(), kg = crSayiH_(s[S.kg]), tl = crSayiH_(s[S.tl]);
+    // Teşvik / prim gelirleri ("diğer"): türü hesap açıklamasından (Fatura Alıcısı Adı sütunu) belirlenir; açıklama çıktıya yazılmaz.
+    if (mal === 'diğer') ad2 = String(s[S.hesap] || '').trim();
+    if (!uy2 || ay2 < 0) continue;
+    satisSatir.push([uy2, +yil2, ay2 + 1, mal === 'diğer' ? 'teşvik / prim' : 'ürün', mal === 'diğer' ? '' : ad2, Math.round(kg * 100) / 100, Math.round(tl * 100) / 100]);
+    if (mal === 'diğer') {
+      var kk = ad2.indexOf('ÇİĞ SÜT') >= 0 ? 'Süt teşviki' : ad2.indexOf('BUZAĞI') >= 0 ? 'Buzağı teşviki' : ad2.indexOf('TARIMSAL') >= 0 ? 'Tarımsal teşvik' : 'İstihdam (SGK) teşvikleri';
+      tes[yil2 + '|' + kk] = (tes[yil2 + '|' + kk] || 0) + tl;
+      continue;
+    }
+    if (grup(ad2)) { var kf = uy2 + '|' + yil2 + '|' + ay2, f0 = F[kf] || (F[kf] = [0, 0]); f0[0] += kg; f0[1] += tl; }
+    if (CR_TARIM_CIFTLIK_[uy2] && CR_TARIM_AD_[ad2]) { var kt2 = uy2 + '|' + ad2 + '|' + yil2, t1 = T[kt2] || (T[kt2] = [0, 0, 0, 0]); t1[0] += kg; t1[1] += tl; }
+  }
+  var birim = Object.keys(U).sort().filter(function (k) { return U[k].q && CR_BIRIM_URUN_[k.split('|')[0]]; }).map(function (k) {
+    var p = k.split('|'), u = U[k], f = F[k] || [0, 0], bm = {};
+    bil.forEach(function (x, j) { if (x[1] >= 0 && (j < 1 || j > 2 || Math.round(u.b[j]))) bm[x[0]] = Math.round(u.b[j]); });
+    return { urun: CR_BIRIM_URUN_[p[0]], yil: +p[1], ay_no: +p[2] + 1, miktar: Math.round(u.q), toplam: Math.round(u.t), bilesen: bm,
+      satis_miktar: Math.round(f[0]), satis_tl: Math.round(f[1]), tutarsiz: false };
+  });
+  // Tutarsız ay: toplam ≤ 0, bileşen toplamı fiili toplamdan %1'den fazla farklı ya da birim maliyet ürünün
+  // ortanca birim maliyetinin 1/4'ünden düşük veya 4 katından yüksek (ör. üretim miktarı ile maliyet aynı aya düşmemiş).
+  var ort = {};
+  birim.forEach(function (x) { (ort[x.urun] = ort[x.urun] || []).push(x.toplam / x.miktar); });
+  Object.keys(ort).forEach(function (u) { var l = ort[u].sort(function (a, b) { return a - b; }); ort[u] = l[Math.floor(l.length / 2)]; });
+  birim.forEach(function (x) {
+    var s0 = 0; for (var kb in x.bilesen) s0 += x.bilesen[kb];
+    var bm = x.toplam / x.miktar, o = ort[x.urun];
+    if (x.toplam <= 0 || Math.abs(s0 - x.toplam) > Math.max(1000, Math.abs(x.toplam) * 0.01) || (o > 0 && (bm < o / 4 || bm > o * 4))) x.tutarsiz = true;
+  });
+  var tarim = Object.keys(T).sort().map(function (k) {
+    var p = k.split('|'), v = T[k];
+    return { ciftlik: CR_TARIM_CIFTLIK_[p[0]], urun: CR_TARIM_AD_[p[1]], yil: +p[2], satis_kg: Math.round(v[0]), satis_tl: Math.round(v[1]),
+      smm_kg: Math.round(v[2]), smm_tl: Math.round(v[3]) };
+  });
+  var tesvik = Object.keys(tes).sort().map(function (k) { var p = k.split('|'); return { yil: +p[0], kalem: p[1], tutar: Math.round(tes[k]) }; });
+
+  return {
+    baslik: 'Çiftlikler Rapor 2026', kaynak: kaynakAdi, donem: 'Ocak–' + CR_AY_ADLARI_[n - 1] + ' 2026', ay_sayisi: n,
+    uretim: 'sunucu (canlı, tam okuma)', gelir: gelir, aylik: aylik, birim: birim, tarim: tarim, tesvik: tesvik,
+    senaryo: crSenaryo_(g, n), gelirTam: tam, satisDetay: satisSatir, smmDetay: smmSatir,
+    smmBilesenleri: bil.filter(function (x) { return x[1] >= 0; }).map(function (x) { return x[0]; }), hatalar: hatalar
+  };
+}
+
+function crSenaryo_(g, n) {
+  var K = {}; CR_KALEMLER_.forEach(function (k) { K[k[0]] = k[1]; });
+  var KAL = ['Net satışlar', 'Satışların maliyeti', 'Brüt satış kârı/zararı', 'Faaliyet giderleri', 'Faaliyet dışı net', 'Dönem net kârı/zararı'];
+  var CF = [['1605 - Aslım', 'Aslım'], ['1611 - Tarımsal Alan', 'Tarımsal Alan'], ['1613 - Şekersüt', 'Şekersüt'], ['1614 - Pan-Gev', 'Pan-Gev']];
+  function ham(s, k, y) { return (((g[s] || {})[k] || {})[y]) || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; }
+  function seri(s, kalem, y) {
+    y = y || '26';
+    if (kalem === 'Faaliyet dışı net') {
+      var a = ['Diğer olağan gelirler (649)', 'Olağandışı gelirler (679)', 'Diğer olağan giderler', 'Olağandışı giderler'].map(function (k) { return ham(s, K[k], y); });
+      return a[0].map(function (_, i) { return a[0][i] + a[1][i] - a[2][i] - a[3][i]; });
+    }
+    return ham(s, K[kalem], y);
+  }
+  function tl(v) { return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+  function mn(v) { return (Math.round(v / 1e5) / 10).toFixed(1).replace('.', ','); }
+  function sutunH(i) { return sutunHarf_(i + 1); }
+  function konum(sayfa, satir, yil, aylar) {
+    function ac(a) { return sutunH((yil === 2026 ? 1 : 28) + 2 * (a - 1)); }
+    var s = aylar.length === 1 ? ac(aylar[0]) + ' sütunu (' + CR_AY_ADLARI_[aylar[0] - 1] + ' ' + (yil % 100) + ')'
+      : ac(aylar[0]) + '–' + ac(aylar[aylar.length - 1]) + ' sütunları (' + CR_AY_ADLARI_[aylar[0] - 1] + '–' + CR_AY_ADLARI_[aylar[aylar.length - 1] - 1] + ' ' + (yil % 100) + ')';
+    return '“' + sayfa + '” sayfası · “' + satir + '” satırı · ' + s;
+  }
+  function donem(s, y, m) {
+    var l = [];
+    for (var i = 0; i < m; i++) {
+      var o = { ay_no: i + 1 };
+      KAL.forEach(function (k) { o[k + '|1'] = Math.round(seri(s, k, y)[i]); o[k + '|2'] = Math.round(seri(s + ' 2', k, y)[i]); });
+      l.push(o);
+    }
+    return { ay_sayisi: m, aylik: l };
+  }
+  var cl = [], kontrol = [], t1 = {}, t2 = {};
+  KAL.forEach(function (k) { t1[k] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; t2[k] = t1[k].slice(); });
+  function sum(l, m) { var s = 0; for (var i = 0; i < m; i++) s += l[i] || 0; return s; }
+  CF.forEach(function (c) {
+    var s = c[0], s2 = s + ' 2';
+    if (!g[s] || !g[s2]) return;
+    var kal = KAL.map(function (k) {
+      var a = seri(s, k), b = seri(s2, k);
+      for (var i = 0; i < 12; i++) { t1[k][i] += a[i]; t2[k][i] += b[i]; }
+      return { kalem: k, s1: Math.round(sum(a, n)), s2: Math.round(sum(b, n)) };
+    });
+    var n1 = seri(s, 'Dönem net kârı/zararı'), n2 = seri(s2, 'Dönem net kârı/zararı'), ns1 = seri(s, 'Net satışlar'), ns2 = seri(s2, 'Net satışlar'), ay = [];
+    for (var i = 0; i < n; i++) ay.push({ ay_no: i + 1, s1: Math.round(n1[i]), s2: Math.round(n2[i]), satis1: Math.round(ns1[i]), satis2: Math.round(ns2[i]) });
+    cl.push({ ciftlik: c[1], sayfa: s, kalemler: kal, aylik: ay, donemler: { '2026': donem(s, '26', n), '2025': donem(s, '25', 12) } });
+    var smm1 = seri(s, 'Satışların maliyeti'), neg = [];
+    for (var j = 0; j < n; j++) if (smm1[j] < -1) neg.push(j + 1);
+    if (neg.length) {
+      kontrol.push({ tur: 'tutarsizlik', baslik: c[1] + ' – negatif satış maliyeti', ciftlik: c[1],
+        aciklama: 'Maliyet senaryosunda (“' + s + '”) ' + neg.map(function (a) { return CR_AY_ADLARI_[a - 1]; }).join(', ') +
+          ' ayında satışların maliyeti eksi (' + tl(Math.min.apply(null, smm1.slice(0, n))) + ' ₺) görünüyor; iade/düzeltme kaydı muhasebeden teyit edilmeli.',
+        kaynak: konum(s, K['Satışların maliyeti'], 2026, neg) });
+    }
+  });
+  if (cl.length) {
+    var kal0 = KAL.map(function (k) { return { kalem: k, s1: Math.round(sum(t1[k], n)), s2: Math.round(sum(t2[k], n)) }; });
+    var ay0 = [];
+    for (var i = 0; i < n; i++) ay0.push({ ay_no: i + 1, s1: Math.round(t1['Dönem net kârı/zararı'][i]), s2: Math.round(t2['Dönem net kârı/zararı'][i]),
+      satis1: Math.round(t1['Net satışlar'][i]), satis2: Math.round(t2['Net satışlar'][i]) });
+    function topla(y) {
+      var l = cl.map(function (c) { return c.donemler[y]; }), m = l[0].ay_sayisi, out = [];
+      for (var i = 0; i < m; i++) {
+        var o = { ay_no: i + 1 };
+        Object.keys(l[0].aylik[i]).forEach(function (k) { if (k !== 'ay_no') o[k] = l.reduce(function (t, x) { return t + x.aylik[i][k]; }, 0); });
+        out.push(o);
+      }
+      return { ay_sayisi: m, aylik: out };
+    }
+    cl.unshift({ ciftlik: 'Çiftliklerimiz (ESK hariç)', sayfa: '', kalemler: kal0, aylik: ay0, donemler: { '2026': topla('2026'), '2025': topla('2025') } });
+    var k2 = g['Çiftlikler Konsolide (2)'];
+    if (k2 && k2[CR_NET_] && k2[CR_DONEM_KARI_]) {
+      var net2 = sum(k2[CR_NET_]['26'], n), dk2 = sum(k2[CR_DONEM_KARI_]['26'], n), tp = sum(t2['Dönem net kârı/zararı'], n), al = [];
+      for (var a2 = 1; a2 <= n; a2++) al.push(a2);
+      if (Math.abs(net2 - dk2) > 1000) kontrol.push({ tur: 'tutarsizlik', baslik: 'Konsolide (2) – dönem net kârı satırı hatalı', ciftlik: 'Çiftliklerimiz (ESK hariç)',
+        aciklama: '“Çiftlikler Konsolide (2)” sayfasında dönem kârı ' + mn(dk2) + ' mn ₺, vergi karşılığı sıfır olduğu hâlde dönem net kârı ' + mn(net2) +
+          ' mn ₺ yazıyor. Çiftlik sayfalarının toplamı ' + mn(tp) + ' mn ₺ olduğundan analizde toplam kullanılmıştır; satırdaki formül düzeltilmeli.',
+        kaynak: konum('Çiftlikler Konsolide (2)', CR_NET_, 2026, al) + '; karşılaştırılan satır “' + CR_DONEM_KARI_ + '”' });
+      if (k2['NET SATIŞLAR']) {
+        var ns = sum(k2['NET SATIŞLAR']['26'], n);
+        if (Math.abs(ns - sum(t2['Net satışlar'], n)) > 1000) kontrol.push({ tur: 'tutarsizlik', baslik: 'Konsolide (2) – net satış toplamı çiftliklerle uyuşmuyor',
+          aciklama: 'Konsolide (2) net satış ' + mn(ns) + ' mn ₺, çiftlik sayfaları toplamı ' + mn(sum(t2['Net satışlar'], n)) + ' mn ₺.',
+          ciftlik: 'Çiftliklerimiz (ESK hariç)', kaynak: konum('Çiftlikler Konsolide (2)', 'NET SATIŞLAR', 2026, al) });
+      }
+    }
+    cl.slice(1).forEach(function (c) {
+      var ayni = c.aylik.filter(function (a) { return a.satis1 === a.satis2 && Math.abs(a.s1 - a.s2) < 1; }).map(function (a) { return CR_AY_ADLARI_[a.ay_no - 1]; });
+      var farkli = c.aylik.filter(function (a) { return Math.abs(a.s1 - a.s2) >= 1; });
+      if (ayni.length && farkli.length) kontrol.push({ tur: 'bilgi', baslik: c.ciftlik + ' – iki senaryonun aynı olduğu aylar', ciftlik: c.ciftlik,
+        aciklama: ayni.join(', ') + ' aylarında iki sayfa aynı; bu aylarda grup içi alım-satım olmamış ya da piyasa fiyatıyla yeniden değerleme yapılmamış olabilir.' });
+    });
+  }
+  return { aciklama: 'Birinci senaryoda çiftliklerde üretilip grup içinde kullanılan ürünler maliyet bedeliyle aktarılır. İkinci senaryoda ' +
+      '(dosyadaki “2” uzantılı sayfalar) bu ürünler dışarı satılsaydı piyasa satış fiyatıyla, dışarıdan alınsaydı piyasa alış fiyatıyla değerlenir.',
+    donem: 'Ocak–' + CR_AY_ADLARI_[n - 1] + ' 2026', ciftlikler: cl, kontrol: kontrol };
+}
+
+/** Çiftlik Raporları E-Tablosundan ciftlik_rapor_2026.json'u üretir ve Uygulama Verileri'ndeki dosyaya yazar. */
+function ciftlikRaporUret_(tablo) {
+  tablo = tablo || ciftlikRaporTabloBul_();
+  if (!tablo) return { hata: 'Çiftlik Raporları E-Tablosu yok' };
+  var ss = SpreadsheetApp.open(tablo);
+  var o = ciftlikRaporUretCekirdek_(function (ad) {
+    var s = ss.getSheetByName(ad);
+    if (!s) { var l = ss.getSheets().filter(function (x) { return x.getName().trim() === ad; }); s = l[0]; }
+    return s ? s.getDataRange().getValues() : null;
+  }, tablo.getName());
+  o.kaynakGuncelleme = Utilities.formatDate(tablo.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm');
+  DriveApp.getFileById(UYGULAMA_DOSYALARI_.ciftlik_rapor_2026).setContent(JSON.stringify(o));
+  try { CacheService.getScriptCache().remove('dosya_ciftlik_rapor_2026_' + UYGULAMA_DOSYALARI_.ciftlik_rapor_2026 + '_n'); } catch (e) {}
+  return { donem: o.donem, gelir: o.gelir.length, birim: o.birim.length, tarim: o.tarim.length, satis: o.satisDetay.length, smm: o.smmDetay.length, hatalar: o.hatalar };
 }

@@ -567,7 +567,7 @@ List<String> _tesvik(CiftlikRaporu r, _Soru q) {
       '$y teşvik gelirleri: ${[
         for (final k in ['Tarımsal teşvik', 'Buzağı teşviki', 'Süt teşviki', 'İstihdam (SGK) teşvikleri'])
           if (r.tesvikTutar(y, k) != 0) '${k.toLowerCase()} ${mn(r.tesvikTutar(y, k))}',
-      ].join(', ')}${y == 2026 ? ' (Ocak–Eylül)' : ''}.',
+      ].join(', ')}${y == 2026 ? ' (${r.donem.replaceAll(' 2026', '')})' : ''}.',
   ];
 }
 

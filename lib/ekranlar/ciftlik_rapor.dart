@@ -861,9 +861,11 @@ class _Kapsam extends StatelessWidget {
                   'Tarım ve Piyasa Senaryosu sekmeleri gelir tablolarına (Çiftlikler Konsolide, 1604–1614 sayfaları), satış özetine ve satılan '
                   'mamul maliyeti detayına; Gider Raporu sekmesi Çiftlikler Gider Raporu Detay sayfasına; Yem ve Tüketim sekmesi besi-düve, '
                   'duran varlık (sağmal) yem tüketimi ve tarımsal alan tüketim sayfalarına dayanır. Muhasebe yeni xlsx gönderdiğinde '
-                  'Drive\'da Dosya › Google E-Tablolar olarak kaydet ile kopya alınıp aynı klasöre konur.'
+                  'sunucu dosyayı otomatik olarak E-Tabloya dönüştürür. Gelir tabloları, satış ve satılan mamul maliyeti sayfaları sunucuda '
+                  'baştan sona okunur (daha önce dosyanın metin dökümünün ilk ~1 MB\'ı kullanılıyordu). Özet sayfalar detay sayfalarından '
+                  'hesaplandığı için ayrıca kullanılmaz.'
             ),
-            ('Dönem', '2026 verileri Ocak–Eylül dönemini kapsar; karşılaştırmalar 2025’in aynı dokuz ayıyla yapılmıştır.'),
+            ('Dönem', '2026 verileri muhasebenin kapattığı son aya kadar olan dönemi kapsar (dönem başlıkta yazar); karşılaştırmalar 2025’in aynı aylarıyla yapılır.'),
             ('Süt', 'Şekersüt ve Pan-Gev gelir tablosu dosyasında Ağustos 2025’ten itibaren yer aldığından süt birim maliyeti 2025 Ağustos–Aralık ortalamasıyla karşılaştırılmıştır. Daha eski aylar için Maliyet Takip sekmesine bakılabilir.'),
             ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyasındaki özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları; İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme bazında, tamamı okunur (İlaç ve Malzeme sekmesi). Sayfalardaki açıklama notları da gösterilir. Formül hatalı hücreler hesaba katılmaz ve Veri Kalitesi\'nde listelenir.'),
             ('İki senaryo', 'Çiftlik sayfaları (ör. “1605 - Aslım”) grup içi ürünlerin maliyet bedeliyle aktarıldığı fiili durumu; “2” uzantılı sayfalar (ör. “1605 - Aslım 2”) aynı ürünler dışarı satılsaydı piyasa satış fiyatıyla, dışarıdan alınsaydı piyasa alış fiyatıyla hesaplanan durumu gösterir. Kâr / Zarar, Süt, Et ve Tarım sekmeleri birinci senaryoya; Piyasa Senaryosu sekmesi ikisinin karşılaştırmasına dayanır. “Çiftlikler Konsolide (2)” sayfası Taşağıl’ı (ESK) içermez.'),

@@ -15,7 +15,7 @@ import 'senaryo.dart';
 const raporAylari = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
 
 /// Maliyet kalemleri (SMM detayındaki sıra).
-const maliyetBilesenleri = ['Hammadde (yem)', 'Direkt işçilik', 'Enerji', 'Bakım onarım', 'Endirekt işçilik', 'Genel üretim', 'Amortisman'];
+const maliyetBilesenleri = ['Hammadde (yem)', 'Yardımcı malzeme', 'Ambalaj malzemesi', 'Direkt işçilik', 'Enerji', 'Bakım onarım', 'Endirekt işçilik', 'Genel üretim', 'Amortisman'];
 
 const kKonsolide = 'Konsolide (tüm çiftlikler)';
 const kCiftliklerimiz = 'Çiftliklerimiz (ESK hariç)';

@@ -25,9 +25,16 @@ class CrSayfa {
   final int satir, sutun;
 }
 
+class CrMutabakat {
+  const CrMutabakat(this.sayfa, this.karsi, this.ozet, this.detay2026, this.detayTum, this.uyumlu, this.aciklama);
+  final String sayfa, karsi, aciklama;
+  final double ozet, detay2026, detayTum;
+  final bool uyumlu;
+}
+
 class CiftlikRaporTam {
   const CiftlikRaporTam({this.dosya = '', this.guncelleme, this.sayfalar = const [], this.gider = const [], this.yem = const [],
-      this.duranVarlik = const [], this.tarim = const [], this.hatalar = const [], this.donusum = ''});
+      this.duranVarlik = const [], this.tarim = const [], this.hatalar = const [], this.donusum = '', this.mutabakat = const []});
   final String dosya;
   final DateTime? guncelleme;
   final List<CrSayfa> sayfalar;
@@ -37,6 +44,9 @@ class CiftlikRaporTam {
 
   /// Otomatik xlsx → E-Tablo dönüştürmenin durumu (güncel, dönüştürüldü, Drive API hizmeti ekli değil…).
   final String donusum;
+
+  /// Özet / çiftlik bazlı pivot sayfalarının ana detay sayfalarıyla karşılaştırması.
+  final List<CrMutabakat> mutabakat;
 
   bool get bos => sayfalar.isEmpty;
 
@@ -63,6 +73,12 @@ class CiftlikRaporTam {
       tarim: t('tarim'),
       hatalar: [for (final h in l('hatalar')) '$h'],
       donusum: j['donusum'] is Map ? '${(j['donusum'] as Map)['durum'] ?? ''}' : '',
+      mutabakat: [
+        for (final m in l('mutabakat'))
+          if (m is Map)
+            CrMutabakat('${m['sayfa'] ?? ''}', '${m['karsi'] ?? ''}', _n(m['ozet']), _n(m['detay2026']), _n(m['detayTum']),
+                m['durum'] == 'uyumlu', '${m['aciklama'] ?? ''}'),
+      ],
     );
   }
 
