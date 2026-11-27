@@ -100,7 +100,7 @@ class _Icerik extends StatelessWidget {
               for (final s in alarmlar) _SapmaKarti(s: s),
             ]),
           ),
-        for (final kol in const [Kol.hayvancilik, Kol.ziraat])
+        for (final kol in const [Kol.hayvancilik, Kol.ziraat, Kol.esk])
           if (karne.any((k) => k.kol == kol))
             Panel(
               baslik: 'Verimlilik karnesi – ${kolAdi(kol)}',
