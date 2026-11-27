@@ -354,6 +354,13 @@ class VeriDeposu extends ChangeNotifier {
   Future<void> danismaSil(int satir, String eskiSoru) =>
       _islem('danismanlikSil', {'satir': '$satir', 'eskiSoru': eskiSoru});
 
+  /// Kaynak Kapsamı: bütün kaynak dosyaların sayfa / sütun / not envanteri.
+  Future<Map<String, dynamic>> kaynakEnvanteri() => _islem('kaynakEnvanteri', const {});
+
+  /// Kaynak Gezgini: bir kaynak sayfanın satırları (KVKK maskeli), [bas]'tan itibaren [adet] satır.
+  Future<Map<String, dynamic>> kaynakSayfa(String dosya, String sayfa, {int bas = 0, int adet = 500}) =>
+      _islem('kaynakSayfa', {'dosya': dosya, 'sayfa': sayfa, 'bas': '$bas', 'adet': '$adet'});
+
   /// Apps Script'e bir işlem gönderir; cevabı (ok: true) döndürür.
   Future<Map<String, dynamic>> _islem(
       String tur, Map<String, String> alan) async {

@@ -9,6 +9,7 @@
 //  - Haftalık süt, sağmal ve satılan süt Fethiye + Erentepe günlük
 //    kayıtlarından (Hayvan_Günlük) hesaplanır.
 
+import 'kaynak_envanteri.dart';
 import 'esk_rapor.dart';
 import 'mali.dart';
 import 'arac.dart';
@@ -1160,6 +1161,7 @@ class RaporVerisi {
     this.hasatDurumu = const [],
     this.ciftlikRaporTam = const CiftlikRaporTam(),
     this.maliyetTakipDetay = const MaliyetTakipDetay(),
+    this.kaynakEnvanteri = const KaynakEnvanterOzet(),
     this.aracMasraf = const AracMasraflari(),
     this.vetBildirimleri = const [],
     this.olusturma,
@@ -1264,6 +1266,9 @@ class RaporVerisi {
   /// Maliyet Takip › İlaç aşı ve diğer malzemeler, malzeme bazında.
   final MaliyetTakipDetay maliyetTakipDetay;
 
+  /// Kaynak envanteri özeti (kullanılmayan / KVKK hariç / okunamayan sayfalar).
+  final KaynakEnvanterOzet kaynakEnvanteri;
+
   /// Araç masrafları (muhasebe listesi; araç adı × ay × iş alanı).
   final AracMasraflari aracMasraf;
   final List<VetBildirim> vetBildirimleri;
@@ -1294,6 +1299,7 @@ class RaporVerisi {
       hasatDurumu: HasatKaydi.liste(j['hasatDurumu']),
       ciftlikRaporTam: CiftlikRaporTam.json(j['ciftlikRaporTam']),
       maliyetTakipDetay: MaliyetTakipDetay.json(j['maliyetTakipDetay']),
+      kaynakEnvanteri: KaynakEnvanterOzet.json(j['kaynakEnvanteri']),
       aracMasraf: AracMasraflari.json(j['aracMasraf']),
       gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
           .map(GelenDosya.oku)

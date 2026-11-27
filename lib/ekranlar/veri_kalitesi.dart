@@ -1,3 +1,5 @@
+import '../veri/kaynak_envanteri.dart';
+import 'kaynak_kapsami.dart';
 import 'package:flutter/material.dart';
 
 import '../bicim.dart';
@@ -185,6 +187,12 @@ class VeriKalitesi {
     for (final h in v.ciftlikRaporTam.hatalar) {
       konular.add(AcikKonu('Çiftlik Raporları sayfası okunamadı', h, 'Uygulama sahibi'));
     }
+    // Kaynak envanteri: okunamayan dosya / sayfa
+    for (final r in v.kaynakEnvanteri.liste) {
+      if (r.length >= 5 && r[3] == 'hata') {
+        konular.add(AcikKonu('Kaynak okunamadı: ${r[1]}${r[2].isEmpty ? '' : ' › ${r[2]}'}', r[4], 'Uygulama sahibi'));
+      }
+    }
     // Maliyet Takip › İlaç aşı ve diğer malzemeler
     final mtd = v.maliyetTakipDetay;
     for (final h in mtd.hatalar) {
@@ -301,6 +309,30 @@ class _Icerik extends StatelessWidget {
               padding: EdgeInsets.only(bottom: 12),
               child: BilgiKutusu(yazi: 'Kaynak dosyaların değişiklik tarihleri, Apps Script güncellendiğinde görünür.'),
             ),
+          Builder(builder: (context) {
+            final ke = VeriDeposu.ben.veri?.kaynakEnvanteri ?? const KaynakEnvanterOzet();
+            return Panel(
+              baslik: 'Kaynak Kapsamı',
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text(
+                    ke.yok
+                        ? 'Kaynak envanteri henüz hazırlanmadı (Apps Script › kaynakEnvanteriHazirla).'
+                        : '${ke.dosya} dosya · ${ke.sayfa} sayfa: ${ke.kullanilan} piramitte kullanılıyor, '
+                            '${ke.kullanilmayan} henüz kullanılmıyor, ${ke.kvkk} KVKK nedeniyle hariç, ${ke.hata} okunamadı. '
+                            '${ke.not} not / açıklama, ${ke.formulHatasi} formül hatası.${ke.tamam ? '' : ' İnceleme sürüyor.'}',
+                    style: const TextStyle(fontSize: 13, height: 1.4)),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.travel_explore, size: 18),
+                    label: const Text('Sayfa sayfa incele'),
+                    onPressed: () => Navigator.of(context)
+                        .push(MaterialPageRoute<void>(builder: (_) => const KaynakKapsamiEkran())),
+                  ),
+                ),
+              ]),
+            );
+          }),
           Panel(
             baslik: 'Kaynaklar',
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
