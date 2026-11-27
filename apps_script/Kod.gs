@@ -4156,6 +4156,12 @@ function crGelirTablosu_(d) {
   var bs = -1, sut = {};
   for (var r = 0; r < Math.min(10, d.length) && bs < 0; r++) {
     d[r].forEach(function (x, j) {
+      // Başlık hücresi metin ("Ocak 26") ya da xlsx dönüşümünde tarih değeri olabilir.
+      if (Object.prototype.toString.call(x) === '[object Date]' && !isNaN(x.getTime())) {
+        var yy = ('0' + (x.getFullYear() % 100)).slice(-2);
+        if (/^(2[4-9])$/.test(yy)) { sut[yy + '|' + x.getMonth()] = j; bs = r; }
+        return;
+      }
       var m = /^\s*(Ocak|Şubat|Mart|Nisan|Mayıs|Haziran|Temmuz|Ağustos|Eylül|Ekim|Kasım|Aralık)\s+(\d\d)\s*$/.exec(String(x));
       if (m) { sut[m[2] + '|' + CR_AY_ADLARI_.indexOf(m[1])] = j; bs = r; }
     });
@@ -4394,6 +4400,9 @@ function ciftlikRaporUret_(tablo) {
     return s ? s.getDataRange().getValues() : null;
   }, tablo.getName());
   o.kaynakGuncelleme = Utilities.formatDate(tablo.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm');
+  // Güvenlik: gelir tablolarından hiç tutar okunamadıysa mevcut dosyanın üzerine yazılmaz.
+  var dolu = o.gelir.some(function (g) { return g.y2026_9ay || g.y2025_yil; });
+  if (!dolu) return { hata: 'Gelir tablolarında tutar okunamadı; mevcut dosya korunuyor.', hatalar: o.hatalar };
   DriveApp.getFileById(UYGULAMA_DOSYALARI_.ciftlik_rapor_2026).setContent(JSON.stringify(o));
   try { CacheService.getScriptCache().remove('dosya_ciftlik_rapor_2026_' + UYGULAMA_DOSYALARI_.ciftlik_rapor_2026 + '_n'); } catch (e) {}
   return { donem: o.donem, gelir: o.gelir.length, birim: o.birim.length, tarim: o.tarim.length, satis: o.satisDetay.length, smm: o.smmDetay.length, hatalar: o.hatalar };
