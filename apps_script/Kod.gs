@@ -3993,7 +3993,18 @@ function kaynakEnvanteriHazirla() {
     l.forEach(function (x) {
       var fl = x.f, id = fl.getId(), imza = String(fl.getLastUpdated().getTime());
       var e0 = eski[id] || yarim[id];
-      if (e0 && e0.imza === imza && !e0.yarim) { kk.dosyalar.push(e0); if (e0.okunanId) okunan[e0.okunanId] = e0.ad; return; }
+      if (e0 && e0.imza === imza && !e0.yarim) {
+        // Dosya değişmedi: sayfalar yeniden okunmaz, yalnızca piramitteki kullanım durumu güncel kurallara göre yenilenir.
+        (e0.sayfalar || []).forEach(function (s0) {
+          if (s0.durum === 'kullaniliyor' || s0.durum === 'kullanilmiyor' || s0.durum === 'bos') {
+            s0.kullanim = kaynakKullanimBul_(e0, s0.ad);
+            if (s0.durum !== 'bos') s0.durum = s0.kullanim ? 'kullaniliyor' : 'kullanilmiyor';
+          }
+        });
+        if (e0.okunanId && okunan[e0.okunanId] && okunan[e0.okunanId] !== e0.ad) { e0.ayni = okunan[e0.okunanId]; e0.sayfalar = []; }
+        else if (e0.okunanId) okunan[e0.okunanId] = e0.ad;
+        kk.dosyalar.push(e0); return;
+      }
       var onceki = e0 && e0.imza === imza && e0.yarim ? e0.sayfalar || [] : [];
       var kayit = { id: id, kaynakId: x.kaynakId, ad: fl.getName(), tur: fl.getMimeType(), imza: imza,
         guncelleme: Utilities.formatDate(fl.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm'), sayfalar: [] };
