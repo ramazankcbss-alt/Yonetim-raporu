@@ -22,6 +22,25 @@ function kvkkSutunMu_(dosyaAdi, baslik) {
 var KVKK_SAYFA_ = /personel|organizasyon|şoför|sürücü|kişiler|kisiler|kişi olay|mesaj|iletişim|telefon|ekipler|görevlendirme|roller|cihazlar|bildirimler|^mutabakat$|veteriner_bildirim/i;
 var KVKK_SUTUN_ = /tedarikçi|tedarikci|cari|müşteri|musteri|alıcı|alici|satıcı|unvan|ünvan|firma adı|kullanıcı|kullanici|ad[ıi]?\s*[-\/]?\s*soyad|^ad[ıi]?$|^soyad|isim|personel|çalışan|şoför|sürücü|operatör|operator|^tc\b|t\.c\.|kimlik|telefon|^tel\b|gsm|cep no|iban|plaka|adres|e-?posta|mail|imza|bildiren|onaylayan|teslim alan|teslim eden|kişi/i;
 
+// KVKK – ücret / personel satırları: kişi bazında ücret bilgisi uygulamaya gitmez. Satır metninde ücret, maaş, kıdem
+// gibi ifadeler geçen satırlar ile ">> PERSONEL GİDERLERİ" başlığı altındaki satırların tutarları maskelenir
+// (yalnızca grup toplamları özel okuyucularda kullanılır).
+var KVKK_UCRET_ = /ücret|ucret|maaş|maas|kıdem|kidem|ihbar|bordro|sgk prim|sigorta primi|işçi gider|memur gider|personel gider/i;
+var KVKK_BOLUM_ = /^\s*>+\s*PERSONEL|^\s*PERSONEL GİDER/i;
+var KVKK_BOLUM_SON_ = /^\s*>+/;
+/** Satırları sırayla dolaşır; maskelenmesi gereken satır numaralarını (0 tabanlı) döndürür. */
+function kvkkUcretSatirlari_(d) {
+  var m = {}, bolumde = false;
+  for (var i = 0; i < d.length; i++) {
+    var ilk = String(d[i][0] || '').trim(), metin = d[i].map(String).join(' ');
+    if (KVKK_BOLUM_.test(ilk)) { bolumde = true; continue; }
+    if (bolumde && KVKK_BOLUM_SON_.test(ilk)) bolumde = false;
+    if (bolumde || KVKK_UCRET_.test(metin)) m[i] = true;
+  }
+  return m;
+}
+function kvkkSayisalMaske_(x) { return /\d/.test(String(x)) && !/[A-Za-zÇĞİÖŞÜçğıöşü]{3}/.test(String(x)) ? '•••' : x; }
+
 function kvkkHucre_(x) {
   var t = String(x == null ? '' : x);
   if (!t) return t;
@@ -345,8 +364,10 @@ function kaynakSayfa_(dosyaId, sayfa, bas, adet) {
   var bsr = 1;
   (bul.sayfalar || []).forEach(function (s) { if (s.ad === sayfa && s.baslikSatiri) bsr = s.baslikSatiri; });
   var bslk = sh.getRange(bsr, 1, 1, w).getDisplayValues()[0], maske = bslk.map(function (h) { return kvkkSutunMu_(bul.ad, h); });
-  var d = sh.getRange(bas + 1, 1, son - bas, w).getDisplayValues().map(function (r) {
-    return r.map(function (x, j) { return maske[j] && x ? '•••' : kvkkHucre_(x); });
+  var ucret = kvkkUcretSatirlari_(sh.getRange(1, 1, son, w).getDisplayValues());
+  var d = sh.getRange(bas + 1, 1, son - bas, w).getDisplayValues().map(function (r, i) {
+    var u = ucret[bas + i];
+    return r.map(function (x, j) { return maske[j] && x ? '•••' : u ? kvkkSayisalMaske_(kvkkHucre_(x)) : kvkkHucre_(x); });
   });
   return { ok: true, toplam: n, sutun: w, bas: bas, baslikSatiri: bsr, satirlar: d };
 }
@@ -373,6 +394,8 @@ function kaynakTabloTanimlari_() {
 
 /** 2B görüntü değerleri → boş satırlarla ayrılmış bloklar [{satirlar: [[...]]}] (boş sütunlar kırpılır). */
 function kaynakBloklar_(d, maske) {
+  var ucret = kvkkUcretSatirlari_(d);
+  d = d.map(function (r, i) { return ucret[i] ? r.map(kvkkSayisalMaske_) : r; });
   var bloklar = [], cur = [];
   function bitir() {
     if (!cur.length) return;
@@ -390,7 +413,7 @@ function kaynakBloklar_(d, maske) {
 }
 
 function kaynakTablolari_() {
-  var c = CacheService.getScriptCache(), m = parcaliOku_(c, 'kaynakTablolari_v1');
+  var c = CacheService.getScriptCache(), m = parcaliOku_(c, 'kaynakTablolari_v2');
   if (m) { try { return JSON.parse(m); } catch (e) {} }
   var o = { menuler: {}, hatalar: [] };
   kaynakTabloTanimlari_().forEach(function (t) {
@@ -415,6 +438,6 @@ function kaynakTablolari_() {
       });
     } catch (e) { o.hatalar.push(t[1] + ': ' + e); }
   });
-  parcaliYaz_(c, 'kaynakTablolari_v1', JSON.stringify(o));
+  parcaliYaz_(c, 'kaynakTablolari_v2', JSON.stringify(o));
   return o;
 }
