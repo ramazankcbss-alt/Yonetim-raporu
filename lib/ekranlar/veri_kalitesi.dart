@@ -185,6 +185,19 @@ class VeriKalitesi {
     for (final h in v.ciftlikRaporTam.hatalar) {
       konular.add(AcikKonu('Çiftlik Raporları sayfası okunamadı', h, 'Uygulama sahibi'));
     }
+    // Maliyet Takip › İlaç aşı ve diğer malzemeler
+    final mt = v.maliyetTakipDetay;
+    for (final h in mt.hatalar) {
+      konular.add(AcikKonu('Maliyet Takip ayrıntı sayfası okunamadı', h, 'Uygulama sahibi'));
+    }
+    for (final n in mt.notlar) {
+      konular.add(AcikKonu('Maliyet Takip › ${n.tur} · ${n.ciftlik}', n.not, 'Maliyet Takip sorumlusu'));
+    }
+    final fiyatsiz = mt.kalemler.where((k) => k.tutar == 0 && k.miktar > 0).length;
+    if (fiyatsiz > 0) {
+      konular.add(AcikKonu('Maliyet Takip: tutarı girilmemiş malzeme kalemleri',
+          '$fiyatsiz kalemde tüketim miktarı var, birim fiyat / tutar boş veya 0.', 'Maliyet Takip sorumlusu'));
+    }
     // Araç masrafları
     final am = v.aracMasraf;
     if (!am.bos) {

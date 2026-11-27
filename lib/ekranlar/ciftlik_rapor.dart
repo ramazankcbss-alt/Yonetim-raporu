@@ -124,6 +124,7 @@ class _Yil2026 extends StatelessWidget {
         ('Piyasa Senaryosu', _PiyasaSenaryosu(r: r, sabitYil: 2026)),
         ('Gider Raporu', const CrGiderSekmesi()),
         ('Yem ve Tüketim', const CrTuketimSekmesi()),
+        ('İlaç ve Malzeme', const MtDetaySekmesi()),
         ('Kapsam', _Kapsam(r: r)),
       ]);
 }
@@ -864,11 +865,11 @@ class _Kapsam extends StatelessWidget {
             ),
             ('Dönem', '2026 verileri Ocak–Eylül dönemini kapsar; karşılaştırmalar 2025’in aynı dokuz ayıyla yapılmıştır.'),
             ('Süt', 'Şekersüt ve Pan-Gev gelir tablosu dosyasında Ağustos 2025’ten itibaren yer aldığından süt birim maliyeti 2025 Ağustos–Aralık ortalamasıyla karşılaştırılmıştır. Daha eski aylar için Maliyet Takip sekmesine bakılabilir.'),
-            ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyasındaki özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları; İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme ayrıntısı olduğundan özet tablolar üzerinden kullanılmıştır. Formül hatalı hücreler hesaba katılmamıştır.'),
+            ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyasındaki özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları; İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme bazında, tamamı okunur (İlaç ve Malzeme sekmesi). Sayfalardaki açıklama notları da gösterilir. Formül hatalı hücreler hesaba katılmaz ve Veri Kalitesi\'nde listelenir.'),
             ('İki senaryo', 'Çiftlik sayfaları (ör. “1605 - Aslım”) grup içi ürünlerin maliyet bedeliyle aktarıldığı fiili durumu; “2” uzantılı sayfalar (ör. “1605 - Aslım 2”) aynı ürünler dışarı satılsaydı piyasa satış fiyatıyla, dışarıdan alınsaydı piyasa alış fiyatıyla hesaplanan durumu gösterir. Kâr / Zarar, Süt, Et ve Tarım sekmeleri birinci senaryoya; Piyasa Senaryosu sekmesi ikisinin karşılaştırmasına dayanır. “Çiftlikler Konsolide (2)” sayfası Taşağıl’ı (ESK) içermez.'),
             ('Çiftliklerimiz (ESK hariç)', 'Konsolide toplamdan 1604 Taşağıl (ESK besi hizmeti) çıkarılarak hesaplanmıştır.'),
             ('KVKK', 'Rapor yalnızca çiftlik bazında toplam tutar ve birim maliyet içerir; kişi adı, alıcı adı ve küpe numarası yoktur. Personel giderleri yalnızca grup toplamı olarak gösterilir (kıdem tazminatı gibi tek kişiye ait olabilecek kalemler ayrıştırılmaz).'),
-            ('Güncelleme', 'Dosyanın yeni sürümü geldiğinde veri araclar/ciftlik_rapor/uret.py ile yeniden üretilir.'),
+            ('Güncelleme', 'Muhasebe yeni xlsx gönderdiğinde sunucu dosyayı otomatik olarak E-Tabloya dönüştürür ve bütün sayfaları yeniden okur.'),
           ], baslik: 'Kapsam ve notlar'),
         ],
       );

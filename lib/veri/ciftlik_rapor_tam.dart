@@ -88,3 +88,55 @@ class CiftlikRaporTam {
     return m;
   }
 }
+
+/// Maliyet Takip › İLAÇ AŞI ve DİĞER MALZEMELER malzeme ayrıntısı (Apps Script › maliyetTakipDetay_).
+class MtKalem {
+  const MtKalem(this.tur, this.ciftlik, this.yil, this.ay, this.kod, this.malzeme, this.miktar, this.birim, this.fiyat, this.tutar);
+  final String tur, ciftlik, kod, malzeme, birim;
+  final int yil, ay;
+  final double miktar, fiyat, tutar;
+}
+
+class MtNot {
+  const MtNot(this.tur, this.ciftlik, this.yil, this.ay, this.not);
+  final String tur, ciftlik, not;
+  final int yil, ay;
+}
+
+class MaliyetTakipDetay {
+  const MaliyetTakipDetay({this.kalemler = const [], this.notlar = const [], this.hatalar = const []});
+  final List<MtKalem> kalemler;
+  final List<MtNot> notlar;
+  final List<String> hatalar;
+  bool get bos => kalemler.isEmpty;
+
+  static MaliyetTakipDetay json(Object? j) {
+    if (j is! Map) return const MaliyetTakipDetay();
+    List l(String k) => j[k] is List ? j[k] as List : const [];
+    return MaliyetTakipDetay(
+      kalemler: [
+        for (final r in l('kalemler'))
+          if (r is List && r.length >= 10)
+            MtKalem('${r[0]}', '${r[1]}', _i(r[2]), _i(r[3]), '${r[4]}', '${r[5]}', _n(r[6]), '${r[7]}', _n(r[8]), _n(r[9])),
+      ],
+      notlar: [
+        for (final n in l('notlar'))
+          if (n is Map) MtNot('${n['tur']}', '${n['ciftlik']}', _i(n['yil']), _i(n['ay']), '${n['not']}'),
+      ],
+      hatalar: [for (final h in l('hatalar')) '$h'],
+    );
+  }
+
+  List<String> get turler => {for (final k in kalemler) k.tur}.toList();
+  List<String> ciftlikler(String tur) => {for (final k in kalemler) if (k.tur == tur) k.ciftlik}.toList();
+
+  /// Ay anahtarı (yıl*100+ay) → tutar.
+  Map<int, double> aylik(String tur, String ciftlik) {
+    final m = <int, double>{};
+    for (final k in kalemler) {
+      if (k.tur != tur || k.ciftlik != ciftlik) continue;
+      m[k.yil * 100 + k.ay] = (m[k.yil * 100 + k.ay] ?? 0) + k.tutar;
+    }
+    return m;
+  }
+}

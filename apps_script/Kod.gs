@@ -277,16 +277,16 @@ function veriTopla_(gun) {
     dersler: basitOku_('Dersler', 6, tz, BILGI_BANKASI_ID),
     // Araç Takip (ayrı tablo, salt okunur)
     aracListe: basitOku_('Araçlar', 0, tz, ARAC_TABLO_ID),
-    aracKullanim: sonSatirlar_(basitOku_('Kullanım', 0, tz, ARAC_TABLO_ID), 800),
+    aracKullanim: basitOku_('Kullanım', 0, tz, ARAC_TABLO_ID),
     aracPlan: basitOku_('Bakım_Plan', 0, tz, ARAC_TABLO_ID),
-    aracBakim: sonSatirlar_(basitOku_('Bakım_Kayıt', 0, tz, ARAC_TABLO_ID), 500),
-    aracAriza: sonSatirlar_(basitOku_('Arıza', 0, tz, ARAC_TABLO_ID), 400),
+    aracBakim: basitOku_('Bakım_Kayıt', 0, tz, ARAC_TABLO_ID),
+    aracAriza: basitOku_('Arıza', 0, tz, ARAC_TABLO_ID),
     aracMutabakat: [], // KVKK: Mutabakat kontrolü uygulamadan kaldırıldı
-    aracIsEmri: sonSatirlar_(basitOku_('İş_Emirleri', 0, tz, ARAC_TABLO_ID), 600),
+    aracIsEmri: basitOku_('İş_Emirleri', 0, tz, ARAC_TABLO_ID),
     // Bakım Onarım Kayıtları: No, Bildirim zamanı, Çiftlik, Bildiren (görev),
     // Makine/ekipman, İşlem türü, Çalışma saati/km, Yapılan iş, Malzeme/parça,
     // Tedarik durumu, Servis, Durum, Onay (Evet/boş), Onay zamanı
-    bakimOnarim: sonSatirlar_(bakimOnarimOku_(tz), 600),
+    bakimOnarim: bakimOnarimOku_(tz),
     // Mali Raporlar: "Mali Raporlar" klasöründeki en yeni mali_veri.json
     // (fatura özetleri; şahıs tedarikçi adı, fatura no ve plaka içermez)
     mali: maliVeri_(),
@@ -326,6 +326,8 @@ function veriTopla_(gun) {
     hasatDurumu: (function () { try { return hasatDurumuOku_(); } catch (err) { return []; } })(),
     // Çiftlik Raporları (muhasebe) E-Tablo kopyasının tamamı: gider raporu, yem ve tarım tüketimleri
     ciftlikRaporTam: (function () { try { return ciftlikRaporTam_(false); } catch (err) { return null; } })(),
+    // Maliyet Takip › İLAÇ AŞI ve DİĞER MALZEMELER malzeme ayrıntısı
+    maliyetTakipDetay: (function () { try { return maliyetTakipDetay_(); } catch (err) { return null; } })(),
     // Araç masrafları: muhasebe xlsx'i doğrudan okunur (araç adı × ay × iş alanı; plaka/satıcı/belge no yok)
     aracMasraf: (function () { try { return aracMasrafOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
@@ -2084,7 +2086,7 @@ function tarlaVeri_(pay) {
   var dos = [];
   if (acik('tarla')) dos = dos.concat(TARLA_DOSYALARI_);
   // Net Sonuç (Mali) ve Ürün Kârlılığı muhasebe ve maliyet toplamlarına dayanır.
-  if (acik('ciftlikRapor')) al(['ciftlikRaporTam']);
+  if (acik('ciftlikRapor')) al(['ciftlikRaporTam', 'maliyetTakipDetay']);
   if (acik('ciftlikRapor', 'mali', 'urun')) dos = dos.concat(['ciftlik_rapor_2026', 'maliyet_takip_2026']);
   if (acik('aracMasraf')) al(['aracMasraf']);
   if (acik('hastalik')) dos.push('hastalik');
@@ -3588,4 +3590,101 @@ function ciftlikRaporHazirla() {
   Logger.log(o ? (o.dosya + ': ' + o.sayfalar.length + ' sayfa, gider ' + o.gider.length + ', besi-düve yem ' + o.yem.length +
     ', duran varlık ' + o.duranVarlik.length + ', tarım ' + o.tarim.length + ' satır; hata: ' + (o.hatalar.join(' | ') || 'yok'))
     : 'Çiftlik Raporları E-Tablosu bulunamadı.');
+}
+
+
+// ---------------------------------------------------------------------------
+// MALİYET TAKİP – İLAÇ AŞI ve DİĞER MALZEMELER: malzeme bazında ayrıntı (canlı okunur, sınırsız).
+// Sayfa düzeni: çiftlik blokları yan yana (1. satırda çiftlik adı); her blokta ay başlığı ("OCAK : belge",
+// "OCAK AYI"), "MALZEME KODU" başlık satırı, kalemler ve "TOPLAM:". Bloklardaki açıklama yazıları not olarak alınır.
+// KVKK: belge numaraları alınmaz; sayfalarda kişi bilgisi yoktur.
+var MALIYET_TAKIP_ID_ = '1Yj2GfYBZBK7HqDqb-iGG2dlsBnWFUcMWHWyLwF4pEaM';
+
+function mtAyBul_(s) {
+  var t = String(s || '').trim().toLocaleUpperCase('tr');
+  for (var i = 0; i < CR_AYLAR_.length; i++) if (t.indexOf(CR_AYLAR_[i]) === 0) return i + 1;
+  return 0;
+}
+
+function mtSayi_(v) {
+  // "5.160,00-" (SAP tüketim çıkışı) ve "3-" gibi sondaki eksi işareti: tutar mutlak değer olarak alınır.
+  var t = String(v == null ? '' : v).replace(/[₺\s]/g, '').replace(/-$/, '');
+  return eskTrSayi_(t);
+}
+
+function mtSayfaOku_(sh, tur) {
+  var d = sh.getDataRange().getDisplayValues(), out = [], notlar = [];
+  if (!d.length) return { kalemler: out, notlar: notlar };
+  var w = 0;
+  d.forEach(function (r) { if (r.length > w) w = r.length; });
+  function h(r, c) { return String((d[r] || [])[c] == null ? '' : d[r][c]).trim(); }
+  function H(r, c) { return h(r, c).toLocaleUpperCase('tr'); }
+  // Blok başlangıç sütunları: herhangi bir satırında "MALZEME KODU" geçen sütunlar.
+  var bloklar = [];
+  for (var c0 = 0; c0 < w; c0++) for (var r0 = 0; r0 < d.length; r0++) if (H(r0, c0) === 'MALZEME KODU') { bloklar.push(c0); break; }
+  function ciftlik(c) {
+    var en = '', enC = -1;
+    for (var rr = 0; rr < Math.min(d.length, 3); rr++) for (var j = 0; j <= Math.min(c + 1, w - 1); j++) {
+      var t = h(rr, j);
+      if (t && !mtAyBul_(t) && j > enC && !/MALZEME/i.test(t)) { en = t; enC = j; }
+    }
+    return en;
+  }
+  bloklar.forEach(function (c) {
+    var cf = ciftlik(c), ay = 0, yil = 0, sonAy = 0, col = null, sap = false;
+    for (var r = 0; r < d.length; r++) {
+      var x = h(r, c), X = H(r, c), a = mtAyBul_(x);
+      if (a && !h(r, c + 1)) {
+        // Ay başlığı ya da "Şubat ayında ilaç aşı düşülmemiştir." gibi ay ile başlayan açıklama
+        if (!yil) yil = a >= 8 ? 2025 : 2026; else if (a < sonAy) yil++;
+        ay = a; sonAy = a; sap = true; // başlıksız ay: SAP dökümü düzeni beklenir, başlık gelirse değişir
+        if (x.length > 25 && /\s/.test(x) && !/:\s*\d/.test(x)) notlar.push({ tur: tur, ciftlik: cf, yil: yil, ay: a, not: x });
+        continue;
+      }
+      if (X === 'MALZEME KODU') {
+        col = { ad: -1, mik: -1, bir: -1, fiy: -1, top: -1 }; sap = false;
+        for (var j = c + 1; j < Math.min(w, c + 8); j++) {
+          var t = H(r, j);
+          if (!t) { if (col.top >= 0) break; continue; }
+          if (t === 'MALZEME') col.ad = j; else if (t === 'TÜKETİM') col.mik = j;
+          else if (t === 'BİRİM' || t === 'BİRİMİ') col.bir = j; else if (t === 'BİRİM FİYAT') col.fiy = j;
+          else if (/^TOPLAM/.test(t)) col.top = j;
+        }
+        continue;
+      }
+      var ad = h(r, c + 1);
+      if (!x && !ad) continue;
+      if (/^TOPLAM/i.test(ad) || /^TOPLAM/i.test(x)) continue;
+      if (!ay) continue;
+      if (sap && /^16\d\d$/.test(h(r, c + 2))) {
+        // SAP dökümü: kod, malzeme, üretim yeri, miktar-, birim, tutar-, TRY
+        var mk = mtSayi_(h(r, c + 3)) || 0, tt = mtSayi_(h(r, c + 5)) || 0;
+        out.push([tur, cf, yil, ay, x, ad, mk, h(r, c + 4), mk ? Math.round(tt / mk * 100) / 100 : 0, tt]);
+        continue;
+      }
+      if (col && col.ad >= 0 && x && ad) {
+        out.push([tur, cf, yil, ay, x, ad, mtSayi_(h(r, col.mik)) || 0, col.bir >= 0 ? h(r, col.bir) : '',
+          col.fiy >= 0 ? mtSayi_(h(r, col.fiy)) || 0 : 0, col.top >= 0 ? mtSayi_(h(r, col.top)) || 0 : 0]);
+        continue;
+      }
+      if (x.length > 15 && /\s/.test(x) && mtSayi_(x) === null) notlar.push({ tur: tur, ciftlik: cf, yil: yil, ay: ay, not: x });
+    }
+  });
+  return { kalemler: out, notlar: notlar };
+}
+
+/** {kalemler: [[tür, çiftlik, yıl, ay, kod, malzeme, miktar, birim, birim fiyat, tutar]], notlar: [...]} */
+function maliyetTakipDetay_() {
+  return onbellekli_('mtDetay_v2', 1800, function () {
+    var ss = SpreadsheetApp.openById(MALIYET_TAKIP_ID_), o = { kalemler: [], notlar: [], hatalar: [] };
+    [['İLAÇ AŞI', 'İlaç ve aşı'], ['DİĞER MALZEMELER', 'Diğer malzemeler']].forEach(function (s) {
+      try {
+        var sh = ss.getSheetByName(s[0]);
+        if (!sh) { o.hatalar.push(s[0] + ' sayfası yok'); return; }
+        var x = mtSayfaOku_(sh, s[1]);
+        o.kalemler = o.kalemler.concat(x.kalemler); o.notlar = o.notlar.concat(x.notlar);
+      } catch (e) { o.hatalar.push(s[0] + ': ' + e); }
+    });
+    return o;
+  });
 }

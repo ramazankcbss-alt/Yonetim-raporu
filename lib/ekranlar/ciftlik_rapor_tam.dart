@@ -141,3 +141,79 @@ class CrTuketimSekmesi extends StatelessWidget {
         },
       );
 }
+
+/// Çiftlik Sonuçları › İlaç ve Malzeme: Maliyet Takip dosyasının İLAÇ AŞI ve DİĞER MALZEMELER sayfaları.
+class MtDetaySekmesi extends StatefulWidget {
+  const MtDetaySekmesi({super.key});
+  @override
+  State<MtDetaySekmesi> createState() => _MtDetaySekmesiState();
+}
+
+class _MtDetaySekmesiState extends State<MtDetaySekmesi> {
+  String? _tur, _cf;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+        listenable: VeriDeposu.ben,
+        builder: (context, _) {
+          final d = VeriDeposu.ben.veri?.maliyetTakipDetay ?? const MaliyetTakipDetay();
+          if (d.bos) {
+            return const Padding(
+                padding: EdgeInsets.all(16),
+                child: BilgiKutusu(yazi: 'Maliyet Takip ilaç ve malzeme ayrıntısı henüz gelmedi. Apps Script güncel olmalı.'));
+          }
+          final tur = _tur != null && d.turler.contains(_tur) ? _tur! : d.turler.first;
+          final cfl = d.ciftlikler(tur);
+          final cf = _cf != null && cfl.contains(_cf) ? _cf! : cfl.first;
+          final ay = d.aylik(tur, cf);
+          final aylar = ay.keys.toList()..sort();
+          final kal = [for (final k in d.kalemler) if (k.tur == tur && k.ciftlik == cf) k];
+          final mal = <String, (double, double, String)>{};
+          for (final k in kal) {
+            final o = mal[k.malzeme] ?? (0.0, 0.0, k.birim);
+            mal[k.malzeme] = (o.$1 + k.miktar, o.$2 + k.tutar, o.$3.isEmpty ? k.birim : o.$3);
+          }
+          final sira = mal.entries.toList()..sort((a, b) => b.value.$2.compareTo(a.value.$2));
+          final top = kal.fold(0.0, (t, k) => t + k.tutar);
+          final notlar = [for (final n in d.notlar) if (n.tur == tur && n.ciftlik == cf) n];
+          final fiyatsiz = kal.where((k) => k.tutar == 0 && k.miktar > 0).length;
+          return ListView(padding: const EdgeInsets.fromLTRB(14, 8, 14, 24), children: [
+            const BilgiKutusu(
+                yazi: 'Kaynak: ÇİFTLİKLER : MALİYET TAKİP 2026 › İLAÇ AŞI ve DİĞER MALZEMELER sayfaları, malzeme bazında '
+                    '(sayfaların tamamı okunur; belge numaraları alınmaz).'),
+            for (final h in d.hatalar)
+              Padding(padding: const EdgeInsets.only(top: 6), child: BilgiKutusu(uyari: true, yazi: 'Okunamadı: $h')),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, children: [
+              for (final t in d.turler)
+                ChoiceChip(label: Text(t), selected: t == tur, onSelected: (_) => setState(() => _tur = t)),
+            ]),
+            Wrap(spacing: 6, runSpacing: 4, children: [
+              for (final c in cfl) ChoiceChip(label: Text(c), selected: c == cf, onSelected: (_) => setState(() => _cf = c)),
+            ]),
+            for (final n in notlar)
+              Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: BilgiKutusu(uyari: true, yazi: '${n.ay > 0 ? '${_ay[n.ay - 1]} ${n.yil}: ' : ''}${n.not}')),
+            if (fiyatsiz > 0)
+              Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: BilgiKutusu(uyari: true, yazi: '$fiyatsiz kalemde miktar var ama birim fiyat / tutar girilmemiş.')),
+            BolumBasligi('$cf · ${tl(top)}', ikon: Icons.vaccines_outlined),
+            VeriTablosu(
+              basliklar: const ['Ay', 'Tutar'],
+              satirlar: [for (final a in aylar) ['${_ay[a % 100 - 1]} ${a ~/ 100}', tl(ay[a])]],
+            ),
+            const BolumBasligi('Malzeme bazında', ikon: Icons.list_alt),
+            VeriTablosu(
+              basliklar: const ['Malzeme', 'Miktar', 'Tutar'],
+              metinSutunlari: const {0},
+              ilkSutunGenislik: 210,
+              satirlar: [
+                for (final e in sira) [e.key, '${sayi(e.value.$1)} ${e.value.$3}'.trim(), tl(e.value.$2)],
+              ],
+            ),
+          ]);
+        },
+      );
+}

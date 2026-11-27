@@ -1159,6 +1159,7 @@ class RaporVerisi {
     this.gecmisOzet = const GecmisOzet(),
     this.hasatDurumu = const [],
     this.ciftlikRaporTam = const CiftlikRaporTam(),
+    this.maliyetTakipDetay = const MaliyetTakipDetay(),
     this.aracMasraf = const AracMasraflari(),
     this.vetBildirimleri = const [],
     this.olusturma,
@@ -1260,6 +1261,9 @@ class RaporVerisi {
   /// Çiftlik Raporları E-Tablo kopyasının tamamından gelen gider ve tüketim ayrıntıları.
   final CiftlikRaporTam ciftlikRaporTam;
 
+  /// Maliyet Takip › İlaç aşı ve diğer malzemeler, malzeme bazında.
+  final MaliyetTakipDetay maliyetTakipDetay;
+
   /// Araç masrafları (muhasebe listesi; araç adı × ay × iş alanı).
   final AracMasraflari aracMasraf;
   final List<VetBildirim> vetBildirimleri;
@@ -1289,6 +1293,7 @@ class RaporVerisi {
       gecmisOzet: GecmisOzet.json(j['gecmisOzet']),
       hasatDurumu: HasatKaydi.liste(j['hasatDurumu']),
       ciftlikRaporTam: CiftlikRaporTam.json(j['ciftlikRaporTam']),
+      maliyetTakipDetay: MaliyetTakipDetay.json(j['maliyetTakipDetay']),
       aracMasraf: AracMasraflari.json(j['aracMasraf']),
       gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
           .map(GelenDosya.oku)
