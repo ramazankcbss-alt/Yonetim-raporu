@@ -10,6 +10,7 @@
 // KVKK: yalnızca çiftlik, ay, kalem ve tutar / sayı; kişi bilgisi yoktur.
 
 import 'ciftlik_rapor.dart';
+import 'hasat_durumu.dart';
 import 'gelir_gider.dart';
 import 'havuz.dart';
 import 'maliyet_takip.dart';
@@ -104,6 +105,7 @@ List<KarneBolumu> verimlilikKarnesi({
   required int yil,
   required int ay,
   UrunKarlilik? tarim,
+  List<HasatKaydi> hasat = const [],
 }) {
   final out = <KarneBolumu>[];
   final donem = '${raporAylari[ay - 1]} $yil · geçen yılın aynı ayıyla';
@@ -159,7 +161,9 @@ List<KarneBolumu> verimlilikKarnesi({
     for (final u in tarim.urunler) {
       if (u.dekar <= 0) continue;
       final gercekKg = u.teslimKg > 0 ? u.teslimKg : u.faturaKg;
-      out.add(KarneBolumu(Kol.ziraat, u.urun, '${tarim.hasatYili} hasat sezonu · plana göre', [
+      final bitti = hasatTamam(hasat, tarim.hasatYili, u.urun);
+      out.add(KarneBolumu(Kol.ziraat, u.urun,
+          '${tarim.hasatYili} hasat sezonu · ${bitti ? 'hasat tamamlandı, kesin sonuç' : 'hasat / teslimat sürüyor'} · plana göre', [
         KarneGostergesi('Verim', 'kg/da', gercekKg > 0 ? gercekKg / u.dekar : null, gecenYil: u.planKg / u.dekar, ondalik: 0),
         KarneGostergesi('Doğrudan maliyet', '₺/da', u.maliyet / u.dekar, ondalik: 0, yuksekIyi: false),
         KarneGostergesi('Kg maliyeti (ortak dahil)', '₺/kg', u.kgMaliyet, yuksekIyi: false, ondalik: 2),

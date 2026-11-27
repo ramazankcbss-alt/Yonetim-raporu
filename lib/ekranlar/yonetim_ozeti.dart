@@ -78,7 +78,8 @@ class _Icerik extends StatelessWidget {
             teslimat: UrunTakibi(v.tarimsalUretim, v.urunTeslimat));
     final karne = r == null || h1.sonMuhasebeAyi == 0
         ? const <KarneBolumu>[]
-        : verimlilikKarnesi(muhasebe: r!, suru: v.suruHareketleri, yil: h1.yil, ay: h1.sonMuhasebeAyi, tarim: tarim);
+        : verimlilikKarnesi(
+            muhasebe: r!, suru: v.suruHareketleri, yil: h1.yil, ay: h1.sonMuhasebeAyi, tarim: tarim, hasat: v.hasatDurumu);
     final sap = r == null || h1.sonMuhasebeAyi == 0
         ? const <Sapma>[]
         : sapmalar(muhasebe: r!, suru: v.suruHareketleri, faturalar: v.mali.gelirGider, yil: h1.yil, sonAy: h1.sonMuhasebeAyi, mt: mt);

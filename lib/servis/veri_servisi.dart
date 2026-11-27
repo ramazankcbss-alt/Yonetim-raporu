@@ -550,6 +550,13 @@ class VeriDeposu extends ChangeNotifier {
     return (j['mesaj'] ?? 'Kaydedildi.').toString();
   }
 
+  /// Ürünün (ya da "Tümü") hasat durumunu kaydeder: tamamlandı / devam ediyor.
+  Future<String> hasatDurumuKaydet({required int sezon, required String urun, required bool tamam}) async {
+    final j = await _islem('hasatDurumu', {'sezon': '$sezon', 'urun': urun, 'tamam': '$tamam'});
+    await yenile();
+    return (j['mesaj'] ?? 'Kaydedildi.').toString();
+  }
+
   /// Uygulamadan girilmiş teslimat kaydını siler (tabloda "Silindi" olarak işaretlenir).
   Future<String> teslimatSil(int satir) async {
     final j = await _islem('teslimatSil', {'satir': '$satir'});

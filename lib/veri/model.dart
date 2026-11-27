@@ -19,6 +19,7 @@ import 'stok_suru.dart';
 import 'esk_kaynak.dart';
 import 'arac_masraf.dart';
 import 'gecmis_ozet.dart';
+import 'hasat_durumu.dart';
 
 export 'arac.dart';
 export 'bakim_onarim.dart';
@@ -1155,6 +1156,7 @@ class RaporVerisi {
     this.eskKaynak = const EskKaynak(),
     this.eskEk = const EskEk(),
     this.gecmisOzet = const GecmisOzet(),
+    this.hasatDurumu = const [],
     this.aracMasraf = const AracMasraflari(),
     this.vetBildirimleri = const [],
     this.olusturma,
@@ -1250,6 +1252,9 @@ class RaporVerisi {
   /// Geçmiş yıl özetleri (kesim/alım 2021–2026, değerlendirme raporu göstergeleri).
   final GecmisOzet gecmisOzet;
 
+  /// Hasadı tamamlanan ürünler (sezon × ürün).
+  final List<HasatKaydi> hasatDurumu;
+
   /// Araç masrafları (muhasebe listesi; araç adı × ay × iş alanı).
   final AracMasraflari aracMasraf;
   final List<VetBildirim> vetBildirimleri;
@@ -1277,6 +1282,7 @@ class RaporVerisi {
       eskKaynak: EskKaynak.json(j['eskKaynak']),
       eskEk: EskEk.json(j['eskEk']),
       gecmisOzet: GecmisOzet.json(j['gecmisOzet']),
+      hasatDurumu: HasatKaydi.liste(j['hasatDurumu']),
       aracMasraf: AracMasraflari.json(j['aracMasraf']),
       gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
           .map(GelenDosya.oku)

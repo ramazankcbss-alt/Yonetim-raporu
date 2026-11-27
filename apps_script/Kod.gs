@@ -322,6 +322,8 @@ function veriTopla_(gun) {
     eskEk: (function () { try { return eskEk_(); } catch (err) { return null; } })(),
     // Geçmiş yıl özetleri: kesim ve canlı hayvan alımı (2021–), tarım net gelir, süt verimi, ölüm oranları
     gecmisOzet: (function () { try { return gecmisOzet_(); } catch (err) { return null; } })(),
+    // Hasadı tamamlanan ürünler (sezon × ürün; "Tümü" o sezonun bütün ürünleri)
+    hasatDurumu: (function () { try { return hasatDurumuOku_(); } catch (err) { return []; } })(),
     // Araç masrafları: muhasebe xlsx'i doğrudan okunur (araç adı × ay × iş alanı; plaka/satıcı/belge no yok)
     aracMasraf: (function () { try { return aracMasrafOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
@@ -470,6 +472,7 @@ function doPost(e) {
     if (govde.tur === 'parselSinir' || govde.tur === 'parselSinirGeriAl') return json_(parselSinir_(govde));
     if (govde.tur === 'tarlaSezonEkle' || govde.tur === 'tarlaSezonSil') return json_(tarlaSezon_(govde));
     if (govde.tur === 'teslimatEkle' || govde.tur === 'teslimatSil') return json_(teslimatKaydet_(govde));
+    if (govde.tur === 'hasatDurumu') return json_(hasatDurumuKaydet_(govde));
     if (String(govde.tur).indexOf('vet') === 0) return json_(vetYonetim_(govde));
     var ss = SpreadsheetApp.openById(OZEL_DOSYA_ID);
     var tz = ss.getSpreadsheetTimeZone() || 'Europe/Istanbul';
@@ -1399,7 +1402,7 @@ function teslimatTopla_(g, k) {
  * çiftlik adı veya "kantar" yazan ek sütun çiftlik kantarına atanır. Plaka ve satıcı no okunmaz (KVKK).
  */
 function tarkopTablolari_(blob) {
-  var out = [], CIFT = /(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|TAŞAĞIL|ORMANLIK|FİDANLIK)/;
+  var out = [], CIFT = /(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|FETHİYE|TAŞAĞIL|ORMANLIK|FİDANLIK)/;
   xlsxSatirlari_(blob).forEach(function (satirlar) {
     var s = null;
     for (var i = 0; i < satirlar.length; i++) {
@@ -1470,7 +1473,7 @@ function tarkopOku_(g, kaynaklar) {
       guncelleme: Utilities.formatDate(f.getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm') });
   });
 
-  var adCiftlik = (/(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|TAŞAĞIL|ORMANLIK|FİDANLIK)/i.exec(ana.getName()) || [])[1];
+  var adCiftlik = (/(ASLIM|ŞEKER\s*SÜT|ŞEKERSÜT|FETHİYE|TAŞAĞIL|ORMANLIK|FİDANLIK)/i.exec(ana.getName()) || [])[1];
   // Aynı tartım no birden fazla satırda gelebilir (bir sefer iki parçaya bölünmüş): net miktarlar toplanır,
   // sefer ve fireli miktar bir kez sayılır. Birebir aynı satırlar yalnızca bir kez alınır.
   var tartimlar = {}, sira = [];
@@ -1547,7 +1550,7 @@ function elleTeslimatOku_(g, kaynaklar, elle) {
 }
 
 function urunTeslimatlari_() {
-  return onbellekli_('teslimat_v2', 600, function () {
+  return onbellekli_('teslimat_v3', 600, function () {
     var g = {}, kaynaklar = [], hatalar = [], elle = [];
     [tarkopOku_, patatesOku_, elleTeslimatOku_].forEach(function (f) {
       try { f(g, kaynaklar, elle); } catch (e) { hatalar.push(String(e).slice(0, 200)); }
@@ -2058,6 +2061,7 @@ function tarlaVeri_(pay) {
     o.tarim = (v.tarim || []).filter(function (r) { return paylasimHayvanMi_(r[2]) ? acik('hayvan') : acik('ziraat'); });
   }
   if (acik('ziraat', 'tarla')) al(['ekim', 'hasat']);
+  if (acik('ziraat', 'urun')) al(['hasatDurumu']);
   if (acik('tarla')) al(['cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel', 'tarlaSezonlari']);
   if (acik('esk')) al(['eskAylik', 'eskBilgi', 'eskKaynak', 'eskEk']);  // eskKaynak: yalnızca toplamlar (plaka/şoför yok)
   if (acik('stokSuru')) al(['suruHareketleri', 'stokSayimi']);  // sayılar; not sütunları zaten okunmaz
@@ -3388,4 +3392,35 @@ function gecmisOzet_() {
     } catch (e) { o.hatalar.push('Değerlendirme raporu: ' + e); }
     return o;
   });
+}
+
+
+// ---------------------------------------------------------------------------
+// HASAT DURUMU: hasadı / teslimatı tamamlanan ürünler. Sayfa: "Hasat Durumu" (Sezon, Ürün, Durum, Tarih).
+// Ürün "Tümü" ise o sezonun bütün ürünleri tamamlanmış sayılır. Kişisel veri içermez.
+var HASAT_SAYFASI_ = 'Hasat Durumu';
+
+function hasatSayfasi_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet(), sh = ss.getSheetByName(HASAT_SAYFASI_);
+  if (!sh) { sh = ss.insertSheet(HASAT_SAYFASI_); sh.getRange(1, 1, 1, 4).setValues([['Sezon', 'Ürün', 'Durum', 'Tarih']]); }
+  return sh;
+}
+
+function hasatDurumuOku_() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(HASAT_SAYFASI_);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sh.getRange(2, 1, sh.getLastRow() - 1, 4).getDisplayValues()
+    .filter(function (r) { return r[0] && r[1]; })
+    .map(function (r) { return { sezon: Number(r[0]), urun: String(r[1]).trim(), tamam: /tamam/i.test(r[2]), tarih: String(r[3] || '') }; });
+}
+
+function hasatDurumuKaydet_(g) {
+  var sezon = Number(g.sezon), urun = String(g.urun || '').trim(), tamam = String(g.tamam) === 'true';
+  if (!sezon || !urun) return { ok: false, hata: 'Sezon ve ürün gerekli.' };
+  var sh = hasatSayfasi_(), son = sh.getLastRow();
+  var v = son > 1 ? sh.getRange(2, 1, son - 1, 2).getDisplayValues() : [], satir = -1;
+  for (var i = 0; i < v.length; i++) if (Number(v[i][0]) === sezon && String(v[i][1]).trim() === urun) { satir = i + 2; break; }
+  var deger = [[sezon, urun, tamam ? 'Tamamlandı' : 'Devam ediyor', Utilities.formatDate(new Date(), 'Europe/Istanbul', 'dd.MM.yyyy')]];
+  if (satir > 0) sh.getRange(satir, 1, 1, 4).setValues(deger); else sh.appendRow(deger[0]);
+  return { ok: true, mesaj: urun + (tamam ? ': hasat tamamlandı olarak işaretlendi.' : ': hasat devam ediyor olarak işaretlendi.') };
 }

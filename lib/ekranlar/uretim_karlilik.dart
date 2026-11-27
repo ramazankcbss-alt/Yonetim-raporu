@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../bicim.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
+import '../veri/hasat_durumu.dart';
 import '../veri/model.dart';
 import '../veri/urun_takip.dart';
 import 'bilesenler.dart';
@@ -42,7 +43,15 @@ class UretimKarlilikEkran extends StatelessWidget {
           child: Scaffold(
             appBar: AppBar(
               title: Text(baslik),
-              actions: const [TabloGuncelleButonu()],
+              actions: [
+                if (!VeriDeposu.ben.paylasimLinki && !v.tarimsalUretim.bos)
+                  IconButton(
+                    tooltip: 'Hasat durumu',
+                    icon: const Icon(Icons.task_alt),
+                    onPressed: () => _hasatDurumuAc(context, v, t),
+                  ),
+                const TabloGuncelleButonu(),
+              ],
               bottom: const TabBar(
                 labelColor: Colors.white,
                 unselectedLabelColor: Color(0xCCFFFFFF),
@@ -87,7 +96,11 @@ class _Urunler extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
         children: [
           _GenelToplam(t: t, v: v),
-          for (final (u, parcalar) in t.urunler) _UrunKarti(d: u, parcalar: parcalar),
+          for (final (u, parcalar) in t.urunler)
+            _UrunKarti(d: u, parcalar: parcalar, hasatBitti: () {
+              final y = sezonYili(v.tarimsalUretim.yilBasligi);
+              return y != null && hasatTamam(v.hasatDurumu, y, u.urun);
+            }()),
           _Kaynak(v: v),
         ],
       );
@@ -178,16 +191,21 @@ String _basHarf(String s) {
 }
 
 class _UrunKarti extends StatelessWidget {
-  const _UrunKarti({required this.d, required this.parcalar});
+  const _UrunKarti({required this.d, required this.parcalar, this.hasatBitti = false});
   final UrunDurumu d;
   final List<UrunDurumu> parcalar;
 
+  /// Hasat durumu "tamamlandı" olarak işaretlenmiş mi (sağ üstteki Hasat durumu düğmesi).
+  final bool hasatBitti;
+
   @override
   Widget build(BuildContext context) {
-    final durum = !d.teslimatVar
+    final durum = hasatBitti
+        ? ('Hasat tamamlandı', Renk.yesil, Renk.yesilAcik)
+        : !d.teslimatVar
         ? ('Teslimat yok', Renk.soluk, Renk.zemin)
         : (d.kalan <= 0 || (d.ilerleme ?? 0) >= 98)
-            ? ('Tamamlandı', Renk.yesil, Renk.yesilAcik)
+            ? ('Teslimat tamamlandı', Renk.yesil, Renk.yesilAcik)
             : ('Devam ediyor', Renk.mavi, Renk.maviAcik);
     final planKar = d.planNet >= 0;
     return Panel(
@@ -499,4 +517,61 @@ class _Kaynak extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// Hasat durumu: ürün bazında "tamamlandı" işareti (sunucuda "Hasat Durumu" sayfasına yazılır).
+Future<void> _hasatDurumuAc(BuildContext context, RaporVerisi v, UrunTakibi t) async {
+  final sezon = sezonYili(v.tarimsalUretim.yilBasligi);
+  if (sezon == null) return;
+  final urunler = [for (final (u, _) in t.urunler) u.urun];
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (ctx) => ListenableBuilder(
+      listenable: VeriDeposu.ben,
+      builder: (ctx, _) {
+        final l = (VeriDeposu.ben.veri ?? v).hasatDurumu;
+        final hepsi = urunler.isNotEmpty && urunler.every((u) => hasatTamam(l, sezon, u));
+        Future<void> kaydet(String urun, bool tamam) async {
+          final m = ScaffoldMessenger.of(context);
+          try {
+            final s = await VeriDeposu.ben.hasatDurumuKaydet(sezon: sezon, urun: urun, tamam: tamam);
+            m.showSnackBar(SnackBar(content: Text(s)));
+          } catch (e) {
+            m.showSnackBar(SnackBar(content: Text('Kaydedilemedi: $e')));
+          }
+        }
+
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.8),
+            child: ListView(shrinkWrap: true, padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), children: [
+              Text('$sezon hasat durumu', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              const Text(
+                  'Hasadı ve teslimatı biten ürünü işaretleyin. Ürün kartında ve Yönetim Özeti karnesinde '
+                  '"Hasat tamamlandı, kesin sonuç" olarak görünür.',
+                  style: TextStyle(fontSize: 12.5, color: Renk.soluk)),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Tüm ürünler', style: TextStyle(fontWeight: FontWeight.w700)),
+                value: hepsi,
+                onChanged: (x) => kaydet(kTumUrunler, x),
+              ),
+              const Divider(),
+              for (final u in urunler)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(u),
+                  value: hasatTamam(l, sezon, u),
+                  onChanged: (x) => kaydet(u, x),
+                ),
+            ]),
+          ),
+        );
+      },
+    ),
+  );
 }
