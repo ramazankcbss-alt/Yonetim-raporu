@@ -7,6 +7,7 @@ import '../veri/model.dart';
 import '../veri/urun_takip.dart';
 import 'bilesenler.dart';
 import 'gonder.dart';
+import 'urun_karlilik.dart';
 
 String _tl(double v) => '${v < 0 ? '−' : ''}${sayi(v.abs())} ₺';
 
@@ -37,7 +38,7 @@ class UretimKarlilikEkran extends StatelessWidget {
         final yil = v.tarimsalUretim.yilBasligi;
         final baslik = yil.isEmpty ? 'Ürün Takibi' : '$yil Ürün Takibi';
         return DefaultTabController(
-          length: 3,
+          length: 4,
           child: Scaffold(
             appBar: AppBar(
               title: Text(baslik),
@@ -46,7 +47,9 @@ class UretimKarlilikEkran extends StatelessWidget {
                 labelColor: Colors.white,
                 unselectedLabelColor: Color(0xCCFFFFFF),
                 indicatorColor: Colors.white,
-                tabs: [Tab(text: 'Ürünler'), Tab(text: 'Çiftlikler'), Tab(text: 'Teslimatlar')],
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                tabs: [Tab(text: 'Ürünler'), Tab(text: 'Çiftlikler'), Tab(text: 'Teslimatlar'), Tab(text: 'Ürün Kârlılığı')],
               ),
             ),
             floatingActionButton: FloatingActionButton.extended(
@@ -65,6 +68,7 @@ class UretimKarlilikEkran extends StatelessWidget {
                     GonderAlani(konu: '$baslik – Ürünler', child: _Urunler(t: t, v: v)),
                     GonderAlani(konu: '$baslik – Çiftlikler', child: _Ciftlikler(t: t, v: v)),
                     GonderAlani(konu: '$baslik – Teslimatlar', child: _Teslimatlar(t: t, v: v)),
+                    GonderAlani(konu: '$baslik – Ürün Kârlılığı', child: UrunKarlilikSekmesi(v: v, t: t)),
                   ]),
           ),
         );
