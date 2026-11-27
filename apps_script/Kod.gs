@@ -3129,6 +3129,21 @@ function eskSutunlar_(d, kurallar) {
   return null;
 }
 
+
+/** Ada göre e-tablolar: Drive araması + ortak sürücüdeki bilinen klasörler (arama ortak sürücüyü kapsamayabilir). */
+function eskTablolar_(sorgu, klasorler, desen) {
+  var gor = {}, out = [];
+  function ekle(f) {
+    if (gor[f.getId()] || f.getMimeType() !== MimeType.GOOGLE_SHEETS || !desen.test(f.getName())) return;
+    gor[f.getId()] = 1; out.push(f);
+  }
+  try { var it = DriveApp.searchFiles(sorgu); while (it.hasNext()) ekle(it.next()); } catch (e) {}
+  (klasorler || []).forEach(function (id) {
+    try { var it2 = DriveApp.getFolderById(id).getFiles(); while (it2.hasNext()) ekle(it2.next()); } catch (e) {}
+  });
+  return out;
+}
+
 function eskEk_() {
   return onbellekli_('eskEk_v1', 1800, function () {
     var o = { kesim: [], olum: [], kasaplik: [], balya: [], gubre: [], nakliye: [], gelir: [], hatalar: [] };
@@ -3137,9 +3152,10 @@ function eskEk_() {
 
     // 1) Aylık ithal kesim / ölüm listeleri ("TAŞAĞIL-ESK İTHAL ÖLÜM / KESİM <AY> <YIL>")
     try {
-      var kes = {}, olu = {}, it = DriveApp.searchFiles("title contains 'İTHAL ÖLÜM' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
-      while (it.hasNext()) {
-        var ss = SpreadsheetApp.open(it.next());
+      var kes = {}, olu = {};
+      eskTablolar_("title contains 'İTHAL ÖLÜM' and trashed = false",
+          ['1yCcs1qxL2IpueOvtAAo-DNrDAnt3nPzg', '1XlmipOR_EVEUSFM5iRjLm5MyqUK5rN9u', '0AP3nZiFWLpVHUk9PVA'], /İTHAL ÖLÜM/i).forEach(function (dosya) {
+        var ss = SpreadsheetApp.open(dosya);
         var sk = ss.getSheetByName('KESİM'), so = ss.getSheetByName('ÖLÜM');
         if (sk) {
           var d = sk.getDataRange().getDisplayValues();
@@ -3167,16 +3183,15 @@ function eskEk_() {
             topla(y.neden, String(d2[j][c2.neden] || 'Belirtilmemiş').trim() || 'Belirtilmemiş', 1);
           }
         }
-      }
+      });
       o.kesim = Object.keys(kes).map(function (k) { return kes[k]; });
       o.olum = Object.keys(olu).map(function (k) { return olu[k]; });
     } catch (e) { hata('İthal kesim/ölüm', e); }
 
     // 2) Kasaplık hayvan listeleri: parti başına çiftlik kantarı net, adet, liman adet ve ağırlık
     try {
-      var it2 = DriveApp.searchFiles("title contains 'KASAPLIK HAYVAN' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
-      while (it2.hasNext()) {
-        SpreadsheetApp.open(it2.next()).getSheets().forEach(function (sh) {
+      eskTablolar_("title contains 'KASAPLIK HAYVAN' and trashed = false", ['12iVwe-Ic5bzU9ha87AkgZgkUej71VgvC'], /KASAPLIK/i)
+        .forEach(function (dosya) { SpreadsheetApp.open(dosya).getSheets().forEach(function (sh) {
           var pm = sh.getName().match(/(\d+)\s*\.?\s*PART/i);
           if (!pm) return;
           var d = sh.getDataRange().getDisplayValues();
@@ -3194,8 +3209,7 @@ function eskEk_() {
             if (c.lkg !== undefined) p.limanKg += eskTrSayi_(d[i][c.lkg]) || 0;
           }
           if (p.adet) o.kasaplik.push(p);
-        });
-      }
+        }); });
       o.kasaplik.sort(function (a, b) { return a.parti - b.parti; });
     } catch (e) { hata('Kasaplık listesi', e); }
 
@@ -3235,9 +3249,9 @@ function eskEk_() {
 
     // 5) Kesim nakliyesi ("ESK NAKLİYE <AY> <YIL>"): ay başına sefer ve taşınan hayvan
     try {
-      var n = {}, it3 = DriveApp.searchFiles("title contains 'ESK NAKLİYE' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
-      while (it3.hasNext()) {
-        SpreadsheetApp.open(it3.next()).getSheets().forEach(function (sh) {
+      var n = {};
+      eskTablolar_("title contains 'ESK NAKLİYE' and trashed = false", [], /NAKLİYE/i).forEach(function (dosya) {
+        SpreadsheetApp.open(dosya).getSheets().forEach(function (sh) {
           var d = sh.getDataRange().getDisplayValues();
           var c = eskSutunlar_(d, { tarih: /^TARİH$/, adet: /HAYVAN SAYISI/ });
           if (!c) return;
@@ -3248,7 +3262,7 @@ function eskEk_() {
             x.sefer++; x.hayvan += a;
           }
         });
-      }
+      });
       o.nakliye = Object.keys(n).map(function (k) { return n[k]; });
     } catch (e) { hata('Nakliye', e); }
 
