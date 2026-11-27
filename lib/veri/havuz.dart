@@ -93,7 +93,10 @@ class Mutabakat {
 
 class GelirGiderHavuzu {
   GelirGiderHavuzu._(this.yil, this.aylar, this.esk, this.sonMuhasebeAyi, this.sonFaturaAyi, this.yatirimlar, this.kolUyusmazliklari,
-      this.muhasebeKonsolide, this.tarimBirimMaliyet, this.muhasebeVar);
+      this.muhasebeKonsolide, this.tarimBirimMaliyet, this.muhasebeVar, this.senaryo);
+
+  /// 1: grup içi aktarımlar maliyet bedeliyle; 2: piyasa satış / alış fiyatıyla (muhasebe 2. senaryo).
+  final int senaryo;
 
   final int yil;
 
@@ -168,6 +171,7 @@ class GelirGiderHavuzu {
     CiftlikRaporu? muhasebe,
     Map<String, double> mtKgMaliyet = const {},
     int? yil,
+    int senaryo = 1,
   }) {
     final y = yil ?? _yil(faturalar, muhasebe);
     final aylar = {for (final c in kHavuzCiftlikleri) c: [for (var m = 1; m <= 12; m++) HavuzAy(c, y, m)]};
@@ -219,8 +223,9 @@ class GelirGiderHavuzu {
         if (d == null) continue;
         for (var m = 1; m <= d.aySayisi && m <= 12; m++) {
           final a = aylar[c]![m - 1];
-          final ns = d.ay(m, 'Net satışlar', 1), smm = d.ay(m, 'Satışların maliyeti', 1), fg = d.ay(m, 'Faaliyet giderleri', 1);
-          final net = d.ay(m, 'Dönem net kârı/zararı', 1);
+          final ns = d.ay(m, 'Net satışlar', senaryo), smm = d.ay(m, 'Satışların maliyeti', senaryo);
+          final fg = d.ay(m, 'Faaliyet giderleri', senaryo);
+          final net = d.ay(m, 'Dönem net kârı/zararı', senaryo);
           if (ns == 0 && smm == 0 && fg == 0 && net == 0) continue;
           a
             ..kesin = true
@@ -235,7 +240,7 @@ class GelirGiderHavuzu {
         }
       }
       final k = sc.ciftlik(kKonsolideMuhasebe)?.donemler[y];
-      if (k != null && sonMuh > 0) konsolide = k.toplam('Dönem net kârı/zararı', 1, ayaKadar: sonMuh);
+      if (k != null && sonMuh > 0) konsolide = k.toplam('Dönem net kârı/zararı', senaryo, ayaKadar: sonMuh);
     }
     if (muhasebe != null) {
       for (final s in muhasebe.aylik) {
@@ -318,7 +323,7 @@ class GelirGiderHavuzu {
       }
     }
 
-    return GelirGiderHavuzu._(y, aylar, esk, sonMuh, sonFatura, yatirim, uyusmaz, konsolide, birim, muhasebe != null);
+    return GelirGiderHavuzu._(y, aylar, esk, sonMuh, sonFatura, yatirim, uyusmaz, konsolide, birim, muhasebe != null, senaryo);
   }
 
   static int _yil(GelirGider f, CiftlikRaporu? m) {

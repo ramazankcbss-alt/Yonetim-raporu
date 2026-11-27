@@ -52,6 +52,13 @@ class KarlilikUrun {
   /// İç kullanıma düşen maliyet: toplam doğrudan maliyetten satılan kısmın muhasebe maliyeti düşülür.
   double get icMaliyet => icKullanim ? maliyet - muhSmm : 0;
 
+  /// İç kullanılan miktarın doğrudan maliyeti (miktar oranında): maliyet bedeliyle aktarımda bu tutar satış sayılır.
+  double get icTransferMaliyeti => icKullanim && planKg > 0 ? maliyet * icKg / planKg : 0;
+
+  /// İç transfer maliyet bedeliyle: dışarı satılan kısım plan fiyatıyla, iç kullanılan kısım doğrudan maliyetiyle.
+  double get satisMaliyetBedeli => planSatis - icPiyasaDegeri + icTransferMaliyeti;
+  double get netKarMaliyetBedeli => satisMaliyetBedeli - maliyet - ortakPay;
+
   double _t(double Function(KarlilikCiftlik) f) => ciftlikler.values.fold(0.0, (a, c) => a + f(c));
   double get dekar => _t((c) => c.dekar);
   double get planKg => _t((c) => c.planKg);
@@ -99,6 +106,7 @@ class UrunKarlilik {
   final ({double satis1, double satis2, double smm1, double smm2, double brut1, double brut2, double net1, double net2})? senaryo;
 
   double get icPiyasaDegeri => _t((u) => u.icPiyasaDegeri);
+  double get netKarMaliyetBedeli => _t((u) => u.netKarMaliyetBedeli);
   double get icMaliyet => _t((u) => u.icMaliyet);
 
   final List<KarlilikUrun> urunler;

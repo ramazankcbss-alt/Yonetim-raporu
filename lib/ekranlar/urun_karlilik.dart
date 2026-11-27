@@ -4,6 +4,7 @@ import '../bicim.dart';
 import '../tema.dart';
 import '../veri/ciftlik_rapor.dart';
 import '../veri/dosyalar.dart';
+import '../veri/havuz.dart';
 import '../veri/maliyet_takip.dart';
 import '../veri/model.dart';
 import '../veri/urun_karlilik.dart';
@@ -102,6 +103,7 @@ class _UrunKarlilikSekmesiState extends State<UrunKarlilikSekmesi> {
         _Tablo(k: k),
         if (k.muhasebeVar) _Muhasebe(k: k),
         if (k.senaryo != null) _Senaryo(k: k),
+        if (muhasebe != null) _DonemBaglantisi(k: k, v: widget.v, muhasebe: muhasebe),
         for (final u in k.urunler) _UrunKarti(u: u),
         _Kontroller(k: k),
         _Kaynak(k: k, v: widget.v),
@@ -123,7 +125,10 @@ class _Ozet extends StatelessWidget {
           _Satir('Doğrudan maliyet', _mn(k.maliyet)),
           _Satir('Ortak gider öncesi kâr', _mn(k.brutKar), renk: _renk(k.brutKar)),
           _Satir('Tarım ortak giderleri', '−${_mn(k.ortakPay)}'),
-          _Satir('Net ürün kârı', _mn(k.netKar), renk: _renk(k.netKar), kalin: true),
+          _Satir('Net ürün kârı (iç transfer piyasa fiyatıyla)', _mn(k.netKar), renk: _renk(k.netKar), kalin: true),
+          if (k.icPiyasaDegeri > 0)
+            _Satir('Net ürün kârı (iç transfer maliyet bedeliyle)', _mn(k.netKarMaliyetBedeli),
+                renk: _renk(k.netKarMaliyetBedeli), kalin: true),
           if (k.ekGelirler.isNotEmpty || k.tarimsalTesvik > 0) ...[
             for (final e in k.ekGelirler) _Satir('+ ${_basHarf(e.$1)} (plan)', _mn(e.$2)),
             if (k.tarimsalTesvik > 0) _Satir('+ Tarımsal teşvik (muhasebe, ${k.muhasebeDonem})', _mn(k.tarimsalTesvik)),
@@ -168,6 +173,7 @@ class _Tablo extends StatelessWidget {
             DataColumn(label: Text('Ortak\npay'), numeric: true),
             DataColumn(label: Text('Net'), numeric: true),
             DataColumn(label: Text('₺/da'), numeric: true),
+            DataColumn(label: Text('Net\n(maliyet b.)'), numeric: true),
             DataColumn(label: Text('Faturalanan'), numeric: true),
           ],
           rows: [
@@ -181,6 +187,7 @@ class _Tablo extends StatelessWidget {
                 h(m(u.ortakPay)),
                 h(m(u.netKar), r: _renk(u.netKar), kalin: true),
                 h(sayi(u.dekarNet), r: _renk(u.dekarNet)),
+                h(m(u.netKarMaliyetBedeli), r: _renk(u.netKarMaliyetBedeli)),
                 h(m(u.faturaTutar)),
               ]),
             DataRow(color: const WidgetStatePropertyAll(Renk.anaAcik), cells: [
@@ -192,6 +199,7 @@ class _Tablo extends StatelessWidget {
               h(m(k.ortakPay), kalin: true),
               h(m(k.netKar), r: _renk(k.netKar), kalin: true),
               h(k.dekar > 0 ? sayi(k.netKar / k.dekar) : '—', kalin: true),
+              h(m(k.netKarMaliyetBedeli), r: _renk(k.netKarMaliyetBedeli), kalin: true),
               h(m(k.faturaTutar), kalin: true),
             ]),
           ],
@@ -265,6 +273,42 @@ class _Muhasebe extends StatelessWidget {
   }
 }
 
+/// Ürün Kârlılığı (hasat sezonu) ile Net Sonuç'taki Tarımsal Alan muhasebe dönem sonucu arasındaki bağlantı.
+class _DonemBaglantisi extends StatelessWidget {
+  const _DonemBaglantisi({required this.k, required this.v, required this.muhasebe});
+  final UrunKarlilik k;
+  final RaporVerisi v;
+  final CiftlikRaporu muhasebe;
+
+  @override
+  Widget build(BuildContext context) {
+    final kg = {for (final u in k.urunler) if (u.planKg > 0 && !u.tahminiMaliyetVar) u.urun: u.maliyet / u.planKg};
+    final h1 = GelirGiderHavuzu.hesapla(faturalar: v.mali.gelirGider, muhasebe: muhasebe, mtKgMaliyet: kg);
+    final h2 = GelirGiderHavuzu.hesapla(faturalar: v.mali.gelirGider, muhasebe: muhasebe, mtKgMaliyet: kg, senaryo: 2);
+    if (h1.sonMuhasebeAyi == 0) return const SizedBox.shrink();
+    final t1 = h1.toplam(ciftlik: 'Tarımsal Alan'), t2 = h2.toplam(ciftlik: 'Tarımsal Alan');
+    final ay = raporAylari[h1.sonMuhasebeAyi - 1], son = raporAylari[h1.sonAy - 1];
+    return Panel(
+      baslik: 'Muhasebe dönem sonucuyla bağlantı',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Maliyet bedeli / piyasa fiyatı', style: TextStyle(fontSize: 12, color: Renk.soluk)),
+        _Satir('Tarımsal Alan muhasebe sonucu (Ocak–$ay ${h1.yil})', '${_mn(t1.kesinNet)} / ${_mn(t2.kesinNet)}'),
+        if (h1.sonAy > h1.sonMuhasebeAyi)
+          _Satir('Tahmin dahil (Ocak–$son ${h1.yil})', '${_mn(t1.net)} / ${_mn(t2.net)}'),
+        _Satir('Ürün Kârlılığı, ${k.hasatYili} hasat sezonu', '${_mn(k.netKarMaliyetBedeli)} / ${_mn(k.netKar)}', kalin: true),
+        const SizedBox(height: 6),
+        const Text(
+            'İki sonuç farklı soruları cevaplar ve aralarındaki fark beklenir:\n'
+            '• Dönem: muhasebe takvim yılını, Ürün Kârlılığı hasat sezonunu (ekimden satışa) kapsar.\n'
+            '• Stok: muhasebe girdileri ürün satılana kadar stokta tutar; satılmayan ürünün maliyeti henüz gider değildir.\n'
+            '• Plan: sezon sonucu, henüz faturalanmayan satışı plan tonaj ve fiyatıyla içerir.\n'
+            'Ürün satışları tamamlanıp muhasebe kapandıkça iki sonuç birbirine yaklaşır.',
+            style: TextStyle(fontSize: 12.5, height: 1.45)),
+      ]),
+    );
+  }
+}
+
 /// İşletme içinde kullanılan ürünler dışarı satılsaydı / dışarıdan alınsaydı (dosyadaki 2. senaryo).
 class _Senaryo extends StatelessWidget {
   const _Senaryo({required this.k});
@@ -323,6 +367,8 @@ class _UrunKarti extends StatelessWidget {
             _Satir('  Tarımsal Faaliyet tahmini', '${_tl(u.tfMaliyet)} (fark ${_tl(u.maliyet - u.tfMaliyet)})'),
           _Satir('Ortak gider payı', _tl(u.ortakPay)),
           _Satir('Net ürün kârı', _tl(u.netKar), renk: _renk(u.netKar), kalin: true),
+          if (u.icKg > 0)
+            _Satir('Net (iç kullanım maliyet bedeliyle)', _tl(u.netKarMaliyetBedeli), renk: _renk(u.netKarMaliyetBedeli)),
           _Satir('Dekar başına', _tl(u.dekarNet), renk: _renk(u.dekarNet)),
           _Satir('Kg maliyeti (ortak dahil)', '${sayi(u.kgMaliyet, ondalik: 2)} ₺/kg'),
           const Divider(),

@@ -34,17 +34,43 @@ class NetSonucSekmesi extends StatefulWidget {
 class _NetSonucSekmesiState extends State<NetSonucSekmesi> {
   late final Future<CiftlikRaporu?> _muhasebe =
       CiftlikRaporu.yukle().then<CiftlikRaporu?>((r) => r).catchError((Object _) => null);
+  int _senaryo = 1;
 
   @override
   Widget build(BuildContext context) => FutureBuilder<CiftlikRaporu?>(
         future: _muhasebe,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-          final h = GelirGiderHavuzu.hesapla(
-              faturalar: widget.v.mali.gelirGider, muhasebe: snap.data, mtKgMaliyet: mtKgMaliyetleri(widget.v));
+          final kg = mtKgMaliyetleri(widget.v);
+          final h = GelirGiderHavuzu.hesapla(faturalar: widget.v.mali.gelirGider, muhasebe: snap.data, mtKgMaliyet: kg, senaryo: _senaryo);
+          final diger = GelirGiderHavuzu.hesapla(
+              faturalar: widget.v.mali.gelirGider, muhasebe: snap.data, mtKgMaliyet: kg, senaryo: _senaryo == 1 ? 2 : 1);
+          final senaryoVar = snap.data?.senaryo?.ciftlik(kKonsolideMuhasebe) != null;
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
             children: [
+              if (senaryoVar)
+                Panel(
+                  baslik: 'Grup içi aktarımların değerlemesi',
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    SegmentedButton<int>(
+                      segments: const [
+                        ButtonSegment(value: 1, label: Text('Maliyet bedeli')),
+                        ButtonSegment(value: 2, label: Text('Piyasa fiyatı')),
+                      ],
+                      selected: {_senaryo},
+                      onSelectionChanged: (x) => setState(() => _senaryo = x.first),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Maliyet bedeliyle: ${_mn((_senaryo == 1 ? h : diger).toplam().net)} · '
+                      'Piyasa fiyatıyla: ${_mn((_senaryo == 2 ? h : diger).toplam().net)} (konsolide, ESK hariç). '
+                      'Piyasa fiyatı: çiftlikte üretilip grup içinde kullanılan ürünler dışarı satılsaydı satış fiyatıyla, '
+                      'dışarıdan alınsaydı alış fiyatıyla (muhasebe 2. senaryo).',
+                      style: const TextStyle(fontSize: 12, color: Renk.soluk, height: 1.4),
+                    ),
+                  ]),
+                ),
               if (!h.muhasebeVar)
                 const Padding(
                   padding: EdgeInsets.only(bottom: 12),

@@ -106,5 +106,9 @@ void main() {
     expect(k.icPiyasaDegeri, 400000);
     expect(k.urunler.firstWhere((u) => u.urun == 'Buğday').icKg, 0);
     expect(k.muhasebeVar, isFalse);
+    // Maliyet bedeliyle: iç kullanılan arpa doğrudan maliyetiyle (350.000) satış sayılır; ortak pay 200.000
+    expect(a.icTransferMaliyeti, 350000);
+    expect(a.netKarMaliyetBedeli, 350000 - 350000 - 200000);
+    expect(a.netKar, 400000 - 350000 - 200000);
   });
 }
