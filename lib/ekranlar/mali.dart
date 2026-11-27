@@ -9,6 +9,7 @@ import 'bilesenler.dart';
 import 'gonder.dart';
 import 'esk.dart' show tl;
 import 'mali_gelir_gider.dart';
+import 'net_sonuc.dart';
 
 /// Mali Raporlar: çiftliklerin gelen faturaları günlük, haftalık, aylık ve
 /// yıllık; açık bakiyeler; dosyalar arası karşılaştırma ve tutarsızlıklar.
@@ -26,7 +27,7 @@ class MaliEkran extends StatelessWidget {
         final acikVar = m.acik.isNotEmpty;
         final muhVar = m.muhasebe.isNotEmpty;
         final ggVar = !m.gelirGider.bos;
-        if (ggVar) return _GelirGiderAna(m: m);
+        if (ggVar) return _GelirGiderAna(m: m, v: VeriDeposu.ben.veri ?? veri);
         return DefaultTabController(
           length: 5 + (acikVar ? 1 : 0) + (muhVar ? 1 : 0),
           child: Scaffold(
@@ -77,8 +78,9 @@ class MaliEkran extends StatelessWidget {
 /// Yıllık ve Karşılaştırma. Gider içinden 2026 Fatura listesi (fatura bazında) ve fatura
 /// kayıt kontrolü açılır.
 class _GelirGiderAna extends StatelessWidget {
-  const _GelirGiderAna({required this.m});
+  const _GelirGiderAna({required this.m, required this.v});
   final MaliVeri m;
+  final RaporVerisi v;
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +108,7 @@ class _GelirGiderAna extends StatelessWidget {
           body: _Karsilastirma(veri: m),
         );
     return DefaultTabController(
-      length: 3 + (acikVar ? 1 : 0),
+      length: 4 + (acikVar ? 1 : 0),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Mali Raporlar'),
@@ -118,14 +120,16 @@ class _GelirGiderAna extends StatelessWidget {
             unselectedLabelColor: const Color(0xCCFFFFFF),
             indicatorColor: Colors.white,
             tabs: [
+              const Tab(text: 'Net Sonuç'),
               const Tab(text: 'Gider'),
               const Tab(text: 'Gelir'),
-              const Tab(text: 'Kâr / Zarar'),
+              const Tab(text: 'Kâr / Zarar (fatura)'),
               if (acikVar) const Tab(text: 'Açık bakiyeler'),
             ],
           ),
         ),
         body: TabBarView(children: [
+          GonderAlani(konu: 'Mali Raporlar – Net Sonuç', child: NetSonucSekmesi(v: v)),
           GelirGiderBolumu(veri: m.gelirGider, sekme: GgSekme.gider, faturalar: m.faturalar.isEmpty ? null : faturalar, kontrol: kontrol),
           GelirGiderBolumu(veri: m.gelirGider, sekme: GgSekme.gelir),
           GelirGiderBolumu(veri: m.gelirGider, sekme: GgSekme.karZarar),
