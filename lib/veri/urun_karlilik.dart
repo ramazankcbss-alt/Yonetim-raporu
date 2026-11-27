@@ -7,6 +7,7 @@
 //  • Teslimatlar (TarKop / patates listesi / elle giriş): bedele esas net teslim.
 // KVKK: yalnızca ürün, çiftlik, alan, miktar ve tutar; müşteri, satıcı ve kişi bilgisi yoktur.
 
+import 'ciftlik_rapor.dart';
 import 'gelir_gider.dart';
 import 'maliyet_takip.dart';
 import 'urun_takip.dart';
@@ -37,6 +38,20 @@ class KarlilikUrun {
   /// Sezon dışında (önceki sezona ait) faturalanan miktar/tutar.
   double oncekiKg = 0, oncekiTutar = 0;
 
+  /// Muhasebe (Çiftlik Raporları › Tarımsal Alan) hasat yılı satışı ve satılan mamul maliyeti.
+  double muhSatisKg = 0, muhSatisTl = 0, muhSmm = 0;
+  bool muhVar = false;
+
+  /// İşletme içinde yem olarak kullanılan ürün (yem bitkisi).
+  bool get icKullanim => kYemBitkileri.contains(urun);
+
+  /// Faturalanmayan (işletme içinde kullanılan) miktar ve plan fiyatıyla piyasa değeri.
+  double get icKg => icKullanim && planKg > faturaKg ? planKg - faturaKg : 0;
+  double get icPiyasaDegeri => icKg * planFiyat;
+
+  /// İç kullanıma düşen maliyet: toplam doğrudan maliyetten satılan kısmın muhasebe maliyeti düşülür.
+  double get icMaliyet => icKullanim ? maliyet - muhSmm : 0;
+
   double _t(double Function(KarlilikCiftlik) f) => ciftlikler.values.fold(0.0, (a, c) => a + f(c));
   double get dekar => _t((c) => c.dekar);
   double get planKg => _t((c) => c.planKg);
@@ -65,9 +80,26 @@ class KarlilikUrun {
   double? get faturaOrani => planKg > 0 ? faturaKg / planKg * 100 : null;
 }
 
+/// İşletme içinde hayvancılıkta yem olarak kullanılan ürünler.
+const kYemBitkileri = {'Yonca', 'Arpa', 'Silajlık Mısır', 'Tritikale'};
+
 class UrunKarlilik {
   UrunKarlilik._(this.urunler, this.ortakToplam, this.ortakYazili, this.anahtar, this.hasatYili, this.mtVar, this.digerGelir,
-      this.ekGelirler, this.ortakDekarlari);
+      this.ekGelirler, this.ortakDekarlari,
+      {this.muhasebeVar = false, this.muhasebeDonem = '', this.tarimsalTesvik = 0, this.senaryo});
+
+  /// Çiftlik Raporları (muhasebe) verisi var mı, hangi dönemi kapsıyor.
+  final bool muhasebeVar;
+  final String muhasebeDonem;
+
+  /// Muhasebedeki hasat yılı tarımsal teşvik tutarı (satış tablosunda "diğer").
+  final double tarimsalTesvik;
+
+  /// Tarımsal Alan: maliyet bedeliyle (1) ve piyasa fiyatıyla (2) senaryo kalemleri.
+  final ({double satis1, double satis2, double smm1, double smm2, double brut1, double brut2, double net1, double net2})? senaryo;
+
+  double get icPiyasaDegeri => _t((u) => u.icPiyasaDegeri);
+  double get icMaliyet => _t((u) => u.icMaliyet);
 
   final List<KarlilikUrun> urunler;
 
@@ -122,6 +154,7 @@ class UrunKarlilik {
     MaliyetTakip? mt,
     GelirGider? gelir,
     UrunTakibi? teslimat,
+    CiftlikRaporu? muhasebe,
     OrtakAnahtar anahtar = OrtakAnahtar.dekar,
     int? hasatYili,
   }) {
@@ -199,9 +232,37 @@ class UrunKarlilik {
           : (toplamMaliyet > 0 ? u.maliyet / toplamMaliyet : 0);
       u.ortakPay = ortak * pay;
     }
+    if (muhasebe != null) {
+      for (final t in muhasebe.tarim) {
+        if (t.ciftlik != 'Tarımsal Alan' || t.yil != yil || t.urun.toLowerCase().contains('tohum')) continue;
+        final u = m[TarimsalUretim.urunAdi(t.urun)];
+        if (u == null) continue;
+        u
+          ..muhVar = true
+          ..muhSatisKg += t.satisKg
+          ..muhSatisTl += t.satisTl
+          ..muhSmm += t.smmTl;
+      }
+    }
+    final sc = muhasebe?.senaryo?.ciftlik('Tarımsal Alan');
     urunler.sort((a, b) => b.netKar.compareTo(a.netKar));
     return UrunKarlilik._(urunler, ortak, mt?.ortakYazili, anahtar, yil, mt != null,
-        diger.values.toList()..sort((a, b) => b.$3.compareTo(a.$3)), plan.ekGelirler, toplamDekar);
+        diger.values.toList()..sort((a, b) => b.$3.compareTo(a.$3)), plan.ekGelirler, toplamDekar,
+        muhasebeVar: muhasebe != null,
+        muhasebeDonem: muhasebe?.donem ?? '',
+        tarimsalTesvik: muhasebe?.tesvikTutar(yil, 'Tarımsal teşvik') ?? 0,
+        senaryo: sc == null
+            ? null
+            : (
+                satis1: sc.s1('Net satışlar'),
+                satis2: sc.s2('Net satışlar'),
+                smm1: sc.s1('Satışların maliyeti'),
+                smm2: sc.s2('Satışların maliyeti'),
+                brut1: sc.s1('Brüt satış kârı/zararı'),
+                brut2: sc.s2('Brüt satış kârı/zararı'),
+                net1: sc.net1,
+                net2: sc.net2,
+              ));
   }
 
   /// Sap, saman, küspe gibi tarım yan ürünleri (süt, hizmet ve hurda hariç).

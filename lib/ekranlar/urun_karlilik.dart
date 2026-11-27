@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../bicim.dart';
 import '../tema.dart';
+import '../veri/ciftlik_rapor.dart';
 import '../veri/dosyalar.dart';
 import '../veri/maliyet_takip.dart';
 import '../veri/model.dart';
@@ -44,12 +45,24 @@ class UrunKarlilikSekmesi extends StatefulWidget {
 
 class _UrunKarlilikSekmesiState extends State<UrunKarlilikSekmesi> {
   OrtakAnahtar _anahtar = OrtakAnahtar.dekar;
+  late final Future<CiftlikRaporu?> _muhasebe =
+      CiftlikRaporu.yukle().then<CiftlikRaporu?>((r) => r).catchError((Object _) => null);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => FutureBuilder<CiftlikRaporu?>(
+        future: _muhasebe,
+        builder: (context, snap) => _icerik(snap.data),
+      );
+
+  Widget _icerik(CiftlikRaporu? muhasebe) {
     final mt = maliyetTakipVerisi();
     final k = UrunKarlilik.hesapla(
-        plan: widget.v.tarimsalUretim, mt: mt, gelir: widget.v.mali.gelirGider, teslimat: widget.t, anahtar: _anahtar);
+        plan: widget.v.tarimsalUretim,
+        mt: mt,
+        gelir: widget.v.mali.gelirGider,
+        teslimat: widget.t,
+        muhasebe: muhasebe,
+        anahtar: _anahtar);
     if (k.bos) {
       return const Padding(
           padding: EdgeInsets.all(16), child: BilgiKutusu(yazi: 'Tarımsal Faaliyet verisi henüz gelmedi.'));
@@ -87,6 +100,8 @@ class _UrunKarlilikSekmesiState extends State<UrunKarlilikSekmesi> {
           ]),
         ),
         _Tablo(k: k),
+        if (k.muhasebeVar) _Muhasebe(k: k),
+        if (k.senaryo != null) _Senaryo(k: k),
         for (final u in k.urunler) _UrunKarti(u: u),
         _Kontroller(k: k),
         _Kaynak(k: k, v: widget.v),
@@ -109,9 +124,11 @@ class _Ozet extends StatelessWidget {
           _Satir('Ortak gider öncesi kâr', _mn(k.brutKar), renk: _renk(k.brutKar)),
           _Satir('Tarım ortak giderleri', '−${_mn(k.ortakPay)}'),
           _Satir('Net ürün kârı', _mn(k.netKar), renk: _renk(k.netKar), kalin: true),
-          if (k.ekGelirler.isNotEmpty) ...[
+          if (k.ekGelirler.isNotEmpty || k.tarimsalTesvik > 0) ...[
             for (final e in k.ekGelirler) _Satir('+ ${_basHarf(e.$1)} (plan)', _mn(e.$2)),
-            _Satir('Ek gelirlerle toplam', _mn(k.netKar + k.ekGelirToplami), renk: _renk(k.netKar + k.ekGelirToplami), kalin: true),
+            if (k.tarimsalTesvik > 0) _Satir('+ Tarımsal teşvik (muhasebe, ${k.muhasebeDonem})', _mn(k.tarimsalTesvik)),
+            _Satir('Ek gelirlerle toplam', _mn(k.netKar + k.ekGelirToplami + k.tarimsalTesvik),
+                renk: _renk(k.netKar + k.ekGelirToplami + k.tarimsalTesvik), kalin: true),
           ],
           const Divider(),
           _Satir('Sezonda faturalanan satış', _mn(k.faturaTutar), kalin: true),
@@ -180,6 +197,108 @@ class _Tablo extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Muhasebe (Çiftlik Raporları › Tarımsal Alan) ile çapraz kontrol.
+class _Muhasebe extends StatelessWidget {
+  const _Muhasebe({required this.k});
+  final UrunKarlilik k;
+
+  @override
+  Widget build(BuildContext context) {
+    const s = TextStyle(fontSize: 12);
+    const b = TextStyle(fontSize: 12, fontWeight: FontWeight.w700);
+    DataCell h(String t, {Color? r, bool kalin = false}) => DataCell(Text(t, style: (kalin ? b : s).copyWith(color: r)));
+    String m(double v) => sayi(v / 1e6, ondalik: 2);
+    final l = [for (final u in k.urunler) if (u.muhVar || u.faturaTutar > 0) u];
+    final notlar = <String>[
+      for (final u in l)
+        if (u.muhVar && u.faturaTutar > 0 && (u.muhSatisTl - u.faturaTutar).abs() >= 1)
+          '${u.urun}: muhasebe satışı ${_tl(u.muhSatisTl)}, gelir tablosu ${_tl(u.faturaTutar)} (fark ${_tl(u.muhSatisTl - u.faturaTutar)}).',
+      for (final u in l)
+        if (u.muhVar && u.muhSatisKg > 0 && u.muhSmm > 0)
+          '${u.urun}: muhasebede satılan ${_ton(u.muhSatisKg)} için maliyet ${sayi(u.muhSmm / u.muhSatisKg, ondalik: 2)} ₺/kg; '
+              'Maliyet Takip\'e göre ${sayi(u.planKg > 0 ? u.maliyet / u.planKg : 0, ondalik: 2)} ₺/kg (plan tonajıyla, ortak gider hariç).',
+      for (final u in l)
+        if (!u.muhVar && u.faturaTutar > 0)
+          '${u.urun}: ${_tl(u.faturaTutar)} fatura muhasebe döneminden (${k.muhasebeDonem}) sonra kesildi.',
+    ];
+    return Panel(
+      baslik: 'Muhasebe ile çapraz kontrol (${k.muhasebeDonem})',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 14,
+            headingRowHeight: 40,
+            dataRowMinHeight: 32,
+            dataRowMaxHeight: 36,
+            headingTextStyle: b.copyWith(color: Renk.anaKoyu),
+            columns: const [
+              DataColumn(label: Text('Ürün')),
+              DataColumn(label: Text('Gelir\ntablosu'), numeric: true),
+              DataColumn(label: Text('Muhasebe\nsatış'), numeric: true),
+              DataColumn(label: Text('Muhasebe\nmaliyet'), numeric: true),
+              DataColumn(label: Text('Maliyet\nTakip'), numeric: true),
+            ],
+            rows: [
+              for (final u in l)
+                DataRow(cells: [
+                  h(u.urun, kalin: true),
+                  h(m(u.faturaTutar)),
+                  h(u.muhVar ? m(u.muhSatisTl) : '—'),
+                  h(u.muhVar ? m(u.muhSmm) : '—'),
+                  h(m(u.maliyet)),
+                ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text('mn ₺ · Muhasebe maliyeti yalnızca satılan miktarın maliyetidir; Maliyet Takip ekilişin tamamını kapsar.',
+            style: TextStyle(fontSize: 11, color: Renk.soluk)),
+        for (final x in notlar)
+          Padding(padding: const EdgeInsets.only(top: 6), child: Text('• $x', style: const TextStyle(fontSize: 13, height: 1.4))),
+      ]),
+    );
+  }
+}
+
+/// İşletme içinde kullanılan ürünler dışarı satılsaydı / dışarıdan alınsaydı (dosyadaki 2. senaryo).
+class _Senaryo extends StatelessWidget {
+  const _Senaryo({required this.k});
+  final UrunKarlilik k;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = k.senaryo!;
+    final ic = [for (final u in k.urunler) if (u.icKg > 0) u];
+    return Panel(
+      baslik: 'Piyasa fiyatı senaryosu – Tarımsal Alan',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text(
+            'Çiftlik Raporları dosyası: 1. senaryoda grup içinde kullanılan ürünler maliyet bedeliyle aktarılır; '
+            '2. senaryoda dışarı satılsaydı piyasa satış fiyatıyla, dışarıdan alınsaydı piyasa alış fiyatıyla değerlenir.',
+            style: TextStyle(fontSize: 12, color: Renk.soluk, height: 1.4)),
+        const SizedBox(height: 6),
+        _Satir('Net satışlar', '${_mn(s.satis1)} → ${_mn(s.satis2)}'),
+        _Satir('Satışların maliyeti', '${_mn(s.smm1)} → ${_mn(s.smm2)}'),
+        _Satir('Brüt kâr', '${_mn(s.brut1)} → ${_mn(s.brut2)}', kalin: true),
+        _Satir('Dönem net kârı', '${_mn(s.net1)} → ${_mn(s.net2)}', renk: _renk(s.net2 - s.net1), kalin: true),
+        _Satir('Piyasa fiyatıyla değerleme farkı', _mn(s.satis2 - s.satis1)),
+        if (ic.isNotEmpty) ...[
+          const Divider(),
+          const Text('Bu tablodaki karşılığı (faturalanmayan yem bitkileri, plan fiyatıyla):',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          for (final u in ic)
+            _Satir('  ${u.urun}', '${_ton(u.icKg)} × ${sayi(u.planFiyat, ondalik: 2)} = ${_mn(u.icPiyasaDegeri)}'),
+          _Satir('İç kullanım piyasa değeri', _mn(k.icPiyasaDegeri), kalin: true),
+          _Satir('İç kullanıma düşen doğrudan maliyet', _mn(k.icMaliyet)),
+          _Satir('Piyasa fiyatıyla brüt katkı', _mn(k.icPiyasaDegeri - k.icMaliyet), renk: _renk(k.icPiyasaDegeri - k.icMaliyet)),
+          _Satir('Dosyadaki değerleme farkıyla fark', _mn(k.icPiyasaDegeri - (s.satis2 - s.satis1))),
+        ],
+      ]),
     );
   }
 }
@@ -273,6 +392,8 @@ class _Kaynak extends StatelessWidget {
           'Doğrudan maliyet ve ortak giderler: ÇİFTLİKLER : MALİYET TAKİP 2026 › MALİYET ÖZET TARIM 2026 (gerçekleşen).',
           'Faturalanan satış: ${g.kaynakGelir.isEmpty ? 'aylık gelir satış tablosu' : g.kaynakGelir} — '
               '${tarihKisa(k.sezonBas)} ile ${tarihKisa(k.sezonBit.subtract(const Duration(days: 1)))} arasında kesilen faturalar (KDV hariç).',
+          if (k.muhasebeVar)
+            'Muhasebe ve senaryo: 2026 Yılı Çiftlik Raporları › Tarımsal Alan gelir tablosu, satış özeti, SMM detayı, "1611 - Tarımsal Alan 2" (${k.muhasebeDonem}).',
           'Teslim edilen: Ürün Takibi teslimat kayıtları (TarKop, patates listesi, uygulamadan giriş).',
           'Yalnızca ürün, çiftlik, alan, miktar ve tutar kullanılır; müşteri, satıcı ve kişi bilgisi alınmaz.',
         ].join('\n'),

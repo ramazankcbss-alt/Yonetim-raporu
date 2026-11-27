@@ -95,4 +95,16 @@ void main() {
     expect(p.ortakPay, closeTo(400000 * 700000 / 1300000, 0.001));
     expect(k.ortakPay, closeTo(400000, 0.001));
   });
+
+  test('işletme içinde kullanılan yem bitkileri plan fiyatıyla değerlenir', () {
+    final k = UrunKarlilik.hesapla(plan: plan, mt: mt, gelir: gelir);
+    final a = k.urunler.firstWhere((u) => u.urun == 'Arpa');
+    expect(a.icKullanim, isTrue);
+    expect(a.icKg, 80000);
+    expect(a.icPiyasaDegeri, 400000);
+    expect(a.icMaliyet, 350000);
+    expect(k.icPiyasaDegeri, 400000);
+    expect(k.urunler.firstWhere((u) => u.urun == 'Buğday').icKg, 0);
+    expect(k.muhasebeVar, isFalse);
+  });
 }
