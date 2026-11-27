@@ -320,6 +320,8 @@ function veriTopla_(gun) {
     eskKaynak: (function () { try { return eskKaynak_(); } catch (err) { return null; } })(),
     // ESK ek kaynaklar: ithal kesim/ölüm, kasaplık partileri, balya, gübre, nakliye, gelir tablosu (yalnızca toplamlar)
     eskEk: (function () { try { return eskEk_(); } catch (err) { return null; } })(),
+    // Geçmiş yıl özetleri: kesim ve canlı hayvan alımı (2021–), tarım net gelir, süt verimi, ölüm oranları
+    gecmisOzet: (function () { try { return gecmisOzet_(); } catch (err) { return null; } })(),
     // Araç masrafları: muhasebe xlsx'i doğrudan okunur (araç adı × ay × iş alanı; plaka/satıcı/belge no yok)
     aracMasraf: (function () { try { return aracMasrafOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
@@ -2061,6 +2063,7 @@ function tarlaVeri_(pay) {
   if (acik('stokSuru')) al(['suruHareketleri', 'stokSayimi']);  // sayılar; not sütunları zaten okunmaz
   if (acik('urun')) al(['tarimsalUretim', 'urunTeslimat']);
   if (acik('gecmis', 'hastalik')) al(['gecmis', 'dersler']);
+  if (acik('gecmis')) al(['gecmisOzet']);
   if (acik('mali')) o.mali = paylasimMali_(v.mali, pay.maliDetay === true);
   // Ürün Takibi › Ürün Kârlılığı fatura gelirlerini (çiftlik × ürün toplamları, tedarikçi yok) kullanır.
   else if (acik('urun') && v.mali) o.mali = { gelirGider: v.mali.gelirGider };
@@ -2812,7 +2815,9 @@ var VERI_KAYNAKLARI_ = [
   { ad: 'ESK kesim / ölüm listeleri', kaynak: [], ara: "title contains 'İTHAL ÖLÜM' and trashed = false" },
   { ad: 'ESK kasaplık listesi', kaynak: [], ara: "title contains 'KASAPLIK HAYVAN' and trashed = false" },
   { ad: 'ESK balya ve gübre', kaynak: ['1y_ya5m5KwXYAHbXSQQDAiRCQ5OMPYGrXSEV2Ezxhsu0', '1_wwlYHdnP3MywO-0bj_TX-lf7C3QIAyuo41B-DUNANg'] },
-  { ad: 'ESK gelir tablosu çalışması', kaynak: ['142BCrHnPYp-eKP49dDaWAjnzN6J3n5TIBsQJZCNTCe0'] }
+  { ad: 'ESK gelir tablosu çalışması', kaynak: ['142BCrHnPYp-eKP49dDaWAjnzN6J3n5TIBsQJZCNTCe0'] },
+  { ad: 'Kesim özeti 2021–2026', kaynak: ['14rJ4Lr5SGqlY7yqJNfX0ckQinI1sPfi46Uc5uU9pHns'] },
+  { ad: 'Değerlendirme raporu 31.12.2025', kaynak: ['1sFGE9-t-rf-uu2RuEdPfP2flA-yJDyBtSDJjG3KSI_s'] }
 ];
 
 function veriKalitesi_() {
@@ -3281,6 +3286,92 @@ function eskEk_() {
         o.gelirDosya = 'Esk çalışma › Gelir Tablosuna Göre';
       }
     } catch (e) { hata('ESK gelir tablosu', e); }
+    return o;
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// GEÇMİŞ YIL ÖZETLERİ: "2021-2026 Yılları Çiftlikler Kesim Özet" (kesim ve canlı hayvan alımı) ile
+// "Çiftlikler Değerlendirme Raporu 31.12.2025" sayfalarından yıl × çiftlik göstergeleri.
+// KVKK: personel dağılımı ve organizasyon şeması sayfaları okunmaz; yalnızca sayısal göstergeler.
+var GECMIS_OZET_ = {
+  kesim: '14rJ4Lr5SGqlY7yqJNfX0ckQinI1sPfi46Uc5uU9pHns',
+  degerlendirme: '1sFGE9-t-rf-uu2RuEdPfP2flA-yJDyBtSDJjG3KSI_s',
+  sayfalar: ['tarım 5yıllık kazanç', 'süt verimliliği ', 'Ölüm oranları ']
+};
+
+/** Kesim Özet › KESİMLER: yıl blokları (yıl başlığı, sütun başlıkları, çiftlik satırları, TOPLAM). */
+function gecmisKesimOku_(d) {
+  var kesim = [], alim = [];
+  for (var i = 0; i < d.length; i++) {
+    var y = String(d[i][0]).trim();
+    if (!/^20\d\d$/.test(y)) continue;
+    var not = String(d[i][9] || '').trim();
+    for (var j = i + 2; j < d.length; j++) {
+      var c = String(d[j][0]).trim();
+      if (!c || /^TOPLAM/i.test(c) || /^20\d\d$/.test(c)) break;
+      kesim.push({ yil: +y, ciftlik: c, erkek: eskTrSayi_(d[j][1]) || 0, erkekKarkas: eskTrSayi_(d[j][2]) || 0,
+        inek: eskTrSayi_(d[j][3]) || 0, inekKarkas: eskTrSayi_(d[j][4]) || 0, duve: eskTrSayi_(d[j][5]) || 0,
+        duveKarkas: eskTrSayi_(d[j][6]) || 0, adet: eskTrSayi_(d[j][7]) || 0, karkas: eskTrSayi_(d[j][8]) || 0,
+        satis: eskTrSayi_(d[j][10]), donem: not });
+    }
+    for (var k = i + 2; k < d.length; k++) {
+      var a = String(d[k][12] || '').trim();
+      if (!a || /^TOPLAM/i.test(a)) { if (/^TOPLAM/i.test(a) || !String(d[k][0]).trim()) break; continue; }
+      if (!String(d[k][13] || '').trim() && !String(d[k][14] || '').trim() && !String(d[k][15] || '').trim()) continue;
+      alim.push({ yil: +y, ciftlik: a, ic: eskTrSayi_(d[k][13]) || 0, dis: eskTrSayi_(d[k][14]) || 0, toplam: eskTrSayi_(d[k][15]) || 0 });
+    }
+  }
+  return { kesim: kesim, alim: alim };
+}
+
+/** Yıl × çiftlik tablosu: başlık hücrelerindeki yıla göre (yılsız sütun önceki sütunun yılını alır). */
+function gecmisMatrisOku_(d, baslik) {
+  var hb = -1;
+  for (var i = 0; i < Math.min(d.length, 8); i++) {
+    var n = d[i].filter(function (x) { return /20\d\d/.test(String(x)); }).length;
+    if (n >= 2 && String(d[i][0] || '').trim() !== '' || n >= 3) { hb = i; }
+    if (hb >= 0 && n >= 2 && d[i].some(function (x) { return /[A-Za-zÇĞİÖŞÜçğıöşü]{4}/.test(String(x).replace(/20\d\d/g, '')); })) { hb = i; break; }
+  }
+  if (hb < 0) return [];
+  var h = d[hb], ust = hb > 0 ? d[hb - 1] : [], out = [], yil = null, yillar = [], olcu = [];
+  for (var j = 1; j < h.length; j++) {
+    var t = String(h[j] || '').replace(/\n/g, ' ').trim(), m = t.match(/20\d\d/) || String(ust[j] || '').match(/20\d\d/);
+    if (m) yil = +m[0];
+    yillar[j] = t ? yil : null;
+    olcu[j] = t.replace(/20\d\d/g, '').replace(/%/g, '').replace(/\s+/g, ' ').trim() || null;
+  }
+  for (var r = hb + 1; r < d.length; r++) {
+    var c = String(d[r][0] || '').trim();
+    if (!c) { if (out.length) break; continue; }
+    for (var j2 = 1; j2 < h.length; j2++) {
+      if (!yillar[j2] || !olcu[j2] || /TOPLAM/i.test(olcu[j2])) continue;
+      var v = eskTrSayi_(String(d[r][j2]).replace('%', ''));
+      if (v === null) continue;
+      var alan = /ALAN/i.test(c);  // "EKİM ALANI" satırı ayrı bir göstergedir
+      out.push({ tablo: baslik, ciftlik: alan || /TOPLAM/i.test(c) ? 'Toplam' : c, yil: yillar[j2],
+        olcu: alan ? 'Ekim alanı (da)' : olcu[j2], deger: v, yuzde: /%/.test(String(d[r][j2])) });
+    }
+  }
+  return out;
+}
+
+function gecmisOzet_() {
+  return onbellekli_('gecmisOzet_v1', 21600, function () {
+    var o = { kesim: [], alim: [], gostergeler: [], hatalar: [] };
+    try {
+      var sh = SpreadsheetApp.openById(GECMIS_OZET_.kesim).getSheetByName('KESİMLER');
+      var k = gecmisKesimOku_(sh.getDataRange().getDisplayValues());
+      o.kesim = k.kesim; o.alim = k.alim;
+    } catch (e) { o.hatalar.push('Kesim özet: ' + e); }
+    try {
+      var ss = SpreadsheetApp.openById(GECMIS_OZET_.degerlendirme);
+      GECMIS_OZET_.sayfalar.forEach(function (ad) {
+        var s = ss.getSheetByName(ad);
+        if (s) o.gostergeler = o.gostergeler.concat(gecmisMatrisOku_(s.getRange(1, 1, Math.min(s.getLastRow(), 40), Math.min(s.getLastColumn(), 30)).getDisplayValues(), ad.trim()));
+      });
+    } catch (e) { o.hatalar.push('Değerlendirme raporu: ' + e); }
     return o;
   });
 }

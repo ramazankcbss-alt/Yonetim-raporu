@@ -7,6 +7,7 @@ import '../veri/gecmis_sinif.dart';
 import '../veri/kategori.dart';
 import '../veri/model.dart';
 import 'bilesenler.dart';
+import 'gecmis_ozet.dart';
 import 'gonder.dart';
 import 'esk.dart' show tl;
 
@@ -215,6 +216,21 @@ class _GecmisMenu extends StatelessWidget {
                 'verim, maliyet, gelir ve kâr/zarar gibi sınıflara ayrılır.',
                 style: TextStyle(fontSize: 12.5)),
           ]),
+        ),
+        const _GMenuBaslik('Özet tablolar'),
+        _GMenuSatiri(
+          ikon: Icons.timeline,
+          baslik: 'Yıllık göstergeler',
+          alt: veri.gecmisOzet.bos
+              ? 'Kesim, canlı hayvan alımı, tarım net geliri, süt verimi, ölüm oranları'
+              : 'Kesim ve alım ${veri.gecmisOzet.kesimYillari.isEmpty ? '' : '${veri.gecmisOzet.kesimYillari.first}–${veri.gecmisOzet.kesimYillari.last}'}'
+                  ' · ${veri.gecmisOzet.tablolar.length} değerlendirme tablosu',
+          ac: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => Scaffold(
+                  appBar: AppBar(title: const Text('Yıllık göstergeler')),
+                  body: ListenableBuilder(
+                      listenable: VeriDeposu.ben,
+                      builder: (context, _) => GecmisOzetGovde(veri: VeriDeposu.ben.veri ?? ilk))))),
         ),
         const _GMenuBaslik('Sınıflandırma'),
         _GMenuSatiri(
