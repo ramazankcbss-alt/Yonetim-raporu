@@ -1152,6 +1152,7 @@ class RaporVerisi {
     this.stokSayimi = const StokSayimi(),
     this.gelenDosyalar = const [],
     this.eskKaynak = const EskKaynak(),
+    this.eskEk = const EskEk(),
     this.aracMasraf = const AracMasraflari(),
     this.vetBildirimleri = const [],
     this.olusturma,
@@ -1241,6 +1242,9 @@ class RaporVerisi {
   /// ESK kaynak tabloları (bakım hizmet tablosu, parti listesi, yem girişi) – yalnızca toplamlar.
   final EskKaynak eskKaynak;
 
+  /// ESK ek kaynaklar (kesim/ölüm listeleri, kasaplık partileri, balya, gübre, nakliye, gelir tablosu).
+  final EskEk eskEk;
+
   /// Araç masrafları (muhasebe listesi; araç adı × ay × iş alanı).
   final AracMasraflari aracMasraf;
   final List<VetBildirim> vetBildirimleri;
@@ -1266,6 +1270,7 @@ class RaporVerisi {
       suruHareketleri: SuruHareketleri.json(j['suruHareketleri']),
       stokSayimi: StokSayimi.json(j['stokSayimi']),
       eskKaynak: EskKaynak.json(j['eskKaynak']),
+      eskEk: EskEk.json(j['eskEk']),
       aracMasraf: AracMasraflari.json(j['aracMasraf']),
       gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
           .map(GelenDosya.oku)

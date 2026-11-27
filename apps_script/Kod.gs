@@ -318,6 +318,8 @@ function veriTopla_(gun) {
     gelenDosyalar: (function () { try { return gelenDosyalar_(); } catch (err) { return []; } })(),
     // ESK kaynak dosyaları: aylık bakım hizmet tablosu toplamları, parti listesi, aylık yem girişi (plaka/şoför yok)
     eskKaynak: (function () { try { return eskKaynak_(); } catch (err) { return null; } })(),
+    // ESK ek kaynaklar: ithal kesim/ölüm, kasaplık partileri, balya, gübre, nakliye, gelir tablosu (yalnızca toplamlar)
+    eskEk: (function () { try { return eskEk_(); } catch (err) { return null; } })(),
     // Araç masrafları: muhasebe xlsx'i doğrudan okunur (araç adı × ay × iş alanı; plaka/satıcı/belge no yok)
     aracMasraf: (function () { try { return aracMasrafOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
@@ -2055,7 +2057,7 @@ function tarlaVeri_(pay) {
   }
   if (acik('ziraat', 'tarla')) al(['ekim', 'hasat']);
   if (acik('tarla')) al(['cks', 'ekimDuzeltme', 'sezonParsel', 'ekimPlani', 'sezonParselSiniri', 'parselSinir', 'resmiParsel', 'tarlaSezonlari']);
-  if (acik('esk')) al(['eskAylik', 'eskBilgi', 'eskKaynak']);  // eskKaynak: yalnızca toplamlar (plaka/şoför yok)
+  if (acik('esk')) al(['eskAylik', 'eskBilgi', 'eskKaynak', 'eskEk']);  // eskKaynak: yalnızca toplamlar (plaka/şoför yok)
   if (acik('stokSuru')) al(['suruHareketleri', 'stokSayimi']);  // sayılar; not sütunları zaten okunmaz
   if (acik('urun')) al(['tarimsalUretim', 'urunTeslimat']);
   if (acik('gecmis', 'hastalik')) al(['gecmis', 'dersler']);
@@ -2806,7 +2808,11 @@ var VERI_KAYNAKLARI_ = [
   { ad: 'Pancar teslimatı (TarKop)', kaynak: [], ara: "title contains 'TarKop' and trashed = false" },
   { ad: 'ESK bakım hizmet tablosu', kaynak: ['1Es9f4xiwQaarxb7Rkup2gkbBszrAO4RLMFGWCG4pNOA'] },
   { ad: 'ESK ithal dana partileri', kaynak: ['1atuPz1wqi42bUzeCzcgZanEtxmRQYdmrIFC9HLsfTOU'] },
-  { ad: 'ESK gelen yemler', kaynak: ['1d7Zvj6SoRKXN71q_bDqF6zVqBG2ehsvSL9yAf8f10WA'] }
+  { ad: 'ESK gelen yemler', kaynak: ['1d7Zvj6SoRKXN71q_bDqF6zVqBG2ehsvSL9yAf8f10WA'] },
+  { ad: 'ESK kesim / ölüm listeleri', kaynak: [], ara: "title contains 'İTHAL ÖLÜM' and trashed = false" },
+  { ad: 'ESK kasaplık listesi', kaynak: [], ara: "title contains 'KASAPLIK HAYVAN' and trashed = false" },
+  { ad: 'ESK balya ve gübre', kaynak: ['1y_ya5m5KwXYAHbXSQQDAiRCQ5OMPYGrXSEV2Ezxhsu0', '1_wwlYHdnP3MywO-0bj_TX-lf7C3QIAyuo41B-DUNANg'] },
+  { ad: 'ESK gelir tablosu çalışması', kaynak: ['142BCrHnPYp-eKP49dDaWAjnzN6J3n5TIBsQJZCNTCe0'] }
 ];
 
 function veriKalitesi_() {
@@ -3086,6 +3092,195 @@ function aracMasrafOku_() {
     if (!en) return null;
     var o = aracMasrafCoz_(xlsxSatirlari_(en.getBlob()));
     if (o) { o.dosya = en.getName(); o.guncelleme = Utilities.formatDate(en.getLastUpdated(), 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss"); }
+    return o;
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// ESK EK KAYNAKLAR (Taşağıl): aylık ithal kesim/ölüm listeleri, kasaplık (geliş tartım) partileri, gelen balya,
+// gübre çıkışı, kesim nakliyesi ve ESK gelir tablosu çalışması. Yalnızca toplamlar döner.
+// KVKK: plaka, şoför, kartela/bilet no, kulak küpesi ve açıklama sütunları okunmaz.
+var ESK_EK_ = {
+  balya: '1y_ya5m5KwXYAHbXSQQDAiRCQ5OMPYGrXSEV2Ezxhsu0',
+  gubre: '1_wwlYHdnP3MywO-0bj_TX-lf7C3QIAyuo41B-DUNANg',
+  calisma: '142BCrHnPYp-eKP49dDaWAjnzN6J3n5TIBsQJZCNTCe0'
+};
+
+function eskTarih_(v) {
+  var m = String(v || '').match(/(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})/);
+  return m ? { yil: Number(m[3]), ay: Number(m[2]), gun: Number(m[1]) } : null;
+}
+
+/** Başlık satırında (ilk 5 satır) verilen ifadelere uyan sütunlar: {ad: index}. */
+function eskSutunlar_(d, kurallar) {
+  for (var i = 0; i < Math.min(d.length, 5); i++) {
+    var h = d[i].map(function (x) { return String(x).toLocaleUpperCase('tr').replace(/\s+/g, ' ').trim(); }), o = { _bas: i }, n = 0;
+    Object.keys(kurallar).forEach(function (k) {
+      for (var j = 0; j < h.length; j++) if (kurallar[k].test(h[j])) { o[k] = j; n++; break; }
+    });
+    if (n >= 2 && o.tarih !== undefined) return o;
+  }
+  return null;
+}
+
+function eskEk_() {
+  return onbellekli_('eskEk_v1', 1800, function () {
+    var o = { kesim: [], olum: [], kasaplik: [], balya: [], gubre: [], nakliye: [], gelir: [], hatalar: [] };
+    function hata(ad, e) { o.hatalar.push(ad + ': ' + String(e)); }
+    function topla(m, k, v) { m[k] = (m[k] || 0) + v; }
+
+    // 1) Aylık ithal kesim / ölüm listeleri ("TAŞAĞIL-ESK İTHAL ÖLÜM / KESİM <AY> <YIL>")
+    try {
+      var kes = {}, olu = {}, it = DriveApp.searchFiles("title contains 'İTHAL ÖLÜM' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
+      while (it.hasNext()) {
+        var ss = SpreadsheetApp.open(it.next());
+        var sk = ss.getSheetByName('KESİM'), so = ss.getSheetByName('ÖLÜM');
+        if (sk) {
+          var d = sk.getDataRange().getDisplayValues();
+          var c = eskSutunlar_(d, { tarih: /^TARİH$/, adet: /KESİLEN HAYVAN/, neden: /KESİM NEDENİ/, kg: /^CANLI AĞIRLIK$/, yer: /KESİM YERİ/ });
+          if (c) for (var i = c._bas + 1; i < d.length; i++) {
+            var t = eskTarih_(d[i][c.tarih]), a = eskTrSayi_(d[i][c.adet]);
+            if (!t || !a) continue;
+            var k = t.yil + '-' + t.ay, x = kes[k] || (kes[k] = { yil: t.yil, ay: t.ay, adet: 0, kg: 0, kgAdet: 0, supheli: 0, neden: {}, yer: {} });
+            x.adet += a;
+            var kg = c.kg !== undefined ? eskTrSayi_(d[i][c.kg]) : null;
+            if (kg && kg / a >= 150 && kg / a <= 900) { x.kg += kg; x.kgAdet += a; } else if (kg) x.supheli++;
+            topla(x.neden, String(d[i][c.neden] || 'Belirtilmemiş').trim() || 'Belirtilmemiş', a);
+            if (c.yer !== undefined) topla(x.yer, String(d[i][c.yer] || 'Belirtilmemiş').trim() || 'Belirtilmemiş', a);
+          }
+        }
+        if (so) {
+          var d2 = so.getDataRange().getDisplayValues();
+          var c2 = eskSutunlar_(d2, { tarih: /^TARİH$/, neden: /ÖLÜM NEDENİ/, maliyet: /MALİYET/ });
+          if (c2) for (var j = c2._bas + 1; j < d2.length; j++) {
+            var t2 = eskTarih_(d2[j][c2.tarih]);
+            if (!t2) continue;
+            var k2 = t2.yil + '-' + t2.ay, y = olu[k2] || (olu[k2] = { yil: t2.yil, ay: t2.ay, adet: 0, maliyete: 0, neden: {} });
+            y.adet++;
+            if (c2.maliyet !== undefined && /YANSIT/i.test(d2[j][c2.maliyet])) y.maliyete++;
+            topla(y.neden, String(d2[j][c2.neden] || 'Belirtilmemiş').trim() || 'Belirtilmemiş', 1);
+          }
+        }
+      }
+      o.kesim = Object.keys(kes).map(function (k) { return kes[k]; });
+      o.olum = Object.keys(olu).map(function (k) { return olu[k]; });
+    } catch (e) { hata('İthal kesim/ölüm', e); }
+
+    // 2) Kasaplık hayvan listeleri: parti başına çiftlik kantarı net, adet, liman adet ve ağırlık
+    try {
+      var it2 = DriveApp.searchFiles("title contains 'KASAPLIK HAYVAN' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
+      while (it2.hasNext()) {
+        SpreadsheetApp.open(it2.next()).getSheets().forEach(function (sh) {
+          var pm = sh.getName().match(/(\d+)\s*\.?\s*PART/i);
+          if (!pm) return;
+          var d = sh.getDataRange().getDisplayValues();
+          var c = eskSutunlar_(d, { tarih: /^TARİH$/, net: /KANTAR NET/, adet: /TAŞAĞIL ADET/, ladet: /LİMAN ADET/, lkg: /LİMAN CANLI/ });
+          if (!c) return;
+          var p = { parti: Number(pm[1]), tarih: '', adet: 0, netKg: 0, limanAdet: 0, limanKg: 0, arac: 0 };
+          for (var i = c._bas + 1; i < d.length; i++) {
+            var t = eskTarih_(d[i][c.tarih]);
+            if (!t) continue;  // toplam / ortalama satırları tarihsizdir
+            if (!p.tarih) p.tarih = ('0' + t.gun).slice(-2) + '.' + ('0' + t.ay).slice(-2) + '.' + t.yil;
+            p.arac++;
+            p.adet += eskTrSayi_(d[i][c.adet]) || 0;
+            p.netKg += eskTrSayi_(d[i][c.net]) || 0;
+            if (c.ladet !== undefined) p.limanAdet += eskTrSayi_(d[i][c.ladet]) || 0;
+            if (c.lkg !== undefined) p.limanKg += eskTrSayi_(d[i][c.lkg]) || 0;
+          }
+          if (p.adet) o.kasaplik.push(p);
+        });
+      }
+      o.kasaplik.sort(function (a, b) { return a.parti - b.parti; });
+    } catch (e) { hata('Kasaplık listesi', e); }
+
+    // 3) Gelen balya (mısır, yonca, sap): ay × ürün × geldiği yer, kg
+    try {
+      var b = {};
+      SpreadsheetApp.openById(ESK_EK_.balya).getSheets().forEach(function (sh) {
+        var d = sh.getDataRange().getDisplayValues();
+        var c = eskSutunlar_(d, { tarih: /TARİH/, kg: /TAŞAĞIL TONAJ/, yer: /GELDİĞİ YER/, urun: /ÜRÜN ADI/ });
+        if (!c) return;
+        for (var i = c._bas + 1; i < d.length; i++) {
+          var t = eskTarih_(d[i][c.tarih]), kg = eskTrSayi_(d[i][c.kg]);
+          if (!t || !kg) continue;
+          var u = String(d[i][c.urun] || '').trim() || 'Belirtilmemiş', yer = String(d[i][c.yer] || '').trim() || 'Belirtilmemiş';
+          topla(b, [t.yil, t.ay, u, yer].join('|'), kg);
+        }
+      });
+      o.balya = Object.keys(b).sort().map(function (k) { var a = k.split('|'); return { yil: +a[0], ay: +a[1], urun: a[2], yer: a[3], kg: b[k] }; });
+    } catch (e) { hata('Balya', e); }
+
+    // 4) Gübre çıkışı: ay × gittiği yer, kg (sayfalar: ahır temizliği, cüruf, biyogaz)
+    try {
+      var g = {};
+      SpreadsheetApp.openById(ESK_EK_.gubre).getSheets().forEach(function (sh) {
+        var d = sh.getDataRange().getDisplayValues();
+        var c = eskSutunlar_(d, { tarih: /TARİH/, kg: /TONAJ/, gittigi: /GİTTİĞİ YER/, urun: /ÜRÜN ADI/ });
+        if (!c) return;
+        for (var i = c._bas + 1; i < d.length; i++) {
+          var t = eskTarih_(d[i][c.tarih]), kg = eskTrSayi_(d[i][c.kg]);
+          if (!t || !kg) continue;
+          var yer = c.gittigi !== undefined ? String(d[i][c.gittigi] || '').trim() : '';
+          topla(g, [t.yil, t.ay, yer || sh.getName(), String(d[i][c.urun] || '').trim()].join('|'), kg);
+        }
+      });
+      o.gubre = Object.keys(g).sort().map(function (k) { var a = k.split('|'); return { yil: +a[0], ay: +a[1], yer: a[2], urun: a[3], kg: g[k] }; });
+    } catch (e) { hata('Gübre', e); }
+
+    // 5) Kesim nakliyesi ("ESK NAKLİYE <AY> <YIL>"): ay başına sefer ve taşınan hayvan
+    try {
+      var n = {}, it3 = DriveApp.searchFiles("title contains 'ESK NAKLİYE' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
+      while (it3.hasNext()) {
+        SpreadsheetApp.open(it3.next()).getSheets().forEach(function (sh) {
+          var d = sh.getDataRange().getDisplayValues();
+          var c = eskSutunlar_(d, { tarih: /^TARİH$/, adet: /HAYVAN SAYISI/ });
+          if (!c) return;
+          for (var i = c._bas + 1; i < d.length; i++) {
+            var t = eskTarih_(d[i][c.tarih]), a = eskTrSayi_(d[i][c.adet]);
+            if (!t || !a) continue;
+            var k = t.yil + '-' + t.ay, x = n[k] || (n[k] = { yil: t.yil, ay: t.ay, sefer: 0, hayvan: 0 });
+            x.sefer++; x.hayvan += a;
+          }
+        });
+      }
+      o.nakliye = Object.keys(n).map(function (k) { return n[k]; });
+    } catch (e) { hata('Nakliye', e); }
+
+    // 6) ESK gelir tablosu çalışması ("Esk çalışma" › "Gelir Tablosuna Göre."): ay blokları
+    try {
+      var sh = SpreadsheetApp.openById(ESK_EK_.calisma).getSheetByName('Gelir Tablosuna Göre.');
+      // Sayfada yıl yazmıyor: dosyanın son değişiklik tarihine göre (o aydan sonraki aylar önceki yıla aittir).
+      var son = DriveApp.getFileById(ESK_EK_.calisma).getLastUpdated(), sYil = son.getFullYear(), sAy = son.getMonth() + 1;
+      if (sh) {
+        var d = sh.getDataRange().getDisplayValues(), AY = ESK_AYLAR_;
+        for (var r = 0; r < Math.min(d.length, 6); r++) {
+          d[r].forEach(function (h, col) {
+            var m = String(h).toLocaleUpperCase('tr').match(/ESK\s+(\S+)\s+BAKIM/);
+            if (!m) return;
+            var ay = AY.indexOf(m[1]) + 1;
+            if (!ay) return;
+            var x = { ay: ay, yil: ay > sAy ? sYil - 1 : sYil };
+            for (var j = r + 1; j < Math.min(d.length, r + 20); j++) {
+              var et = String(d[j][col] || '').toLocaleUpperCase('tr'), v = eskTrSayi_(d[j][col + 1]);
+              if (v === null) continue;
+              if (/SAP BALYASI/.test(et)) x.sap = v;
+              else if (/BAKIM BESLEME/.test(et)) x.bakim = v;
+              else if (/KİRA/.test(et)) x.kira = v;
+              else if (/TOPLAM SATIŞ/.test(et)) x.satis = v;
+              else if (/^SMM/.test(et)) x.smm = v;
+              else if (/DİĞER SATIŞLARIN/.test(et)) x.digerMaliyet = v;
+              else if (/FAALİYET/.test(et)) x.faaliyet = v;
+              else if (/TOPLAM GİDER/.test(et)) x.gider = v;
+              else if (/KAZANÇ/.test(et)) x.kazanc = v;
+            }
+            if (x.satis !== undefined || x.kazanc !== undefined) o.gelir.push(x);
+          });
+        }
+        o.gelir.sort(function (a, b) { return a.yil * 12 + a.ay - (b.yil * 12 + b.ay); });
+        o.gelirDosya = 'Esk çalışma › Gelir Tablosuna Göre';
+      }
+    } catch (e) { hata('ESK gelir tablosu', e); }
     return o;
   });
 }

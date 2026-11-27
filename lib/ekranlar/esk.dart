@@ -168,10 +168,9 @@ class _Menu extends StatelessWidget {
           ikon: Icons.rule,
           baslik: 'Kaynak tablolar ve mutabakat',
           alt: veri.eskKaynak.bos
-              ? 'Bakım hizmet tablosu, parti listesi, gelen yem'
-              : '${veri.eskKaynak.aylar.length} ay · ${veri.eskKaynak.partiler.length} parti · '
-                  '${veri.eskKaynak.mutabakat(veri.eskAylik).length} fark',
-          renk: veri.eskKaynak.mutabakat(veri.eskAylik).isNotEmpty ? Renk.amber : null,
+              ? 'Bakım tablosu, kesim/ölüm, gelişler, yem-balya-gübre, gelir tablosu'
+              : '${veri.eskKaynak.aylar.length} ay · ${veri.eskKaynak.partiler.length} parti · ${eskFarkSayisi(veri)} fark',
+          renk: eskFarkSayisi(veri) > 0 ? Renk.amber : null,
           ac: () => ac('Kaynak tablolar ve mutabakat', (v) => EskKaynakGovde(veri: v)),
         ),
         _MenuSatiri(
@@ -743,3 +742,7 @@ class _Liste extends StatelessWidget {
     );
   }
 }
+
+/// ESK kaynak tabloları ile rapor arasındaki fark sayısı.
+int eskFarkSayisi(RaporVerisi v) =>
+    v.eskKaynak.mutabakat(v.eskAylik).length + v.eskEk.mutabakat(v.eskKaynak, v.eskAylik).length;

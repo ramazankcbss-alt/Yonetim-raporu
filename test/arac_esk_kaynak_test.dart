@@ -50,4 +50,38 @@ void main() {
     expect(m.single.kalem, 'Panagro kesim');
     expect(m.single.fark, 1);
   });
+
+  test('ESK ek kaynaklar: ayrıştırma ve mutabakat', () {
+    final k = EskKaynak.json({
+      'aylar': [
+        {'yil': 2030, 'ay': 3, 'kesilen': 10, 'sehirKesim': 0, 'olen': 1, 'basGun': 10, 'birimFiyat': 1, 'bakimGideri': 10}
+      ]
+    });
+    final e = EskEk.json({
+      'kesim': [
+        {'yil': 2030, 'ay': 3, 'adet': 12, 'kg': 5000, 'kgAdet': 10, 'supheli': 1, 'neden': {'BESİ SONU': 10, 'ACİL': 2}}
+      ],
+      'olum': [
+        {'yil': 2030, 'ay': 3, 'adet': 1, 'maliyete': 1, 'neden': {'AHIRDA ÖLDÜ': 1}}
+      ],
+      'kasaplik': [
+        {'parti': 2, 'tarih': '01.03.2030', 'adet': 20, 'netKg': 9000, 'limanAdet': 20, 'limanKg': 10000, 'arac': 1}
+      ],
+      'balya': [
+        {'yil': 2030, 'ay': 3, 'urun': 'MISIR', 'yer': 'A', 'kg': 1000},
+        {'yil': 2030, 'ay': 3, 'urun': 'MISIR', 'yer': 'B', 'kg': 500},
+      ],
+      'gelir': [
+        {'yil': 2030, 'ay': 3, 'satis': 100, 'gider': 150, 'kazanc': -50000}
+      ],
+    });
+    expect(e.kesim.single.ortKg, 500);
+    expect(e.kasaplik.single.ortKg, 450);
+    expect(e.kasaplik.single.fireYuzde, closeTo(10, 1e-9));
+    expect(EskEk.aylik(e.balya)['2030-03']!['MISIR'], 1500);
+    expect(EskEk.aylik(e.balya, yereGore: true)['2030-03']!['B'], 500);
+    final m = e.mutabakat(k, [const EskAy(ay: 'Mart 2030', karZarar: -40000)]);
+    expect(m.map((x) => x.kalem).toList(),
+        ['Kesim (liste – bakım tablosu)', 'Kâr/zarar (gelir tablosu – aylık rapor)']);
+  });
 }

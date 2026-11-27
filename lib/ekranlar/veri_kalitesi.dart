@@ -87,6 +87,13 @@ class VeriKalitesi {
       (t('ESK ithal dana partileri'), 'ESK ithal dana partileri',
           v.eskKaynak.partiler.isEmpty ? 'Veri yok' : '${v.eskKaynak.partiler.length} parti'),
       (t('ESK gelen yemler'), 'ESK gelen yemler', yemKapsam()),
+      (t('ESK kesim / ölüm listeleri'), 'ESK kesim / ölüm listeleri',
+          v.eskEk.kesim.isEmpty ? 'Veri yok' : '${v.eskEk.kesim.first.ad} – ${v.eskEk.kesim.last.ad}'),
+      (t('ESK kasaplık listesi'), 'ESK kasaplık listesi',
+          v.eskEk.kasaplik.isEmpty ? 'Veri yok' : '${v.eskEk.kasaplik.first.parti}.–${v.eskEk.kasaplik.last.parti}. parti'),
+      (t('ESK balya ve gübre'), 'ESK balya ve gübre', v.eskEk.balya.isEmpty && v.eskEk.gubre.isEmpty ? 'Veri yok' : 'Aylık tonaj'),
+      (t('ESK gelir tablosu çalışması'), 'ESK gelir tablosu çalışması',
+          v.eskEk.gelir.isEmpty ? 'Veri yok' : '${v.eskEk.gelir.first.ad} – ${v.eskEk.gelir.last.ad}'),
     ];
 
     // Eksik aylar: bu yıl için tamamlanmış son ay.
@@ -191,7 +198,12 @@ class VeriKalitesi {
       }
     }
     // ESK: kaynak tablo ile ESK aylık rapor
-    final em = v.eskKaynak.mutabakat(v.eskAylik);
+    final em = [...v.eskKaynak.mutabakat(v.eskAylik), ...v.eskEk.mutabakat(v.eskKaynak, v.eskAylik)];
+    final supheli = v.eskEk.kesim.fold(0, (t, x) => t + x.supheli);
+    if (supheli > 0) {
+      konular.add(AcikKonu('ESK kesim listesi: şüpheli canlı ağırlık',
+          '$supheli satırda baş başına canlı ağırlık 150–900 kg dışında (ör. fazladan sıfır yazılmış olabilir).', 'ESK sorumlusu'));
+    }
     if (em.isNotEmpty) {
       konular.add(AcikKonu('ESK: kaynak tablo ile aylık rapor farklı',
           em.take(4).map((m) => '${m.ay} ${m.kalem}: tablo ${sayi(m.kaynak)}, rapor ${sayi(m.rapor)}').join('; ') +
