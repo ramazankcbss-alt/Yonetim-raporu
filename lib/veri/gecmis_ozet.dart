@@ -43,12 +43,22 @@ class GecmisGosterge {
   final bool yuzde;
 }
 
+class GecmisKontrol {
+  const GecmisKontrol(this.tablo, this.ciftlik, this.yil, this.olcu, this.yazilan, this.hesaplanan, this.pay, this.payda);
+  final String tablo, ciftlik, olcu, pay, payda;
+  final int yil;
+  final double yazilan, hesaplanan;
+}
+
 class GecmisOzet {
-  const GecmisOzet({this.kesim = const [], this.alim = const [], this.gostergeler = const [], this.hatalar = const []});
+  const GecmisOzet({this.kesim = const [], this.alim = const [], this.gostergeler = const [], this.hatalar = const [], this.kontroller = const []});
   final List<GecmisKesim> kesim;
   final List<GecmisAlim> alim;
   final List<GecmisGosterge> gostergeler;
   final List<String> hatalar;
+
+  /// Değerlendirme raporunda yazılan oranın, aynı satırdaki sayılardan hesaplanan orandan farklı olduğu hücreler.
+  final List<GecmisKontrol> kontroller;
 
   bool get bos => kesim.isEmpty && alim.isEmpty && gostergeler.isEmpty;
 
@@ -78,6 +88,12 @@ class GecmisOzet {
                 olcu: '${x['olcu'] ?? ''}', deger: _n(x['deger'])!, yuzde: x['yuzde'] == true),
       ],
       hatalar: [for (final h in l('hatalar')) '$h'],
+      kontroller: [
+        for (final k in l('kontroller'))
+          if (k is Map)
+            GecmisKontrol('${k['tablo'] ?? ''}', '${k['ciftlik'] ?? ''}', (k['yil'] as num?)?.toInt() ?? 0, '${k['olcu'] ?? ''}',
+                (k['yazilan'] as num?)?.toDouble() ?? 0, (k['hesaplanan'] as num?)?.toDouble() ?? 0, '${k['pay'] ?? ''}', '${k['payda'] ?? ''}'),
+      ],
     );
   }
 

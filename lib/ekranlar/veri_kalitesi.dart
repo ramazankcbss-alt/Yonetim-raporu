@@ -6,6 +6,7 @@ import '../bicim.dart';
 import '../servis/veri_servisi.dart';
 import '../tema.dart';
 import '../veri/ciftlik_rapor.dart';
+import '../veri/gecmis_ozet.dart' show gecmisCiftlikAdi;
 import '../veri/havuz.dart';
 import '../veri/model.dart';
 import '../veri/urun_karlilik.dart';
@@ -197,6 +198,13 @@ class VeriKalitesi {
       if (r.length >= 5 && r[3] == 'hata') {
         konular.add(AcikKonu('Kaynak okunamadı: ${r[1]}${r[2].isEmpty ? '' : ' › ${r[2]}'}', r[4], 'Uygulama sahibi'));
       }
+    }
+    // Değerlendirme raporu: oranlar sayılarla tutarlı mı
+    for (final k in v.gecmisOzet.kontroller) {
+      konular.add(AcikKonu('Değerlendirme Raporu › ${k.tablo.trim()} · ${gecmisCiftlikAdi(k.ciftlik)} ${k.yil}',
+          '${k.olcu} %${sayi(k.yazilan, ondalik: 1)} yazılmış; ${k.pay} / ${k.payda} ile hesaplanan oran %${sayi(k.hesaplanan, ondalik: 1)}.'
+              '${k.hesaplanan > 100 ? ' Oran %100\'ü aşıyor; sayılar kontrol edilmeli.' : ''}',
+          'Değerlendirme raporunu hazırlayan birim'));
     }
     // Maliyet Takip › İlaç aşı ve diğer malzemeler
     final mtd = v.maliyetTakipDetay;

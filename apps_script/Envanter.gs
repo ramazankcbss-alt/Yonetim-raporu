@@ -38,7 +38,7 @@ function kaynakKullanim_() {
   return [
     [MALIYET_TAKIP_ID_, /^(MALİYET ÖZET HAYVANCILIK|MALİYET ÖZET TARIM 2026|YEM|SÜT MALİYETİ|KARKAS MALİYETİ|KAYAR ORTALAMA|ÖZET)$/, 'Çiftlik Sonuçları › maliyet (sunucuda, otomatik)'],
     [MALIYET_TAKIP_ID_, /^(İLAÇ AŞI|DİĞER MALZEMELER)$/, 'Çiftlik Sonuçları › İlaç ve Malzeme'],
-    [GECMIS_OZET_.degerlendirme, /./, 'Geçmiş Yıllar › Kaynak tabloları'],
+    [GECMIS_OZET_.degerlendirme, /./, 'Geçmiş Yıllar › yıllık göstergeler ve kaynak tabloları'],
     [GECMIS_OZET_.kesim, /^(ALIM ÖZET|Sayfa6|Sayfa7|GENEL MALİYETLER)$/, 'Geçmiş Yıllar › Kaynak tabloları'],
     [BILGI_BANKASI_ID, /^(Envanter|Aylık_Sürü)$/, 'Geçmiş Yıllar › Kaynak tabloları'],
     [ESK_EK_.calisma, /./, 'ESK › Kaynak tabloları'],

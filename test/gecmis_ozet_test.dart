@@ -33,4 +33,13 @@ void main() {
     expect(o.matris('T')['Ölüm Oranı']!['Şekersüt']![2031], 2.7);
     expect(o.tablolar, ['T']);
   });
+  test('geçmiş özet: oran tutarlılık kontrolleri', () {
+    final o = GecmisOzet.json({
+      'kontroller': [
+        {'tablo': 'T', 'ciftlik': 'A', 'yil': 2030, 'olcu': 'Doğum Oranı', 'yazilan': 10, 'hesaplanan': 20, 'pay': 'Doğum Sayısı 2', 'payda': 'Hayvan sayısı 10'}
+      ]
+    });
+    expect(o.kontroller.single.hesaplanan, 20);
+    expect(o.kontroller.single.yil, 2030);
+  });
 }

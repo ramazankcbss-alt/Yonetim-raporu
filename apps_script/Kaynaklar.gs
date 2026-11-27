@@ -597,7 +597,11 @@ function gecmisMatrisOku_(d, baslik) {
   }
   for (var r = hb + 1; r < d.length; r++) {
     var c = String(d[r][0] || '').trim();
-    if (!c) { if (out.length) break; continue; }
+    if (!c) {
+      // Tablo bitti: sayfanın kalanında başka yıl tablosu varsa o da okunur (sınır yok).
+      if (out.length) return out.concat(r + 1 < d.length ? gecmisMatrisOku_(d.slice(r + 1), baslik) : []);
+      continue;
+    }
     for (var j2 = 1; j2 < h.length; j2++) {
       if (!yillar[j2] || !olcu[j2] || /TOPLAM/i.test(olcu[j2])) continue;
       var v = eskTrSayi_(String(d[r][j2]).replace('%', ''));
@@ -610,8 +614,29 @@ function gecmisMatrisOku_(d, baslik) {
   return out;
 }
 
+/** Oran tutarlılığı: "<X> Oranı" yüzdesi, aynı satırdaki "<X> sayısı" ile hayvan sayısından yeniden hesaplanır.
+ *  [{tablo, ciftlik, yil, olcu, yazilan, hesaplanan}] — fark 0,5 puandan büyükse ya da oran %100'ü aşıyorsa. */
+function gecmisKontrol_(gl) {
+  var g = {}, out = [];
+  gl.forEach(function (x) { var k = x.tablo + '|' + x.ciftlik + '|' + x.yil; (g[k] = g[k] || []).push(x); });
+  Object.keys(g).forEach(function (k) {
+    var l = g[k];
+    l.filter(function (x) { return x.yuzde && /Oran/i.test(x.olcu); }).forEach(function (o) {
+      var kok = o.olcu.replace(/\s*Oran[ıi]?.*$/i, '').trim().toLocaleLowerCase('tr');
+      if (!kok) return;
+      var pay = l.find(function (x) { return !x.yuzde && x.olcu.toLocaleLowerCase('tr').indexOf(kok) === 0 && /say/i.test(x.olcu); });
+      var payda = l.find(function (x) { return !x.yuzde && x !== pay && /say/i.test(x.olcu) && x.olcu.toLocaleLowerCase('tr').indexOf(kok) !== 0; });
+      if (!pay || !payda || !payda.deger) return;
+      var h = Math.round(pay.deger / payda.deger * 1000) / 10;
+      if (Math.abs(h - o.deger) > 0.5 || o.deger > 100) out.push({ tablo: o.tablo, ciftlik: o.ciftlik, yil: o.yil, olcu: o.olcu, yazilan: o.deger, hesaplanan: h,
+        pay: pay.olcu + ' ' + pay.deger, payda: payda.olcu + ' ' + payda.deger });
+    });
+  });
+  return out;
+}
+
 function gecmisOzet_() {
-  return onbellekli_('gecmisOzet_v1', 21600, function () {
+  return onbellekli_('gecmisOzet_v2', 21600, function () {
     var o = { kesim: [], alim: [], gostergeler: [], hatalar: [] };
     try {
       var sh = SpreadsheetApp.openById(GECMIS_OZET_.kesim).getSheetByName('KESİMLER');
@@ -620,10 +645,13 @@ function gecmisOzet_() {
     } catch (e) { o.hatalar.push('Kesim özet: ' + e); }
     try {
       var ss = SpreadsheetApp.openById(GECMIS_OZET_.degerlendirme);
-      GECMIS_OZET_.sayfalar.forEach(function (ad) {
-        var s = ss.getSheetByName(ad);
-        if (s) o.gostergeler = o.gostergeler.concat(gecmisMatrisOku_(s.getDataRange().getDisplayValues(), ad.trim()));
+      // Değerlendirme raporunun bütün sayfaları (KVKK sayfaları hariç); yıl sütunlu tablolar gösterge olarak okunur.
+      ss.getSheets().forEach(function (s) {
+        var ad = s.getName();
+        if (KVKK_SAYFA_.test(ad) || !s.getLastRow()) return;
+        o.gostergeler = o.gostergeler.concat(gecmisMatrisOku_(s.getDataRange().getDisplayValues(), ad.trim()));
       });
+      o.kontroller = gecmisKontrol_(o.gostergeler);
     } catch (e) { o.hatalar.push('Değerlendirme raporu: ' + e); }
     return o;
   });
