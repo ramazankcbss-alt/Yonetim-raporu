@@ -56,6 +56,7 @@ class _NetSonucSekmesiState extends State<NetSonucSekmesi> {
               _Ozet(h: h),
               _Kollar(h: h),
               _AyTablosu(h: h),
+              if (snap.data != null && !widget.v.suruHareketleri.bos) _Birim(h: h, v: widget.v, r: snap.data!),
               _Tahmin(h: h),
               _Mutabakat(h: h),
               if (h.yatirimlar.isNotEmpty) _Yatirim(h: h),
@@ -211,6 +212,68 @@ class _AyTablosu extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         const Text('* Tahmin: muhasebe bu ayı henüz kapatmadı. Yöntem aşağıda.', style: TextStyle(fontSize: 11, color: Renk.soluk)),
+      ]),
+    );
+  }
+}
+
+/// Hayvancılık birim göstergeleri (kesin aylar): sürü, sağmal başına süt, baş başına gider, litre maliyeti.
+class _Birim extends StatelessWidget {
+  const _Birim({required this.h, required this.v, required this.r});
+  final GelirGiderHavuzu h;
+  final RaporVerisi v;
+  final CiftlikRaporu r;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = v.suruHareketleri;
+    const st = TextStyle(fontSize: 12);
+    final satirlar = <DataRow>[];
+    for (final (c, sut) in const [('Şekersüt', kSekersut), ('Pan-Gev', kPangev), ('Aslım', null)]) {
+      for (final a in h.ciftlikAylari(c)) {
+        if (!a.kesin || a.ay < h.sonMuhasebeAyi - 2) continue;
+        final tum = s.deger(c, h.yil, a.ay, 'TÜM SÜRÜ'), sagmal = s.deger(c, h.yil, a.ay, 'SAĞMAL');
+        final b = sut == null ? null : r.birimAylar(sut).where((x) => x.yil == h.yil && x.ayNo == a.ay).firstOrNull;
+        final gun = DateTime(h.yil, a.ay + 1, 0).day;
+        String f(double? x, {int o = 0}) => x == null || !x.isFinite ? '—' : sayi(x, ondalik: o);
+        satirlar.add(DataRow(cells: [
+          DataCell(Text('$c · ${_ay(a.ay)}', style: st)),
+          DataCell(Text(f(tum), style: st)),
+          DataCell(Text(f(sagmal), style: st)),
+          DataCell(Text(b == null || sagmal == null || sagmal == 0 ? '—' : f(b.miktar / sagmal / gun, o: 1), style: st)),
+          DataCell(Text(tum == null || tum == 0 ? '—' : f(a.muhGider / tum), style: st)),
+          DataCell(Text(b == null || b.miktar == 0 ? '—' : f(b.toplam / b.miktar, o: 2), style: st)),
+        ]));
+      }
+    }
+    if (satirlar.isEmpty) return const SizedBox.shrink();
+    return Panel(
+      baslik: 'Hayvancılık birim göstergeleri (son 3 kesin ay)',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            columnSpacing: 14,
+            headingRowHeight: 44,
+            dataRowMinHeight: 30,
+            dataRowMaxHeight: 34,
+            headingTextStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Renk.anaKoyu),
+            columns: const [
+              DataColumn(label: Text('Çiftlik · ay')),
+              DataColumn(label: Text('Tüm\nsürü'), numeric: true),
+              DataColumn(label: Text('Sağmal'), numeric: true),
+              DataColumn(label: Text('Süt\nL/sağmal/gün'), numeric: true),
+              DataColumn(label: Text('Gider\n₺/baş/ay'), numeric: true),
+              DataColumn(label: Text('Süt maliyeti\n₺/L'), numeric: true),
+            ],
+            rows: satirlar,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+            'Hayvan sayıları: Sürü Hareketleri (aylık ortalama). Süt litresi ve süt maliyeti: muhasebe üretim kaydı. '
+            'Gider ₺/baş/ay: çiftliğin muhasebe gideri ÷ tüm sürü.',
+            style: TextStyle(fontSize: 11, color: Renk.soluk, height: 1.4)),
       ]),
     );
   }

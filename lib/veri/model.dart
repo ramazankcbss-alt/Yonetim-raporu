@@ -15,6 +15,7 @@ import 'arac.dart';
 import 'bakim_onarim.dart';
 import 'uretim_karlilik.dart';
 import 'urun_takip.dart';
+import 'stok_suru.dart';
 
 export 'arac.dart';
 export 'bakim_onarim.dart';
@@ -1145,6 +1146,8 @@ class RaporVerisi {
     this.tarimsalUretim = const TarimsalUretim(),
     this.urunTeslimat = const UrunTeslimat(),
     this.kaynakTarihleri = const [],
+    this.suruHareketleri = const SuruHareketleri(),
+    this.stokSayimi = const StokSayimi(),
     this.vetBildirimleri = const [],
     this.olusturma,
   })  : bakimOnarim = BakimOnarimOzeti(bakimOnarim),
@@ -1222,6 +1225,10 @@ class RaporVerisi {
 
   /// Veri kalitesi: kaynak dosyaların ve uygulamadaki kopyaların son değişiklik tarihleri.
   final List<KaynakTarihi> kaynakTarihleri;
+
+  /// Sürü hareketleri (hayvan sayısının asıl kaynağı) ve en yeni stok sayımı.
+  final SuruHareketleri suruHareketleri;
+  final StokSayimi stokSayimi;
   final List<VetBildirim> vetBildirimleri;
 
   /// Dönemdeki bulgular (veri gününe göre), yeniden eskiye.
@@ -1242,6 +1249,8 @@ class RaporVerisi {
       mali: MaliVeri.json(j['mali']),
       tarimsalUretim: TarimsalUretim.json(j['tarimsalUretim']),
       urunTeslimat: UrunTeslimat.json(j['urunTeslimat']),
+      suruHareketleri: SuruHareketleri.json(j['suruHareketleri']),
+      stokSayimi: StokSayimi.json(j['stokSayimi']),
       kaynakTarihleri: (j['veriKalitesi'] is List ? j['veriKalitesi'] as List : const [])
           .map(KaynakTarihi.oku)
           .whereType<KaynakTarihi>()

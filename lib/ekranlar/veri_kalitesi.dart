@@ -50,12 +50,23 @@ class VeriKalitesi {
       return '${ay(aylar.first)} – ${ay(aylar.last)}';
     }
 
+    String suruKapsam() {
+      final sh = v.suruHareketleri;
+      if (sh.bos) return 'Veri yok';
+      var son = 0;
+      for (final c in sh.ciftlikler) {
+        final a = sh.sonAy(c, simdi.year);
+        if (a > son) son = a;
+      }
+      return son == 0 ? '' : 'Ocak–${raporAylari[son - 1]} ${simdi.year}';
+    }
+
     final kaynaklar = <(KaynakTarihi?, String, String)>[
       (t('Çiftlik Raporları (muhasebe)'), 'Çiftlik Raporları (muhasebe)', muhasebe?.donem ?? 'Veri yok'),
       (t('Maliyet Takip'), 'Maliyet Takip', mtKapsam()),
       (t('Aylık gelir satış ve gider tabloları'), 'Aylık gelir satış ve gider tabloları', gg.bos ? 'Veri yok' : gg.donem),
-      (t('Stok sayımları'), 'Stok sayımları', 'Uygulamaya bağlanacak (piramit 4. adım)'),
-      (t('Sürü hareketleri'), 'Sürü hareketleri', 'Uygulamaya bağlanacak (piramit 4. adım)'),
+      (t('Stok sayımları'), 'Stok sayımları', v.stokSayimi.bos ? 'Veri yok' : '${v.stokSayimi.donem} sayımı'.trim()),
+      (t('Sürü hareketleri'), 'Sürü hareketleri', suruKapsam()),
       (t('Tarımsal Faaliyet'), 'Tarımsal Faaliyet',
           v.tarimsalUretim.bos ? 'Veri yok' : '${v.tarimsalUretim.yilBasligi} hasadı'.trim()),
     ];
@@ -107,6 +118,36 @@ class VeriKalitesi {
             konular.add(AcikKonu('Maliyet Takip\'te olmayan ekiliş', '${u.urun}: ${yok.join(', ')} (tahmini maliyet kullanılıyor).',
                 'Maliyet Takip sorumlusu'));
           }
+        }
+      }
+    }
+    // Süt: fatura litresi ile muhasebe üretim kaydı (%10'dan büyük fark)
+    if (muhasebe != null) {
+      for (final (c, urun) in const [('Şekersüt', kSekersut), ('Pan-Gev', kPangev)]) {
+        for (final b in muhasebe.birimAylar(urun)) {
+          if (b.yil != h.yil || b.miktar <= 0) continue;
+          final l = gg.gelir
+              .where((g) => g.ciftlik == c && g.yil == b.yil && g.ay == b.ayNo && g.urun == 'Çiğ süt' && g.birim.toUpperCase() == 'L')
+              .fold(0.0, (s, g) => s + g.miktar);
+          if (l > 0 && ((l - b.miktar) / b.miktar).abs() > 0.10) {
+            konular.add(AcikKonu('$c süt litresi: fatura ile muhasebe farklı (${raporAylari[b.ayNo - 1]})',
+                'Gelir tablosundaki süt faturası ${sayi(l)} L, muhasebe üretim kaydı ${sayi(b.miktar)} L. '
+                    'Fatura başka bir ayın teslimini içeriyor olabilir; aylık litre için muhasebe kaydı kullanılır.',
+                'Muhasebe'));
+          }
+        }
+      }
+    }
+    // Hayvan sayısı: Maliyet Takip ile Sürü Hareketleri (%5'ten büyük fark)
+    if (mt != null && !v.suruHareketleri.bos) {
+      for (final x in mt.hayvan) {
+        if (x.yil != h.yil || x.hayvan == null || x.hayvan == 0) continue;
+        final s = v.suruHareketleri.deger(x.ciftlik, x.yil, x.ay, 'TÜM SÜRÜ');
+        if (s == null || s == 0) continue;
+        if (((x.hayvan! - s) / s).abs() > 0.05) {
+          konular.add(AcikKonu('${x.ciftlik} hayvan sayısı: Maliyet Takip ile Sürü Hareketleri farklı (${raporAylari[x.ay - 1]})',
+              'Maliyet Takip ${sayi(x.hayvan)}, Sürü Hareketleri ${sayi(s)} baş. Hayvan sayısının asıl kaynağı Sürü Hareketleri\'dir.',
+              'Maliyet Takip sorumlusu'));
         }
       }
     }

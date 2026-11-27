@@ -11,6 +11,7 @@ import 'esk.dart';
 import 'gecmis.dart';
 import 'genel_soru.dart';
 import 'veri_kalitesi.dart';
+import 'stok_suru.dart';
 import 'hastalik.dart';
 import 'gunce.dart';
 import 'kilit.dart';
@@ -94,6 +95,15 @@ class AsistanEkran extends StatelessWidget {
           renk: Renk.mavi,
           ac: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const CiftlikRaporEkran())),
+        ),
+        _Bolum(
+          ikon: Icons.inventory_2_outlined,
+          baslik: 'Stok ve Sürü',
+          aciklama: veri.suruHareketleri.bos && veri.stokSayimi.bos
+              ? 'Sürü hareketleri (çiftlik × ay) ve stok sayımı'
+              : 'Sürü hareketleri${veri.stokSayimi.donem.isEmpty ? '' : ' · ${veri.stokSayimi.donem} stok sayımı'}',
+          renk: Renk.anaKoyu,
+          ac: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => StokSuruEkran(veri: veri))),
         ),
         _Bolum(
           ikon: Icons.insights_outlined,

@@ -311,6 +311,9 @@ function veriTopla_(gun) {
     urunTeslimat: (function () { try { return urunTeslimatlari_(); } catch (err) { return { hata: String(err) }; } })(),
     // Tarımsal Faaliyet › PARSEL: Çiftlik, İlçe, Köy, Ada, Parsel, Alan (da), Ürün
     resmiParsel: (function () { try { return resmiParsellerOku_(); } catch (err) { return []; } })(),
+    // Sürü hareketleri (çiftlik × ay sayılar) ve en yeni stok sayımı (not sütunları okunmaz)
+    suruHareketleri: (function () { try { return suruHareketleriOku_(); } catch (err) { return null; } })(),
+    stokSayimi: (function () { try { return stokSayimiOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
     veriKalitesi: (function () { try { return veriKalitesi_(); } catch (err) { return []; } })(),
     // Veteriner Kontrol Paneli: kodlar (Kod, Etiket, Oluşturma, Durum, Son giriş)
@@ -2802,5 +2805,60 @@ function veriKalitesi_() {
       var kopya = !k.kopya ? null : k.kopya === 'mali' ? maliKopya() : dosya(UYGULAMA_DOSYALARI_[k.kopya]);
       return { ad: k.ad, kaynak: tarih(son), kopya: tarih(kopya), canli: !k.kopya };
     });
+  });
+}
+
+
+// ---------------------------------------------------------------------------
+// SÜRÜ HAREKETLERİ: "SÜRÜ HAREKETLERİ" dosyasının bu yıl ve geçen yıl sayfaları (A:N).
+// Çiftlik başlığı + kalem satırları (tüm sürü, sağmal, doğum, kesim, ölüm, nakil…) × 12 ay. Yalnızca sayı.
+var SURU_HAREKETLERI_ID = '1yp23PwaA_kFXMapnLQGZfcVhjzcTTbujSUJS3m77y48';
+
+function suruHareketleriOku_() {
+  return onbellekli_('suruHareketleri_v1', 1800, function () {
+    var ss = SpreadsheetApp.openById(SURU_HAREKETLERI_ID), yil = new Date().getFullYear(), sayfalar = {};
+    [yil, yil - 1].forEach(function (y) {
+      var sh = ss.getSheetByName(String(y));
+      if (!sh) return;
+      var n = Math.min(sh.getLastRow(), 200);
+      if (n < 3) return;
+      sayfalar[String(y)] = sh.getRange(1, 1, n, 14).getValues().map(function (r) {
+        return r.map(function (x) { return x instanceof Date ? '' : x; });
+      });
+    });
+    return { dosya: ss.getName(), guncelleme: Utilities.formatDate(DriveApp.getFileById(SURU_HAREKETLERI_ID).getLastUpdated(), 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss"), sayfalar: sayfalar };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// STOK SAYIMI: adında "Stok Sayımları" geçen en yeni tablo; üretim yeri sayfaları (1604, 1605, …).
+// KVKK: yalnızca başlıklı sütunlar okunur (ÜY, DY, malzeme kodu ve adı, birim, stok, sayım, tüketim);
+// başlıklardan sonra gelen açıklama sütunları (kişi adı içerebilir) okunmaz.
+var STOK_BASLIKLARI_ = ['ÜY', 'DY', 'MALZ KOD', 'MALZ', 'ÖB', 'STOK', 'SAYIM', 'ANAÇ TÜKETİM', 'GENÇ TÜKETİM'];
+
+function stokSayimiOku_() {
+  return onbellekli_('stokSayimi_v1', 1800, function () {
+    var it = DriveApp.searchFiles("title contains 'Stok Sayımları' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false");
+    var en = null;
+    while (it.hasNext()) {
+      var f = it.next();
+      if (!en || f.getLastUpdated() > en.getLastUpdated()) en = f;
+    }
+    if (!en) return null;
+    var ss = SpreadsheetApp.openById(en.getId()), sayfalar = {};
+    ss.getSheets().forEach(function (sh) {
+      var ad = sh.getName();
+      if (!/^16\d\d$/.test(ad) || sh.getLastRow() < 2) return;
+      var lc = Math.min(sh.getLastColumn(), 26);
+      var baslik = sh.getRange(1, 1, 1, lc).getValues()[0].map(function (x) { return String(x).trim().toLocaleUpperCase('tr'); });
+      var son = -1;
+      baslik.forEach(function (b, i) { if (STOK_BASLIKLARI_.indexOf(b) >= 0) son = i; });
+      if (son < 0) return;
+      var n = Math.min(sh.getLastRow(), 600);
+      sayfalar[ad] = sh.getRange(1, 1, n, son + 1).getValues().map(function (r) {
+        return r.map(function (x) { return x instanceof Date ? '' : x; });
+      });
+    });
+    return { dosya: en.getName(), guncelleme: Utilities.formatDate(en.getLastUpdated(), 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss"), sayfalar: sayfalar };
   });
 }
