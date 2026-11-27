@@ -324,6 +324,8 @@ function veriTopla_(gun) {
     gecmisOzet: (function () { try { return gecmisOzet_(); } catch (err) { return null; } })(),
     // Hasadı tamamlanan ürünler (sezon × ürün; "Tümü" o sezonun bütün ürünleri)
     hasatDurumu: (function () { try { return hasatDurumuOku_(); } catch (err) { return []; } })(),
+    // Çiftlik Raporları (muhasebe) E-Tablo kopyasının tamamı: gider raporu, yem ve tarım tüketimleri
+    ciftlikRaporTam: (function () { try { return ciftlikRaporTam_(false); } catch (err) { return null; } })(),
     // Araç masrafları: muhasebe xlsx'i doğrudan okunur (araç adı × ay × iş alanı; plaka/satıcı/belge no yok)
     aracMasraf: (function () { try { return aracMasrafOku_(); } catch (err) { return null; } })(),
     // Veri kalitesi paneli: kaynak dosyaların ve kopyaların son değişiklik tarihleri (içerik okunmaz)
@@ -836,7 +838,7 @@ function ozetEksikGunler_(ss, ch, notlar) {
   var gun0 = Number(ozTarih.slice(8, 10)), ay = ozTarih.slice(0, 8);
   var formul = oz.getRange(1, 1, 27, 18).getFormulas();
   var deger = oz.getRange(1, 1, 27, 18).getValues();
-  var iv = isl.getRange(1, 1, Math.min(isl.getLastRow(), 150), Math.min(isl.getLastColumn(), 45)).getValues();
+  var iv = isl.getRange(1, 1, isl.getLastRow(), Math.max(isl.getLastColumn(), 45)).getValues();
   var hedef = ss.getSheetByName(SAYFALAR.ozet);
   var mevcut = mevcutGunler_(hedef), tam = tamamlananlar_();
 
@@ -964,7 +966,7 @@ function ozetTakipKur() {
 function gunlukEsitle_(ss, ch, tz, notlar) {
   var sh = ch.getSheetByName('isletme');
   if (!sh) { notlar.push("'isletme' sayfası yok"); return 0; }
-  var v = sh.getRange(1, 1, Math.min(sh.getLastRow(), 120), 33).getValues();
+  var v = sh.getRange(1, 1, sh.getLastRow(), Math.max(sh.getLastColumn(), 33)).getValues();
   var ozt = tarihCoz_(ch.getSheetByName('ozet').getRange(2, 2).getValue());
   if (!ozt) return 0;
   var yilAy = ozt.slice(0, 8);
@@ -1038,7 +1040,7 @@ function tarimEsitle_(ss, tz) {
     var sonK = sh.getLastRow();
     if (sonK < 4) return;
     var bas = Math.max(5, sonK - 300);
-    var gen = Math.min(sh.getLastColumn(), 10);
+    var gen = sh.getLastColumn();
     // KVKK: 4. satırdaki başlıkta OPERATÖR / PERSONEL / ŞOFÖR geçen sütun okunmaz.
     var atla = {};
     sh.getRange(4, 1, 1, gen).getValues()[0].forEach(function (h, i) {
@@ -1507,7 +1509,7 @@ function patatesOku_(g, kaynaklar) {
   var ss = SpreadsheetApp.openById(PATATES_FIRE_ID);
   var sh = ss.getSheetByName('LİSTE');
   if (!sh || sh.getLastRow() < 3) return;
-  var v = sh.getRange(1, 1, sh.getLastRow(), Math.min(sh.getLastColumn(), 22)).getDisplayValues();
+  var v = sh.getRange(1, 1, sh.getLastRow(), Math.max(sh.getLastColumn(), 22)).getDisplayValues();
   var bi = v.findIndex(function (r) { return /tartım no/i.test(r[0]); });
   if (bi < 0) return;
   var h = v[bi].map(function (x) { return String(x).toLocaleLowerCase('tr').trim(); });
@@ -1619,7 +1621,7 @@ function ekimPlaniOku_() {
   return onbellekli_('ekimPlani', 3600, function () {
     var ss = SpreadsheetApp.openById(EKIM_PLANI_ID);
     var sh = ss.getSheets()[0];
-    var v = sh.getRange(1, 1, sh.getLastRow(), Math.min(sh.getLastColumn(), 27)).getDisplayValues();
+    var v = sh.getRange(1, 1, sh.getLastRow(), Math.max(sh.getLastColumn(), 27)).getDisplayValues();
     var yil = '', urunler = null, cikti = [];
     v.forEach(function (r) {
       var metin = r.join(' ');
@@ -2082,6 +2084,7 @@ function tarlaVeri_(pay) {
   var dos = [];
   if (acik('tarla')) dos = dos.concat(TARLA_DOSYALARI_);
   // Net Sonuç (Mali) ve Ürün Kârlılığı muhasebe ve maliyet toplamlarına dayanır.
+  if (acik('ciftlikRapor')) al(['ciftlikRaporTam']);
   if (acik('ciftlikRapor', 'mali', 'urun')) dos = dos.concat(['ciftlik_rapor_2026', 'maliyet_takip_2026']);
   if (acik('aracMasraf')) al(['aracMasraf']);
   if (acik('hastalik')) dos.push('hastalik');
@@ -2358,7 +2361,7 @@ function detaySayfaOku_(sh) {
     if (String(a[i][0]).trim().toLocaleUpperCase('tr-TR') === 'PERSONEL') { bitis = i; break; }
   }
   if (bitis < 1) return {};
-  var v = sh.getRange(1, 1, bitis, Math.min(sh.getLastColumn(), 33)).getValues();
+  var v = sh.getRange(1, 1, bitis, Math.max(sh.getLastColumn(), 33)).getValues();
   var yil = null, ay = null, bolum = '', sonuc = {};
   var bugun = bugun_();
   for (var r = 0; r < v.length; r++) {
@@ -2820,6 +2823,7 @@ var VERI_KAYNAKLARI_ = [
   { ad: 'ESK kasaplık listesi', kaynak: [], ara: "title contains 'KASAPLIK HAYVAN' and trashed = false" },
   { ad: 'ESK balya ve gübre', kaynak: ['1y_ya5m5KwXYAHbXSQQDAiRCQ5OMPYGrXSEV2Ezxhsu0', '1_wwlYHdnP3MywO-0bj_TX-lf7C3QIAyuo41B-DUNANg'] },
   { ad: 'ESK gelir tablosu çalışması', kaynak: ['142BCrHnPYp-eKP49dDaWAjnzN6J3n5TIBsQJZCNTCe0'] },
+  { ad: 'Çiftlik Raporları (E-Tablo kopyası)', kaynak: [], ara: "title contains 'Çiftlik Raporları' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false" },
   { ad: 'Kesim özeti 2021–2026', kaynak: ['14rJ4Lr5SGqlY7yqJNfX0ckQinI1sPfi46Uc5uU9pHns'] },
   { ad: 'Değerlendirme raporu 31.12.2025', kaynak: ['1sFGE9-t-rf-uu2RuEdPfP2flA-yJDyBtSDJjG3KSI_s'] }
 ];
@@ -2846,19 +2850,20 @@ function veriKalitesi_() {
 
 
 // ---------------------------------------------------------------------------
-// SÜRÜ HAREKETLERİ: "SÜRÜ HAREKETLERİ" dosyasının bu yıl ve geçen yıl sayfaları (A:N).
+// SÜRÜ HAREKETLERİ: "SÜRÜ HAREKETLERİ" dosyasının bütün yıl sayfaları.
 // Çiftlik başlığı + kalem satırları (tüm sürü, sağmal, doğum, kesim, ölüm, nakil…) × 12 ay. Yalnızca sayı.
 var SURU_HAREKETLERI_ID = '1yp23PwaA_kFXMapnLQGZfcVhjzcTTbujSUJS3m77y48';
 
 function suruHareketleriOku_() {
-  return onbellekli_('suruHareketleri_v1', 1800, function () {
-    var ss = SpreadsheetApp.openById(SURU_HAREKETLERI_ID), yil = new Date().getFullYear(), sayfalar = {};
-    [yil, yil - 1].forEach(function (y) {
-      var sh = ss.getSheetByName(String(y));
-      if (!sh) return;
+  return onbellekli_('suruHareketleri_v2', 1800, function () {
+    // Bütün yıl sayfaları (2020–…) okunur.
+    var ss = SpreadsheetApp.openById(SURU_HAREKETLERI_ID), sayfalar = {};
+    ss.getSheets().forEach(function (sh) {
+      var y = sh.getName().trim();
+      if (!/^20\d\d$/.test(y)) return;
       var n = sh.getLastRow();
       if (n < 3) return;
-      sayfalar[String(y)] = sh.getRange(1, 1, n, 14).getValues().map(function (r) {
+      sayfalar[y] = sh.getRange(1, 1, n, Math.max(sh.getLastColumn(), 14)).getValues().map(function (r) {
         return r.map(function (x) { return x instanceof Date ? '' : x; });
       });
     });
@@ -2885,7 +2890,7 @@ function stokSayimiOku_() {
     ss.getSheets().forEach(function (sh) {
       var ad = sh.getName();
       if (!/^16\d\d$/.test(ad) || sh.getLastRow() < 2) return;
-      var lc = Math.min(sh.getLastColumn(), 26);
+      var lc = sh.getLastColumn();
       var baslik = sh.getRange(1, 1, 1, lc).getValues()[0].map(function (x) { return String(x).trim().toLocaleUpperCase('tr'); });
       var son = -1;
       baslik.forEach(function (b, i) { if (STOK_BASLIKLARI_.indexOf(b) >= 0) son = i; });
@@ -2956,7 +2961,7 @@ function eskKaynak_() {
         if (!ay) return;
         var d = sh.getDataRange().getDisplayValues();
         var bas = -1;
-        for (var i = 0; i < Math.min(d.length, 10); i++) if (String(d[i][0]).trim() === 'GÜN') { bas = i; break; }
+        for (var i = 0; i < Math.min(d.length, 40); i++) if (String(d[i][0]).trim() === 'GÜN') { bas = i; break; }
         if (bas < 0) return;
         var h = d[bas].map(function (x) { return String(x).toLocaleUpperCase('tr'); });
         var top = null;
@@ -3023,7 +3028,7 @@ function excelTarih_(n) { return new Date(Date.UTC(1899, 11, 30) + Math.round(n)
 function aracMasrafCoz_(sayfalar) {
   var genel = null, detay = null;
   sayfalar.forEach(function (s) {
-    for (var i = 0; i < Math.min(s.length, 10); i++) {
+    for (var i = 0; i < Math.min(s.length, 40); i++) {
       var a = String(s[i].A || '').trim().toLocaleUpperCase('tr');
       if (!genel && a === 'PLAKA') genel = { s: s, h: i };
       if (!detay && a === 'ANA HESAP') detay = { s: s, h: i };
@@ -3123,7 +3128,7 @@ function eskTarih_(v) {
 
 /** Başlık satırında (ilk 5 satır) verilen ifadelere uyan sütunlar: {ad: index}. */
 function eskSutunlar_(d, kurallar) {
-  for (var i = 0; i < Math.min(d.length, 5); i++) {
+  for (var i = 0; i < Math.min(d.length, 40); i++) {
     var h = d[i].map(function (x) { return String(x).toLocaleUpperCase('tr').replace(/\s+/g, ' ').trim(); }), o = { _bas: i }, n = 0;
     Object.keys(kurallar).forEach(function (k) {
       for (var j = 0; j < h.length; j++) if (kurallar[k].test(h[j])) { o[k] = j; n++; break; }
@@ -3277,14 +3282,14 @@ function eskEk_() {
       var son = DriveApp.getFileById(ESK_EK_.calisma).getLastUpdated(), sYil = son.getFullYear(), sAy = son.getMonth() + 1;
       if (sh) {
         var d = sh.getDataRange().getDisplayValues(), AY = ESK_AYLAR_;
-        for (var r = 0; r < Math.min(d.length, 6); r++) {
+        for (var r = 0; r < Math.min(d.length, 40); r++) {
           d[r].forEach(function (h, col) {
             var m = String(h).toLocaleUpperCase('tr').match(/ESK\s+(\S+)\s+BAKIM/);
             if (!m) return;
             var ay = AY.indexOf(m[1]) + 1;
             if (!ay) return;
             var x = { ay: ay, yil: ay > sAy ? sYil - 1 : sYil };
-            for (var j = r + 1; j < Math.min(d.length, r + 20); j++) {
+            for (var j = r + 1; j < Math.min(d.length, r + 40); j++) {
               var et = String(d[j][col] || '').toLocaleUpperCase('tr'), v = eskTrSayi_(d[j][col + 1]);
               if (v === null) continue;
               if (/SAP BALYASI/.test(et)) x.sap = v;
@@ -3347,7 +3352,7 @@ function gecmisKesimOku_(d) {
 /** Yıl × çiftlik tablosu: başlık hücrelerindeki yıla göre (yılsız sütun önceki sütunun yılını alır). */
 function gecmisMatrisOku_(d, baslik) {
   var hb = -1;
-  for (var i = 0; i < Math.min(d.length, 8); i++) {
+  for (var i = 0; i < Math.min(d.length, 40); i++) {
     var n = d[i].filter(function (x) { return /20\d\d/.test(String(x)); }).length;
     if (n >= 2 && String(d[i][0] || '').trim() !== '' || n >= 3) { hb = i; }
     if (hb >= 0 && n >= 2 && d[i].some(function (x) { return /[A-Za-zÇĞİÖŞÜçğıöşü]{4}/.test(String(x).replace(/20\d\d/g, '')); })) { hb = i; break; }
@@ -3423,4 +3428,130 @@ function hasatDurumuKaydet_(g) {
   var deger = [[sezon, urun, tamam ? 'Tamamlandı' : 'Devam ediyor', Utilities.formatDate(new Date(), 'Europe/Istanbul', 'dd.MM.yyyy')]];
   if (satir > 0) sh.getRange(satir, 1, 1, 4).setValues(deger); else sh.appendRow(deger[0]);
   return { ok: true, mesaj: urun + (tamam ? ': hasat tamamlandı olarak işaretlendi.' : ': hasat devam ediyor olarak işaretlendi.') };
+}
+
+
+// ---------------------------------------------------------------------------
+// ÇİFTLİK RAPORLARI – TAM OKUMA: muhasebenin "Çiftlik Raporları" dosyasının Google E-Tablolar kopyası
+// (xlsx 22 MB olduğu için Drive bağlantısıyla tamamı okunamıyordu). En yeni E-Tablo kopyası kullanılır.
+// Okunan sayfalar: Çiftlikler Gider Raporu Detay (yıl × üretim yeri × hesap × ay), Besi-Düve Yem Tüketimi
+// (hayvan bazlı ham kayıt → yıl × ay × üretim yeri × malzeme × cins toplamı), Duran Varlık Yem Tüketimi,
+// Tarımsal Alan Tüketim Raporu. Sonuç, kaynak değişene kadar "Uygulama Verileri" klasöründe saklanır.
+// KVKK: personel hesapları (2. İşçi, 3. Memur) yalnızca grup toplamı olarak alınır (kıdem tazminatı gibi tek
+// kişiye ait olabilecek satırlar ayrıştırılmaz); kulak küpe no ve sipariş/parti no çıktıya yazılmaz.
+var CIFTLIK_RAPOR_KLASOR_ = '12WB0NVfd94hnMefdq8X7qOn4f75-xSwY';  // 06 – Çiftlikler Rapor 2026
+var UYGULAMA_VERI_KLASOR_ = '1p5jLVOBAOZP0RdOMm7qN4zQOpLQKllp-';
+var CR_AYLAR_ = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+
+function crAy_(v) { return CR_AYLAR_.indexOf(String(v || '').trim().toLocaleUpperCase('tr')) + 1; }
+function crSayi_(v) { if (typeof v === 'number') return v; var n = eskTrSayi_(String(v || '').replace(/-\s*$/, '')); return n || 0; }
+
+function ciftlikRaporTabloBul_() {
+  var en = null;
+  function bak(it) {
+    while (it.hasNext()) {
+      var f = it.next();
+      if (f.getMimeType() !== MimeType.GOOGLE_SHEETS || !/Çiftlik Raporları/i.test(f.getName())) continue;
+      if (!en || f.getLastUpdated() > en.getLastUpdated()) en = f;
+    }
+  }
+  try { bak(DriveApp.getFolderById(CIFTLIK_RAPOR_KLASOR_).getFiles()); } catch (e) {}
+  if (!en) { try { bak(DriveApp.searchFiles("title contains 'Çiftlik Raporları' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false")); } catch (e) {} }
+  return en;
+}
+
+function ciftlikRaporTamHesapla_(dosya) {
+  var ss = SpreadsheetApp.open(dosya), o = { dosya: dosya.getName(), sayfalar: [], gider: [], yem: [], duranVarlik: [], tarim: [], hatalar: [] };
+  ss.getSheets().forEach(function (s) { o.sayfalar.push({ ad: s.getName(), satir: s.getLastRow(), sutun: s.getLastColumn() }); });
+  function topla(m, k, v) { m[k] = (m[k] || 0) + v; }
+
+  // 1) Gider raporu detay
+  try {
+    var sh = ss.getSheetByName('Çiftlikler Gider Raporu Detay'), d = sh.getDataRange().getValues(), h = d[0].map(String);
+    var c = { yil: h.indexOf('Yıl'), uy: h.indexOf('Üretim Yeri'), kod: h.indexOf('Hesap Kodu'), grup: h.indexOf('Grup'), ack: h.indexOf('Hesap Açıklaması') };
+    var aySut = [];
+    h.forEach(function (x, j) { var a = crAy_(x); if (a) aySut.push([j, a]); });
+    var g = {};
+    for (var i = 1; i < d.length; i++) {
+      var r = d[i], yil = Number(r[c.yil]), uy = String(r[c.uy]).trim(), grup = String(r[c.grup]).trim();
+      if (!yil || !uy || !grup) continue;
+      var personel = /^\s*[23]\./.test(grup);
+      var hesap = personel ? '' : String(r[c.kod]).trim() + ' ' + String(r[c.ack]).trim();
+      aySut.forEach(function (p) {
+        var v = crSayi_(r[p[0]]);
+        if (v) topla(g, [yil, p[1], uy, grup, hesap].join('|'), v);
+      });
+    }
+    o.gider = Object.keys(g).map(function (k) { var a = k.split('|'); return [+a[0], +a[1], a[2], a[3], a[4], Math.round(g[k] * 100) / 100]; });
+  } catch (e) { o.hatalar.push('Gider raporu: ' + e); }
+
+  // 2) Besi-düve yem tüketimi (hayvan bazlı ham kayıt; parça parça okunur)
+  try {
+    var sb = ss.getSheetByName('Besi-Düve Yem Tüketimi'), son = sb.getLastRow(), hb = sb.getRange(1, 1, 1, sb.getLastColumn()).getValues()[0].map(String);
+    function s(ad) { return hb.findIndex(function (x) { return x.trim() === ad; }); }
+    var cb = { yil: s('Yıl'), ay: s('Ay'), uy: s('Üretim yeri'), mal: s('Malzeme kısa metni'), mik: s('Toplam tüketim'), tut: s('Tutar'), cins: s('Canlı hayvan Cins') };
+    var son_sut = Math.max(cb.yil, cb.ay, cb.uy, cb.mal, cb.mik, cb.tut, cb.cins) + 1, y = {};
+    for (var bas = 2; bas <= son; bas += 40000) {
+      var n = Math.min(40000, son - bas + 1), v = sb.getRange(bas, 1, n, son_sut).getValues();
+      for (var j = 0; j < v.length; j++) {
+        var r2 = v[j], yil2 = Number(r2[cb.yil]), ay2 = crAy_(r2[cb.ay]);
+        if (!yil2 || !ay2) continue;
+        var k = [yil2, ay2, String(r2[cb.uy]).trim(), String(r2[cb.mal]).trim(), String(r2[cb.cins] || '').trim()].join('|');
+        var x = y[k] || (y[k] = [0, 0]);
+        x[0] += crSayi_(r2[cb.mik]); x[1] += crSayi_(r2[cb.tut]);
+      }
+    }
+    o.yem = Object.keys(y).map(function (k) { var a = k.split('|'); return [+a[0], +a[1], a[2], a[3], a[4], Math.round(y[k][0] * 100) / 100, Math.round(y[k][1] * 100) / 100]; });
+  } catch (e) { o.hatalar.push('Besi-düve yem tüketimi: ' + e); }
+
+  // 3) Duran varlık (sağmal) yem tüketimi ve 4) tarımsal alan tüketimi
+  function tuketim(ad, uyVar) {
+    var sh2 = ss.getSheetByName(ad);
+    if (!sh2) return [];
+    var d2 = sh2.getDataRange().getValues(), h2 = d2[0].map(function (x) { return String(x).trim(); }), m = {};
+    var c2 = { yil: h2.indexOf('Yıl'), ay: h2.indexOf('Aylar'), uy: h2.indexOf('Üretim yeri'), mal: h2.indexOf('Malzeme kısa metni'),
+      mik: h2.indexOf('Miktar'), bir: h2.indexOf('Giriş ölçü birimi'), tut: h2.indexOf('Tutar') };
+    for (var i2 = 1; i2 < d2.length; i2++) {
+      var r3 = d2[i2], yil3 = Number(r3[c2.yil]), ay3 = crAy_(r3[c2.ay]);
+      if (!yil3 || !ay3) continue;
+      var k3 = [yil3, ay3, uyVar ? String(r3[c2.uy]).trim() : '1611', String(r3[c2.mal]).trim(), String(r3[c2.bir]).trim()].join('|');
+      var x3 = m[k3] || (m[k3] = [0, 0]);
+      x3[0] += crSayi_(r3[c2.mik]); x3[1] += crSayi_(r3[c2.tut]);
+    }
+    return Object.keys(m).map(function (k) { var a = k.split('|'); return [+a[0], +a[1], a[2], a[3], a[4], Math.round(m[k][0] * 100) / 100, Math.round(m[k][1] * 100) / 100]; });
+  }
+  try { o.duranVarlik = tuketim('Duran Varlık Yem Tüketimi', true); } catch (e) { o.hatalar.push('Duran varlık yem: ' + e); }
+  try { o.tarim = tuketim('Tarımsal Alan Tüketim Raporu', false); } catch (e) { o.hatalar.push('Tarımsal alan tüketimi: ' + e); }
+  return o;
+}
+
+/** Kaynak değişmedikçe kayıtlı sonucu döndürür; değiştiyse yeniden hesaplar ve kaydeder. */
+function ciftlikRaporTam_(zorla) {
+  var kaynak = ciftlikRaporTabloBul_();
+  if (!kaynak) return null;
+  var imza = kaynak.getId() + '@' + kaynak.getLastUpdated().getTime(), ad = 'ciftlik_rapor_tam.json', cache = CacheService.getScriptCache();
+  var k = 'crTam_' + imza, m = zorla ? null : parcaliOku_(cache, k);
+  if (m) { try { return JSON.parse(m); } catch (e) {} }
+  var klasor = DriveApp.getFolderById(UYGULAMA_VERI_KLASOR_), it = klasor.getFilesByName(ad), f = it.hasNext() ? it.next() : null;
+  if (f && !zorla) {
+    try {
+      var kayit = JSON.parse(f.getBlob().getDataAsString('UTF-8'));
+      if (kayit.imza === imza) { parcaliYaz_(cache, k, JSON.stringify(kayit)); return kayit; }
+    } catch (e) {}
+  }
+  var o = ciftlikRaporTamHesapla_(kaynak);
+  o.imza = imza;
+  o.guncelleme = Utilities.formatDate(kaynak.getLastUpdated(), 'Europe/Istanbul', "yyyy-MM-dd'T'HH:mm:ss");
+  var metin = JSON.stringify(o);
+  if (f) f.setContent(metin); else klasor.createFile(ad, metin, 'application/json');
+  parcaliYaz_(cache, k, metin);
+  return o;
+}
+
+/** Düzenleyiciden bir kez çalıştırın: Çiftlik Raporları E-Tablosunun tamamını okuyup kaydeder. */
+function ciftlikRaporHazirla() {
+  var o = ciftlikRaporTam_(true);
+  Logger.log(o ? (o.dosya + ': ' + o.sayfalar.length + ' sayfa, gider ' + o.gider.length + ', besi-düve yem ' + o.yem.length +
+    ', duran varlık ' + o.duranVarlik.length + ', tarım ' + o.tarim.length + ' satır; hata: ' + (o.hatalar.join(' | ') || 'yok'))
+    : 'Çiftlik Raporları E-Tablosu bulunamadı.');
 }

@@ -20,6 +20,7 @@ import 'esk_kaynak.dart';
 import 'arac_masraf.dart';
 import 'gecmis_ozet.dart';
 import 'hasat_durumu.dart';
+import 'ciftlik_rapor_tam.dart';
 
 export 'arac.dart';
 export 'bakim_onarim.dart';
@@ -1157,6 +1158,7 @@ class RaporVerisi {
     this.eskEk = const EskEk(),
     this.gecmisOzet = const GecmisOzet(),
     this.hasatDurumu = const [],
+    this.ciftlikRaporTam = const CiftlikRaporTam(),
     this.aracMasraf = const AracMasraflari(),
     this.vetBildirimleri = const [],
     this.olusturma,
@@ -1255,6 +1257,9 @@ class RaporVerisi {
   /// Hasadı tamamlanan ürünler (sezon × ürün).
   final List<HasatKaydi> hasatDurumu;
 
+  /// Çiftlik Raporları E-Tablo kopyasının tamamından gelen gider ve tüketim ayrıntıları.
+  final CiftlikRaporTam ciftlikRaporTam;
+
   /// Araç masrafları (muhasebe listesi; araç adı × ay × iş alanı).
   final AracMasraflari aracMasraf;
   final List<VetBildirim> vetBildirimleri;
@@ -1283,6 +1288,7 @@ class RaporVerisi {
       eskEk: EskEk.json(j['eskEk']),
       gecmisOzet: GecmisOzet.json(j['gecmisOzet']),
       hasatDurumu: HasatKaydi.liste(j['hasatDurumu']),
+      ciftlikRaporTam: CiftlikRaporTam.json(j['ciftlikRaporTam']),
       aracMasraf: AracMasraflari.json(j['aracMasraf']),
       gelenDosyalar: (j['gelenDosyalar'] is List ? j['gelenDosyalar'] as List : const [])
           .map(GelenDosya.oku)

@@ -10,6 +10,7 @@ import '../veri/ciftlik_soru.dart';
 import '../veri/maliyet_analiz.dart';
 import '../veri/senaryo.dart';
 import 'bilesenler.dart';
+import 'ciftlik_rapor_tam.dart';
 import 'gonder.dart';
 
 /// Çiftlik Sonuçları: her yıl ayrı bir bölümdür (Tarla Haritası sezonları gibi).
@@ -121,6 +122,8 @@ class _Yil2026 extends StatelessWidget {
         ('Tarım', _Tarim(r: r)),
         ('Maliyet Takip', _MaliyetTakip(r: r)),
         ('Piyasa Senaryosu', _PiyasaSenaryosu(r: r, sabitYil: 2026)),
+        ('Gider Raporu', const CrGiderSekmesi()),
+        ('Yem ve Tüketim', const CrTuketimSekmesi()),
         ('Kapsam', _Kapsam(r: r)),
       ]);
 }
@@ -853,16 +856,18 @@ class _Kapsam extends StatelessWidget {
           _Nedenler([
             (
               'Kaynak',
-              '“2026 Yılı Çiftlik Raporları (7)” dosyası (yaklaşık 22 MB). Dosyanın metin çıktısının ilk bölümü okunmuştur: Çiftlikler Konsolide, '
-                  '1604 Taşağıl, 1605 Aslım, 1611 Tarımsal Alan, 1613 Şekersüt, 1614 Pan-Gev gelir tabloları; satış özeti; satılan mamul maliyeti '
-                  'detayı. Besi-düve yem tüketimi sayfasından sonraki sayfalar okunamamıştır.'
+              '“2026 Yılı Çiftlik Raporları (7)” dosyasının Google E-Tablolar kopyası; 28 sayfanın tamamı okunur. Kâr / Zarar, Süt, Et, '
+                  'Tarım ve Piyasa Senaryosu sekmeleri gelir tablolarına (Çiftlikler Konsolide, 1604–1614 sayfaları), satış özetine ve satılan '
+                  'mamul maliyeti detayına; Gider Raporu sekmesi Çiftlikler Gider Raporu Detay sayfasına; Yem ve Tüketim sekmesi besi-düve, '
+                  'duran varlık (sağmal) yem tüketimi ve tarımsal alan tüketim sayfalarına dayanır. Muhasebe yeni xlsx gönderdiğinde '
+                  'Drive\'da Dosya › Google E-Tablolar olarak kaydet ile kopya alınıp aynı klasöre konur.'
             ),
             ('Dönem', '2026 verileri Ocak–Eylül dönemini kapsar; karşılaştırmalar 2025’in aynı dokuz ayıyla yapılmıştır.'),
             ('Süt', 'Şekersüt ve Pan-Gev gelir tablosu dosyasında Ağustos 2025’ten itibaren yer aldığından süt birim maliyeti 2025 Ağustos–Aralık ortalamasıyla karşılaştırılmıştır. Daha eski aylar için Maliyet Takip sekmesine bakılabilir.'),
             ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyasındaki özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları; İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme ayrıntısı olduğundan özet tablolar üzerinden kullanılmıştır. Formül hatalı hücreler hesaba katılmamıştır.'),
             ('İki senaryo', 'Çiftlik sayfaları (ör. “1605 - Aslım”) grup içi ürünlerin maliyet bedeliyle aktarıldığı fiili durumu; “2” uzantılı sayfalar (ör. “1605 - Aslım 2”) aynı ürünler dışarı satılsaydı piyasa satış fiyatıyla, dışarıdan alınsaydı piyasa alış fiyatıyla hesaplanan durumu gösterir. Kâr / Zarar, Süt, Et ve Tarım sekmeleri birinci senaryoya; Piyasa Senaryosu sekmesi ikisinin karşılaştırmasına dayanır. “Çiftlikler Konsolide (2)” sayfası Taşağıl’ı (ESK) içermez.'),
             ('Çiftliklerimiz (ESK hariç)', 'Konsolide toplamdan 1604 Taşağıl (ESK besi hizmeti) çıkarılarak hesaplanmıştır.'),
-            ('KVKK', 'Rapor yalnızca çiftlik bazında toplam tutar ve birim maliyet içerir; kişi adı, personel, ücret ayrıntısı, alıcı adı ve küpe numarası yoktur.'),
+            ('KVKK', 'Rapor yalnızca çiftlik bazında toplam tutar ve birim maliyet içerir; kişi adı, alıcı adı ve küpe numarası yoktur. Personel giderleri yalnızca grup toplamı olarak gösterilir (kıdem tazminatı gibi tek kişiye ait olabilecek kalemler ayrıştırılmaz).'),
             ('Güncelleme', 'Dosyanın yeni sürümü geldiğinde veri araclar/ciftlik_rapor/uret.py ile yeniden üretilir.'),
           ], baslik: 'Kapsam ve notlar'),
         ],
