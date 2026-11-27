@@ -867,7 +867,7 @@ class _Kapsam extends StatelessWidget {
             ),
             ('Dönem', '2026 verileri muhasebenin kapattığı son aya kadar olan dönemi kapsar (dönem başlıkta yazar); karşılaştırmalar 2025’in aynı aylarıyla yapılır.'),
             ('Süt', 'Şekersüt ve Pan-Gev gelir tablosu dosyasında Ağustos 2025’ten itibaren yer aldığından süt birim maliyeti 2025 Ağustos–Aralık ortalamasıyla karşılaştırılmıştır. Daha eski aylar için Maliyet Takip sekmesine bakılabilir.'),
-            ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyasındaki özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları; İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme bazında, tamamı okunur (İlaç ve Malzeme sekmesi). Sayfalardaki açıklama notları da gösterilir. Formül hatalı hücreler hesaba katılmaz ve Veri Kalitesi\'nde listelenir.'),
+            ('Maliyet Takip', '“ÇİFTLİKLER : MALİYET TAKİP 2026” dosyası sunucuda otomatik okunur (dosya değiştiğinde yeniden): özet, süt, karkas, canlı maliyet, tarım ve yem sayfaları (yem sayfasında bütün malzemeler ve 12 ay); İLAÇ AŞI ve DİĞER MALZEMELER sayfaları malzeme bazında, tamamı okunur (İlaç ve Malzeme sekmesi). Sayfalardaki açıklama notları da gösterilir. Formül hatalı hücreler hesaba katılmaz ve Veri Kalitesi\'nde listelenir.'),
             ('İki senaryo', 'Çiftlik sayfaları (ör. “1605 - Aslım”) grup içi ürünlerin maliyet bedeliyle aktarıldığı fiili durumu; “2” uzantılı sayfalar (ör. “1605 - Aslım 2”) aynı ürünler dışarı satılsaydı piyasa satış fiyatıyla, dışarıdan alınsaydı piyasa alış fiyatıyla hesaplanan durumu gösterir. Kâr / Zarar, Süt, Et ve Tarım sekmeleri birinci senaryoya; Piyasa Senaryosu sekmesi ikisinin karşılaştırmasına dayanır. “Çiftlikler Konsolide (2)” sayfası Taşağıl’ı (ESK) içermez.'),
             ('Çiftliklerimiz (ESK hariç)', 'Konsolide toplamdan 1604 Taşağıl (ESK besi hizmeti) çıkarılarak hesaplanmıştır.'),
             ('KVKK', 'Rapor yalnızca çiftlik bazında toplam tutar ve birim maliyet içerir; kişi adı, alıcı adı ve küpe numarası yoktur. Personel giderleri yalnızca grup toplamı olarak gösterilir (kıdem tazminatı gibi tek kişiye ait olabilecek kalemler ayrıştırılmaz).'),
@@ -1266,7 +1266,7 @@ class _MaliyetTakip extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text.rich(TextSpan(children: [
-                  TextSpan(text: '$g (9 ay ${mn(m.yemGenel[g] ?? 0)}): ', style: const TextStyle(fontWeight: FontWeight.w700)),
+                  TextSpan(text: '$g (dönem ${mn(m.yemGenel[g] ?? 0)}): ', style: const TextStyle(fontWeight: FontWeight.w700)),
                   TextSpan(text: yemFiyatDegisimleri(m, g).join('; ')),
                 ]), style: const TextStyle(fontSize: 13, height: 1.4)),
               ),

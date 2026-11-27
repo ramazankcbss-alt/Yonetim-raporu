@@ -45,7 +45,7 @@ List<String> yemFiyatDegisimleri(MaliyetTakip m, String grup, {int adet = 4}) {
     final a = m.yemAylar(grup, malzeme);
     if (a.length < 2) continue;
     final f = (a.last.fiyat! / a.first.fiyat! - 1) * 100;
-    out.add('${_yemAdi(malzeme)}: ${sayi(a.first.fiyat, ondalik: 2)} → ${sayi(a.last.fiyat, ondalik: 2)} ₺/kg (${yuzde(f)}), 9 ay ${mn(tutar)}');
+    out.add('${_yemAdi(malzeme)}: ${sayi(a.first.fiyat, ondalik: 2)} → ${sayi(a.last.fiyat, ondalik: 2)} ₺/kg (${yuzde(f)}), dönem ${mn(tutar)}');
   }
   return out;
 }

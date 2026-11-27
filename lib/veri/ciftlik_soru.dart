@@ -232,7 +232,7 @@ List<Bulgu> maliyetTakipBulgulari(CiftlikRaporu r) {
   }
   for (final (g, mz, q) in m.yemToplamsiz) {
     l.add(Bulgu(BulguTuru.tutarsizlik, '$k – $g yem toplamı eksik',
-        '$mz için 9 ayda ${sayi(q)} kg tüketim girilmiş ancak tutarı TOPLAM sütununa alınmamış; yem gideri olduğundan düşük görünür.',
+        '$mz için dönem boyunca ${sayi(q)} kg tüketim girilmiş ancak tutarı TOPLAM sütununa alınmamış; yem gideri olduğundan düşük görünür.',
         {g.split(' ').first, 'yem', 'süt'}));
   }
 
@@ -786,7 +786,7 @@ List<String> _mtYem(MaliyetTakip m, _Soru q) {
   for (final g in m.yemGruplari) {
     if (q.ciftlikler.isNotEmpty && !q.ciftlikler.any((c) => g.startsWith(c))) continue;
     final y = yemFiyatDegisimleri(m, g);
-    if (y.isNotEmpty) l.add('$g (9 ay yem ${mn(m.yemGenel[g] ?? 0)}): ${y.join('; ')}.');
+    if (y.isNotEmpty) l.add('$g (dönem yem ${mn(m.yemGenel[g] ?? 0)}): ${y.join('; ')}.');
   }
   return l;
 }

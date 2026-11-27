@@ -221,7 +221,7 @@ function veriTopla_(gun) {
     surum: 1,
     olusturma: Utilities.formatDate(new Date(), tz, "yyyy-MM-dd'T'HH:mm:ss"),
     // Uygulama veri dosyaları (çiftlik raporu, maliyet takip, hastalık arşivi, tarla haritası)
-    dosyalar: uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'hastalik', 'uygulamalar'].concat(TARLA_DOSYALARI_)),
+    dosyalar: (function () { try { maliyetTakipGuncelle_(); } catch (e) {} return uygulamaDosyalari_(['ciftlik_rapor_2026', 'maliyet_takip_2026', 'hastalik', 'uygulamalar'].concat(TARLA_DOSYALARI_)); })(),
     // Tarih, İşletme, Personel, Taşeron, Hayvan, Sağılan, Süt, Doğan Buzağı,
     // İnek/Düve Kesim-Satış, Buzağı Ölümü, Kesilen Dana, İnek Ölüm,
     // Genç Kesim/Satış, Genç Ölüm, Yavru Atma/Ölü Doğum, Ölen Dana,
@@ -3813,7 +3813,7 @@ function kvkkHucre_(x) {
 /** Piramitte hangi sayfanın nerede kullanıldığı: [dosya kimliği | /dosya adı deseni/, /sayfa deseni/, yer]. */
 function kaynakKullanim_() {
   return [
-    [MALIYET_TAKIP_ID_, /^(MALİYET ÖZET HAYVANCILIK|MALİYET ÖZET TARIM 2026|YEM|SÜT MALİYETİ|KARKAS MALİYETİ|KAYAR ORTALAMA|ÖZET)$/, 'Çiftlik Sonuçları › maliyet (dönüştürücü)'],
+    [MALIYET_TAKIP_ID_, /^(MALİYET ÖZET HAYVANCILIK|MALİYET ÖZET TARIM 2026|YEM|SÜT MALİYETİ|KARKAS MALİYETİ|KAYAR ORTALAMA|ÖZET)$/, 'Çiftlik Sonuçları › maliyet (sunucuda, otomatik)'],
     [MALIYET_TAKIP_ID_, /^(İLAÇ AŞI|DİĞER MALZEMELER)$/, 'Çiftlik Sonuçları › İlaç ve Malzeme'],
     [GECMIS_OZET_.degerlendirme, /./, 'Geçmiş Yıllar › Kaynak tabloları'],
     [GECMIS_OZET_.kesim, /^(ALIM ÖZET|Sayfa6|Sayfa7|GENEL MALİYETLER)$/, 'Geçmiş Yıllar › Kaynak tabloları'],
@@ -3983,6 +3983,8 @@ function kaynakEnvanterDosyasi_() {
 /** Bütün kaynakları inceler. 5 dakikayı aşarsa kaldığı yerden devam etmek için kendini 1 dakika sonraya kurar.
  *  Değişmeyen dosyalar (aynı güncelleme zamanı) yeniden okunmaz. Günlük otomatik çalışma da kurulur. */
 function kaynakEnvanteriHazirla() {
+  try { maliyetTakipGuncelle_(); } catch (e) { Logger.log('Maliyet Takip güncellenemedi: ' + e); }
+  try { ciftlikRaporTam_(false); } catch (e) { Logger.log('Çiftlik Raporları güncellenemedi: ' + e); }
   var bas = Date.now(), f = kaynakEnvanterDosyasi_(), eski = {};
   try { if (f) (JSON.parse(f.getBlob().getDataAsString()).kaynaklar || []).forEach(function (k) { (k.dosyalar || []).forEach(function (x) { eski[x.id] = x; }); }); } catch (e) {}
   var pr = PropertiesService.getScriptProperties(), yarim = {};
@@ -4478,4 +4480,181 @@ function kaynakTablolari_() {
   });
   parcaliYaz_(c, 'kaynakTablolari_v1', JSON.stringify(o));
   return o;
+}
+
+
+// ---------------------------------------------------------------------------
+// MALİYET TAKİP – sunucuda canlı ve tam okuma (maliyet_takip_2026.json). Daha önce xlsx dışa aktarımından
+// çevrimdışı üretiliyordu (araclar/ciftlik_rapor/maliyet_takip.py). Fark: yem sayfasında yalnızca ana yemler ve
+// 9 ay değil, bütün malzemeler ve 12 ay okunur. KVKK: yalnızca çiftlik / kalem toplamları; kişi, belge no yok.
+var MT_AYLAR_UST_ = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+function mtUst_(x) { return String(x == null ? '' : x).toLocaleUpperCase('tr'); }
+function mtDeger_(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return v;
+  if (Object.prototype.toString.call(v) === '[object Date]') return null;
+  var s = String(v).trim();
+  if (s.charAt(0) === '#') return 'HATA';
+  var x = Number(s.replace(/\./g, '').replace(',', '.'));
+  return isNaN(x) || s === '' ? null : x;
+}
+function mtSayiMi_(v) { return typeof v === 'number' && !isNaN(v); }
+function mtHucre_(r, j) { return r && j < r.length ? r[j] : null; }
+
+function maliyetTakipUretCekirdek_(oku) {
+  var hatalar = {}, H = function (k) { hatalar[k] = (hatalar[k] || 0) + 1; };
+  // 1) Hayvancılık
+  var s = oku('MALİYET ÖZET HAYVANCILIK') || [], hay = [];
+  var bloklar = [[3, 'Aslım'], [20, 'Taşağıl'], [44, 'Şekersüt'], [61, 'Pan-Gev']], kalemler = [[1, 'yem'], [2, 'iscilik'], [3, 'amortisman'], [4, 'diger'], [5, 'toplam'], [7, 'hayvan']];
+  bloklar.forEach(function (b) {
+    [[2025, 2], [2026, 17]].forEach(function (yk) {
+      for (var ay = 0; ay < 12; ay++) {
+        var k = { ciftlik: b[1], yil: yk[0], ay: ay + 1 }, bos = true;
+        kalemler.forEach(function (kl) {
+          var v = mtDeger_(mtHucre_(s[b[0] - 1 + kl[0]], yk[1] + ay));
+          if (v === 'HATA') { H(['MALİYET ÖZET HAYVANCILIK', b[1], yk[0]].join('|')); v = null; }
+          if (v !== null && v !== 0) bos = false;
+          k[kl[1]] = v;
+        });
+        if (!bos) hay.push(k);
+      }
+    });
+  });
+  var kopya = 0;
+  if (s[78] && s[61]) for (var j = 2; j < 14; j++) { var a = mtDeger_(s[78][j]), bb = mtDeger_(s[61][j]); if (mtSayiMi_(a) && a === bb) kopya++; }
+  // 2) Tarım
+  var t = oku('MALİYET ÖZET TARIM 2026') || [], donem = [], ortak = [], ekilis = [];
+  for (var c = 2; c < 19; c++) {
+    var h = mtHucre_(t[2], c);
+    donem.push(Object.prototype.toString.call(h) === '[object Date]' ? [h.getFullYear(), h.getMonth() + 1] : null);
+  }
+  donem.forEach(function (ya, i) {
+    if (!ya) return;
+    var k = { yil: ya[0], ay: ya[1] };
+    [[3, 'iscilik'], [4, 'amortisman'], [5, 'diger']].forEach(function (x) { var v = mtDeger_(mtHucre_(t[x[0]], 2 + i)); k[x[1]] = v === 'HATA' ? null : v; });
+    if (k.iscilik || k.amortisman || k.diger) ortak.push(k);
+  });
+  var URUN = { 'YONCA': 'Yonca', 'ARPA': 'Arpa', 'BUĞDAY': 'Buğday', 'TRİTİKALE': 'Tritikale', 'PANCAR': 'Şeker pancarı', 'MISIR SİLAJI': 'Mısır silajı', 'PATATES': 'Patates' };
+  var CF = { 'ASLIM': 'Aslım', 'ŞEKERSÜT': 'Şekersüt', 'TAŞAĞIL': 'Taşağıl' }, cf = null;
+  for (var r = 9; r < t.length; r++) {
+    var row = t[r];
+    if (row[0]) { var u0 = mtUst_(row[0]).replace(' EKİLİŞ', '').trim(); cf = CF[u0] || (u0.charAt(0) + u0.slice(1).toLocaleLowerCase('tr')); }
+    if (!row[1] || mtUst_(row[1]).trim() === 'TOPLAM' || cf === null) continue;
+    var ad = String(row[1]).trim(), p = ad.indexOf('('), urun = (p >= 0 ? ad.slice(0, p) : ad).trim(), alan = p >= 0 ? ad.slice(p + 1) : '';
+    var dek = mtDeger_(alan.replace('dekar', '').replace(')', '').trim()), aylik = {}, top = 0;
+    donem.forEach(function (ya, i) {
+      if (!ya) return;
+      var v = mtDeger_(row[2 + i]);
+      if (v === 'HATA') { H(['MALİYET ÖZET TARIM 2026', cf, urun].join('|')); return; }
+      if (v) { aylik[ya[0] + '-' + ('0' + ya[1]).slice(-2)] = v; top += v; }
+    });
+    ekilis.push({ ciftlik: cf, urun: URUN[urun] || urun, dekar: mtSayiMi_(dek) ? dek : null, aylik: aylik, toplam: Math.round(top * 100) / 100 });
+  }
+  var yazili = t[6] ? mtDeger_(t[6][19]) : null;
+  // 3) Süt litre maliyeti
+  var su = oku('SÜT MALİYETİ') || [], sut = [], disari = [];
+  [['Şekersüt', 0], ['Pan-Gev', 7]].forEach(function (x) {
+    su.slice(5, 17).forEach(function (row) {
+      var ay = MT_AYLAR_UST_.indexOf(mtUst_(row[x[1]]).trim()) + 1;
+      if (!ay) return;
+      [2024, 2025, 2026].forEach(function (yil, jj) {
+        var v = mtDeger_(row[x[1] + 1 + jj]);
+        if (mtSayiMi_(v)) { var sa = yil === 2026 ? mtDeger_(row[x[1] + 4]) : null; sut.push({ ciftlik: x[0], yil: yil, ay: ay, maliyet: v, satis: mtSayiMi_(sa) ? sa : null }); }
+      });
+    });
+  });
+  su.forEach(function (row, i) { row.forEach(function (v, jj) { if (jj >= 13 && v !== null && v !== '') disari.push(sutunHarf_(jj + 1) + (i + 1)); }); });
+  // 4) Karkas
+  var ka = oku('KARKAS MALİYETİ') || [], karkas = [];
+  var tanim = [['Aslım', 'Besi', 0, 1, 2], ['Şekersüt', 'Dişi', 4, 5, null], ['Şekersüt', 'Besi', 4, 6, 7], ['Pan-Gev', 'Dişi', 8, 9, null]];
+  ka.slice(5, 17).forEach(function (row) {
+    tanim.forEach(function (x) {
+      var ay = MT_AYLAR_UST_.indexOf(mtUst_(row[x[2]]).trim()) + 1;
+      if (!ay) return;
+      var v = mtHucre_(row, x[3]), not = x[4] !== null && row[x[4]] ? String(row[x[4]]).trim() : '', d = mtDeger_(v);
+      if (typeof v === 'string' && d === null) not = v.trim();
+      if (d === null && !not) return;
+      karkas.push({ ciftlik: x[0], tur: x[1], ay: ay, maliyet: mtSayiMi_(d) ? d : null, not_: not });
+    });
+  });
+  // 5) Canlı hayvan (kayar ortalama)
+  var kay = oku('KAYAR ORTALAMA') || [], canli = [];
+  var tc = [['Aslım', 0, ['Besi', 'Başlıksız sütun']], ['Şekersüt', 4, ['Erkek buzağı', 'Besi', 'Dişi buzağı', 'Dişi dana', 'Düve', 'İnek']],
+    ['Pan-Gev', 12, ['Erkek buzağı', 'Dişi buzağı', 'Dişi dana', 'Düve', 'İnek']]];
+  kay.slice(6, 18).forEach(function (row) {
+    tc.forEach(function (x) {
+      var ay = MT_AYLAR_UST_.indexOf(mtUst_(row[x[1]]).trim()) + 1;
+      if (!ay) return;
+      x[2].forEach(function (kat, jj) { var d = mtDeger_(mtHucre_(row, x[1] + 1 + jj)); if (mtSayiMi_(d)) canli.push({ ciftlik: x[0], kategori: kat, ay: ay, maliyet: d }); });
+    });
+  });
+  // 6) Yem: bütün malzemeler, 12 ay (ay başına miktar + tutar + birim fiyat sütunu)
+  var y = oku('YEM') || [], yem = [], toplamsiz = [], genel = [], grup = null;
+  var GR = { 'ASLIM': 'Aslım', 'ŞEKERSÜT BESİ': 'Şekersüt besi', 'ŞEKERSÜT ANAÇ': 'Şekersüt anaç' };
+  y.forEach(function (row) {
+    if (row[0]) {
+      var g0 = String(row[0]).trim();
+      grup = GR[g0] || g0;
+      if (g0.indexOf('PANGEV') === 0 && g0.indexOf('ANAÇ') >= 0) grup = 'Pan-Gev anaç'; else if (g0 === 'PANGEV') grup = 'Pan-Gev besi';
+    }
+    var ad = row[2];
+    if (grup === null || typeof ad !== 'string' || !ad.trim()) {
+      if (String(row[1]).trim() === 'Genel Toplam' && grup) genel.push({ grup: grup, tutar: mtDeger_(row[41]) || 0, miktar: mtDeger_(row[40]) || 0 });
+      return;
+    }
+    ad = ad.trim();
+    if (/^malzeme/i.test(ad)) return;
+    var aylik = [];
+    for (var ay = 0; ay < 12; ay++) {
+      if (5 + 3 * ay >= 40) break;  // 40. ve 41. sütunlar dönem toplamlarıdır
+      var q = mtDeger_(row[4 + 3 * ay]), tt = mtDeger_(row[5 + 3 * ay]);
+      if (mtSayiMi_(q) && q) aylik.push([ay + 1, q, mtSayiMi_(tt) ? tt : null]);
+    }
+    if (!aylik.length) return;
+    var tp = mtDeger_(row[41]);
+    if (tp === null || tp === 'HATA') toplamsiz.push({ grup: grup, malzeme: ad, miktar: Math.round(aylik.reduce(function (s0, a) { return s0 + a[1]; }, 0) * 10) / 10 });
+    aylik.forEach(function (a) { yem.push({ grup: grup, malzeme: ad, ay: a[0], miktar: Math.round(a[1] * 100) / 100, tutar: a[2] ? Math.round(a[2] * 100) / 100 : null }); });
+  });
+  // 7) Özet sayfası hata sayısı
+  var oz = oku('ÖZET') || [], ozRef = 0;
+  oz.forEach(function (row) { row.forEach(function (v) { if (typeof v === 'string' && /^#REF/.test(v.trim())) ozRef++; }); });
+  function ayni(c) {
+    var a = hay.filter(function (h) { return h.ciftlik === c && h.ay === 1; });
+    return a.length === 2 && ['yem', 'iscilik', 'amortisman', 'diger', 'toplam', 'hayvan'].every(function (k) { return a[0][k] === a[1][k]; });
+  }
+  return {
+    kaynak: 'ÇİFTLİKLER : MALİYET TAKİP 2026', uretim: 'sunucu (canlı, tam okuma)',
+    hayvancilik: hay, tarim_ortak: ortak, tarim_ekilis: ekilis, sut_litre: sut, karkas: karkas, canli: canli, yem: yem, yem_genel: genel,
+    kontrol: {
+      ref_hatalari: Object.keys(hatalar).sort().map(function (k) { var p = k.split('|'); return { sayfa: p[0], bolum: p[1], yil: String(p[2]), adet: hatalar[k] }; }),
+      ozet_ref: ozRef, toplam_2025_pangev_kopya: kopya, tasagil_2026_ocak_2025_kopya: ayni('Taşağıl'), sut_tablo_disi_hucre: disari,
+      yem_toplama_alinmayan: toplamsiz, tarim_ortak_toplam_yazili: mtSayiMi_(yazili) ? yazili : null
+    }
+  };
+}
+
+function maliyetTakipUret_() {
+  var ss = SpreadsheetApp.openById(MALIYET_TAKIP_ID_);
+  var o = maliyetTakipUretCekirdek_(function (ad) { var sh = ss.getSheetByName(ad); return sh ? sh.getDataRange().getValues() : null; });
+  if (!o.hayvancilik.length) return { hata: 'Maliyet Takip hayvancılık tablosu okunamadı; mevcut dosya korunuyor.' };
+  o.kaynakGuncelleme = Utilities.formatDate(DriveApp.getFileById(MALIYET_TAKIP_ID_).getLastUpdated(), 'Europe/Istanbul', 'dd.MM.yyyy HH:mm');
+  DriveApp.getFileById(UYGULAMA_DOSYALARI_.maliyet_takip_2026).setContent(JSON.stringify(o));
+  try { CacheService.getScriptCache().remove('dosya_maliyet_takip_2026_' + UYGULAMA_DOSYALARI_.maliyet_takip_2026 + '_n'); } catch (e) {}
+  return { hayvancilik: o.hayvancilik.length, ekilis: o.tarim_ekilis.length, sut: o.sut_litre.length, karkas: o.karkas.length, canli: o.canli.length, yem: o.yem.length };
+}
+
+/** Maliyet Takip dosyası değiştiyse yeniden üretir (veri toplanırken ve günlük çalışmada çağrılır). */
+function maliyetTakipGuncelle_() {
+  var pr = PropertiesService.getScriptProperties(), imza = String(DriveApp.getFileById(MALIYET_TAKIP_ID_).getLastUpdated().getTime());
+  if (pr.getProperty('mtUretim') === imza) return { durum: 'güncel' };
+  var r = maliyetTakipUret_();
+  if (!r.hata) pr.setProperty('mtUretim', imza);
+  return r;
+}
+
+/** Elle çalıştırma: Maliyet Takip verisini hemen yeniden üretir ve sonucu günlüğe yazar. */
+function maliyetTakipHazirla() {
+  var r = maliyetTakipUret_();
+  if (!r.hata) PropertiesService.getScriptProperties().setProperty('mtUretim', String(DriveApp.getFileById(MALIYET_TAKIP_ID_).getLastUpdated().getTime()));
+  Logger.log('Maliyet Takip: ' + JSON.stringify(r));
 }

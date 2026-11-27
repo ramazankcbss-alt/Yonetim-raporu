@@ -186,7 +186,7 @@ class MaliyetTakip {
 
   List<String> get yemGruplari => [for (final g in yemGenel.keys) g];
 
-  /// Grupta tutarı en yüksek ana yem kalemleri (9 ay).
+  /// Grupta tutarı en yüksek yem kalemleri (dönem).
   List<(String, double)> anaYemler(String grup) {
     final m = <String, double>{};
     for (final y in yem) {
