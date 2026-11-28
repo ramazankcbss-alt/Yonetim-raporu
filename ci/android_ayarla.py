@@ -187,10 +187,10 @@ if os.path.exists(kok_g):
         k = (k[:i] + blok + k[i:]) if i >= 0 else (k.rstrip() + "\n\n" + blok)
         yaz(kok_g, k)
 
-# --- Uygulama simgesi (assets/simge/android › res/mipmap-*) ----------------
+# --- Uygulama simgesi (assets/simge/mipmap › res/mipmap-*) ----------------
 import shutil
 
-SIMGE = os.path.join(KOK, "assets", "simge", "android")
+SIMGE = os.path.join(KOK, "assets", "simge", "mipmap")
 if os.path.isdir(SIMGE):
     for klasor in os.listdir(SIMGE):
         hedef = os.path.join(APP, "src", "main", "res", klasor)
